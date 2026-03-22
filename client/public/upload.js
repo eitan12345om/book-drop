@@ -1,0 +1,279 @@
+const ACCEPTED_EXTENSIONS = ['.epub', '.mobi', '.pdf', '.txt', '.cbz', '.cbr'];
+const ACCEPT_ATTR = [
+  ...ACCEPTED_EXTENSIONS,
+  'application/epub+zip',
+  'application/epub',
+  'application/x-mobipocket-ebook',
+  'application/pdf',
+  'application/vnd.comicbook+zip',
+  'application/vnd.comicbook-rar',
+].join(',');
+
+// Don't restrict file type on iOS — it breaks the file picker
+const isIOS =
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const zoneEmpty = document.getElementById('zone-empty');
+const zoneSelected = document.getElementById('zone-selected');
+const zoneFileName = document.getElementById('zone-file-name');
+const zoneFileSize = document.getElementById('zone-file-size');
+const submitBtn = document.getElementById('submit-btn');
+const statusMsg = document.getElementById('status-msg');
+const progressWrap = document.getElementById('progress-wrap');
+const progressFill = document.getElementById('progress-fill');
+const pageUrlLink = document.getElementById('page-url');
+
+pageUrlLink.href = window.location.href;
+pageUrlLink.textContent = window.location.href;
+
+if (!isIOS) {
+  fileInput.accept = ACCEPT_ATTR;
+}
+
+const OPTIONS = [
+  {
+    id: 'kepubify',
+    name: 'kepubify',
+    label: 'Kobo format',
+    tag: 'Kobo · EPUB',
+    description:
+      "Converts EPUB to Kobo's .kepub format — enables better typography, font control, and page turns. Only runs when sending an EPUB to a Kobo.",
+    defaultChecked: true,
+  },
+  {
+    id: 'kindlegen',
+    name: 'kindlegen',
+    label: 'Kindle format',
+    tag: 'Kindle · EPUB',
+    description:
+      "Converts EPUB to MOBI so Kindle can open it — Kindle doesn't natively support EPUB. Only runs when sending an EPUB to a Kindle.",
+    defaultChecked: false,
+  },
+  {
+    id: 'pdfcropmargins',
+    name: 'pdfcropmargins',
+    label: 'Crop PDF margins',
+    tag: 'PDF only',
+    description:
+      'Trims white borders from PDF pages so text fills more of the small screen. Most useful for academic papers or scanned books with wide margins.',
+    defaultChecked: false,
+  },
+  {
+    id: 'transliteration',
+    name: 'transliteration',
+    label: 'Transliterate filename',
+    tag: 'Any file',
+    description:
+      "Replaces accented and non-Latin characters in the filename with ASCII equivalents (e.g. Ü→U, é→e). Helps older devices that can't handle Unicode filenames.",
+    defaultChecked: false,
+  },
+];
+
+const MUTUALLY_EXCLUSIVE = ['kepubify', 'kindlegen'];
+
+/** Renders the conversion option checkboxes into the options grid. */
+function buildOptionsGrid() {
+  const optionsGrid = document.getElementById('options-grid');
+  OPTIONS.forEach(({ id, name, label, tag, description, defaultChecked }) => {
+    const lbl = document.createElement('label');
+    lbl.className = 'option-item';
+    lbl.htmlFor = id;
+    lbl.innerHTML =
+      `<input type="checkbox" id="${id}" name="${name}"${defaultChecked ? ' checked' : ''}` +
+      ` aria-describedby="${id}-desc">` +
+      `<span>` +
+      `<span class="option-label-row">` +
+      `<span class="option-label">${label}</span>` +
+      `<span class="option-tag">${tag}</span>` +
+      `</span>` +
+      `<span class="option-desc" id="${id}-desc">${description}</span>` +
+      `</span>`;
+    optionsGrid.appendChild(lbl);
+  });
+}
+
+/** Wires mutual-exclusion behaviour so checking one format option unchecks the other. */
+function wireMutualExclusion() {
+  MUTUALLY_EXCLUSIVE.forEach((id) => {
+    document.getElementById(id).addEventListener('change', (e) => {
+      if (e.target.checked) {
+        MUTUALLY_EXCLUSIVE.forEach((otherId) => {
+          if (otherId !== id) {
+            document.getElementById(otherId).checked = false;
+          }
+        });
+      }
+    });
+  });
+}
+
+let selectedFile = null;
+
+/** Returns a human-readable file size string. */
+function formatSize(bytes) {
+  return bytes > 1024 * 1024
+    ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${Math.ceil(bytes / 1024)} KB`;
+}
+
+/** Updates UI to reflect the currently selected file, or clears it if file is null. */
+function setFile(file) {
+  selectedFile = file;
+  submitBtn.disabled = !file;
+  if (file) {
+    zoneEmpty.style.display = 'none';
+    zoneSelected.style.display = '';
+    zoneFileName.textContent = file.name;
+    zoneFileSize.textContent = formatSize(file.size);
+    dropZone.classList.add('has-file');
+    dropZone.setAttribute('aria-label', `Selected: ${file.name}`);
+  } else {
+    zoneEmpty.style.display = '';
+    zoneSelected.style.display = 'none';
+    dropZone.classList.remove('has-file');
+    dropZone.setAttribute('aria-label', 'Choose or drop an ebook file');
+  }
+}
+
+/** Returns true if the file's extension is in ACCEPTED_EXTENSIONS, showing an error otherwise. */
+function validateFile(file) {
+  const ext = `.${file.name.split('.').pop().toLowerCase()}`;
+  if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+    showStatus(
+      'error',
+      `Unsupported format: ${file.name}\nAllowed: ${ACCEPTED_EXTENSIONS.join(', ')}`,
+    );
+    return false;
+  }
+  return true;
+}
+
+/** Validates and stages the first file from a FileList. */
+function handleFiles(files) {
+  const f = files && files[0];
+  if (!f) {
+    setFile(null);
+    return;
+  }
+  if (validateFile(f)) {
+    setFile(f);
+    hideStatus();
+  }
+}
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    fileInput.click();
+  }
+});
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('dragging');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragging');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+/** Displays a status message of the given type ('info', 'success', or 'error'). */
+function showStatus(type, message) {
+  statusMsg.textContent = message;
+  statusMsg.className = `status-msg status-${type}`;
+  statusMsg.style.display = '';
+}
+
+/** Hides the status message. */
+function hideStatus() {
+  statusMsg.style.display = 'none';
+}
+
+statusMsg.addEventListener('click', () => {
+  if (!statusMsg.classList.contains('status-info')) {
+    hideStatus();
+  }
+});
+
+/** Updates the progress bar visibility and fill percentage. */
+function setProgress(value, visible) {
+  progressWrap.style.display = visible ? '' : 'none';
+  progressWrap.setAttribute('aria-valuenow', value);
+  progressFill.style.width = `${value}%`;
+}
+
+document.getElementById('upload-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+
+  const key = document.getElementById('keyinput').value.trim().toUpperCase();
+  if (key.length !== 4) {
+    showStatus('error', 'Please enter the 4-character key shown on your e-reader.');
+    return;
+  }
+
+  const urlVal = document.getElementById('urlinput').value.trim();
+  if (!selectedFile && !urlVal) {
+    showStatus('error', 'Please choose a file or enter a URL.');
+    return;
+  }
+
+  // Build FormData explicitly so drag-and-drop files are included
+  const formData = new FormData();
+  formData.set('key', key);
+  if (selectedFile) {
+    formData.set('file', selectedFile, selectedFile.name);
+  }
+  if (urlVal) {
+    formData.set('url', urlVal);
+  }
+  OPTIONS.forEach(({ id, name }) => {
+    if (document.getElementById(id).checked) {
+      formData.set(name, 'on');
+    }
+  });
+
+  submitBtn.disabled = true;
+  setProgress(0, true);
+  showStatus('info', 'Uploading\u2026');
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/upload', true);
+
+  xhr.upload.addEventListener('progress', (ev) => {
+    if (ev.lengthComputable) {
+      const pct = Math.round((ev.loaded / ev.total) * 100);
+      setProgress(pct, true);
+      showStatus('info', pct < 100 ? `Uploading\u2026 ${pct}%` : 'Processing\u2026 please wait');
+    }
+  });
+
+  xhr.addEventListener('load', () => {
+    submitBtn.disabled = false;
+    setProgress(0, false);
+    if (xhr.status >= 200 && xhr.status < 300) {
+      showStatus('success', xhr.responseText);
+      setFile(null);
+      document.getElementById('urlinput').value = '';
+      document.getElementById('keyinput').value = '';
+    } else {
+      showStatus('error', xhr.responseText || 'Upload failed.');
+    }
+  });
+
+  xhr.addEventListener('error', () => {
+    submitBtn.disabled = false;
+    setProgress(0, false);
+    showStatus('error', 'Could not reach the server. Is it running?');
+  });
+
+  xhr.send(formData);
+});
+
+buildOptionsGrid();
+wireMutualExclusion();

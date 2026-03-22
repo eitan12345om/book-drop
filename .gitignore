@@ -1,2 +1,29 @@
+# Dependencies
 node_modules
+
+# Build output
+dist
+*.js.map
+
+# Environment — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Uploaded files
 uploads
+
+# Test coverage
+coverage
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+logs

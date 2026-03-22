@@ -1,0 +1,161 @@
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'fs';
+import {
+  isValidKey,
+  isValidUrl,
+  isEreaderAgent,
+  doTransliterate,
+  deleteFile,
+  ALLOWED_TYPES,
+  ALLOWED_EXTENSIONS,
+} from '../src/utils.js';
+import { envInt } from '../src/config.js';
+
+describe('isValidKey', () => {
+  it('accepts a valid 4-char key', () => {
+    assert.strictEqual(isValidKey('ACDF'), true);
+  });
+
+  it('rejects keys that are too short', () => {
+    assert.strictEqual(isValidKey('ACD'), false);
+  });
+
+  it('rejects keys that are too long', () => {
+    assert.strictEqual(isValidKey('ACDFG'), false);
+  });
+
+  it('rejects keys with disallowed characters (0, 1, O, I, B)', () => {
+    assert.strictEqual(isValidKey('0000'), false);
+    assert.strictEqual(isValidKey('OOOO'), false);
+    assert.strictEqual(isValidKey('IIII'), false);
+    assert.strictEqual(isValidKey('BBBB'), false);
+  });
+
+  it('rejects lowercase', () => {
+    assert.strictEqual(isValidKey('acdf'), false);
+  });
+});
+
+describe('isValidUrl', () => {
+  it('accepts http URLs', () => {
+    assert.strictEqual(isValidUrl('http://example.com'), true);
+  });
+
+  it('accepts https URLs', () => {
+    assert.strictEqual(isValidUrl('https://example.com/path?q=1'), true);
+  });
+
+  it('rejects javascript: URLs', () => {
+    assert.strictEqual(isValidUrl('javascript:alert(1)'), false);
+  });
+
+  it('rejects ftp: URLs', () => {
+    assert.strictEqual(isValidUrl('ftp://example.com'), false);
+  });
+
+  it('rejects data: URLs', () => {
+    assert.strictEqual(isValidUrl('data:text/html,<h1>hi</h1>'), false);
+  });
+
+  it('rejects malformed strings', () => {
+    assert.strictEqual(isValidUrl('not a url'), false);
+    assert.strictEqual(isValidUrl(''), false);
+  });
+});
+
+describe('isEreaderAgent', () => {
+  it('recognises Kobo', () => {
+    assert.strictEqual(isEreaderAgent('Mozilla/5.0 (Linux; Kobo Touch 4.39)'), true);
+  });
+
+  it('recognises Kindle', () => {
+    assert.strictEqual(isEreaderAgent('Mozilla/5.0 Kindle/3.0'), true);
+  });
+
+  it('recognises Tolino', () => {
+    assert.strictEqual(isEreaderAgent('Mozilla/5.0 Tolino/1.0'), true);
+  });
+
+  it('recognises eReader user-agent string', () => {
+    assert.strictEqual(isEreaderAgent('eReader/1.0 (Model X)'), true);
+  });
+
+  it('is case-insensitive for known brands', () => {
+    assert.strictEqual(isEreaderAgent('KOBO/2.0'), true);
+    assert.strictEqual(isEreaderAgent('kindle browser'), true);
+  });
+
+  it('rejects a regular browser', () => {
+    assert.strictEqual(isEreaderAgent('Mozilla/5.0 Chrome/120 Safari/537.36'), false);
+  });
+});
+
+describe('doTransliterate', () => {
+  it('replaces non-ASCII characters in the stem while preserving the extension', () => {
+    const result = doTransliterate('Ünïcödé-title.epub');
+    assert.ok(result.endsWith('.epub'), `Expected .epub extension, got: ${result}`);
+    // Only ASCII characters should remain after transliteration
+    assert.strictEqual(/[^\u0021-\u007E\s.]/u.test(result), false);
+  });
+
+  it('leaves ASCII filenames unchanged', () => {
+    assert.strictEqual(doTransliterate('my-book.epub'), 'my-book.epub');
+  });
+
+  it('handles filenames with multiple dots (preserves only the last extension)', () => {
+    const result = doTransliterate('my.book.name.epub');
+    assert.ok(result.endsWith('.epub'));
+  });
+});
+
+describe('deleteFile', () => {
+  it('calls fs.unlink on the given path', () => {
+    const unlinkMock = mock.method(fs, 'unlink', (_path: string, cb: Function) => cb(null));
+    deleteFile('/tmp/test-delete.epub');
+    assert.strictEqual(unlinkMock.mock.calls.length, 1);
+    assert.strictEqual(unlinkMock.mock.calls[0].arguments[0], '/tmp/test-delete.epub');
+    unlinkMock.mock.restore();
+  });
+
+  it('silently ignores ENOENT errors', () => {
+    const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+    const unlinkMock = mock.method(fs, 'unlink', (_path: string, cb: Function) => cb(enoent));
+    assert.doesNotThrow(() => deleteFile('/tmp/nonexistent.epub'));
+    unlinkMock.mock.restore();
+  });
+});
+
+describe('ALLOWED_TYPES and ALLOWED_EXTENSIONS', () => {
+  it('includes epub', () => {
+    assert.ok(ALLOWED_TYPES.has('application/epub+zip'));
+    assert.ok(ALLOWED_EXTENSIONS.has('epub'));
+  });
+
+  it('includes pdf', () => {
+    assert.ok(ALLOWED_TYPES.has('application/pdf'));
+    assert.ok(ALLOWED_EXTENSIONS.has('pdf'));
+  });
+
+  it('does not include exe', () => {
+    assert.strictEqual(ALLOWED_EXTENSIONS.has('exe'), false);
+  });
+});
+
+describe('envInt', () => {
+  it('returns the fallback when the env var is absent', () => {
+    assert.strictEqual(envInt('_BOOK_DROP_NONEXISTENT_12345', 42), 42);
+  });
+
+  it('parses a valid integer env var', () => {
+    process.env._BOOK_DROP_TEST_INT = '99';
+    assert.strictEqual(envInt('_BOOK_DROP_TEST_INT', 0), 99);
+    delete process.env._BOOK_DROP_TEST_INT;
+  });
+
+  it('returns the fallback when the env var is not a valid integer', () => {
+    process.env._BOOK_DROP_TEST_INT = 'not-a-number';
+    assert.strictEqual(envInt('_BOOK_DROP_TEST_INT', 42), 42);
+    delete process.env._BOOK_DROP_TEST_INT;
+  });
+});

@@ -1,0 +1,34 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "no-console": "warn",
+    "eqeqeq": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    "prefer-template": "warn",
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "curly": "error",
+    "react/jsx-no-target-blank": "error",
+    "react/no-danger": "warn"
+  },
+  "env": {
+    "builtin": true,
+    "node": true,
+    "browser": true
+  },
+  "ignorePatterns": ["dist", "node_modules", "static", "*.d.ts"],
+  "overrides": [
+    {
+      "files": ["tests/**/*.ts"],
+      "plugins": ["vitest"],
+      "rules": {
+        "no-console": "off"
+      }
+    }
+  ]
+}

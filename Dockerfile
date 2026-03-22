@@ -1,40 +1,61 @@
-# node 20 is lts at the time of writing
+# ── Stage 1: Builder ─────────────────────────────────────────────────────────
+FROM node:lts-alpine AS builder
+
+RUN corepack enable pnpm
+
+WORKDIR /build
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY src ./src
+COPY tsconfig.json ./
+
+RUN pnpm build
+
+# ── Stage 2: Production ───────────────────────────────────────────────────────
 FROM node:lts-alpine
 
-# Create app directory
 WORKDIR /usr/src/app
 
-# Download and install kepubify
-RUN wget https://github.com/pgaskin/kepubify/releases/download/v4.0.4/kepubify-linux-64bit && \
+# ── kepubify ────────────────────────────────────────────────────────────────
+RUN KEPUBIFY_VERSION=v4.0.4 && \
+    wget -q "https://github.com/pgaskin/kepubify/releases/download/${KEPUBIFY_VERSION}/kepubify-linux-64bit" && \
+    wget -q "https://github.com/pgaskin/kepubify/releases/download/${KEPUBIFY_VERSION}/SHA256SUMS" && \
+    grep "kepubify-linux-64bit$" SHA256SUMS | sha256sum -c - && \
     mv kepubify-linux-64bit /usr/local/bin/kepubify && \
-    chmod +x /usr/local/bin/kepubify
+    chmod +x /usr/local/bin/kepubify && \
+    rm SHA256SUMS
 
-# Download and install kindlegen
-RUN wget https://github.com/zzet/fp-docker/raw/f2b41fb0af6bb903afd0e429d5487acc62cb9df8/kindlegen_linux_2.6_i386_v2_9.tar.gz && \
-    echo "9828db5a2c8970d487ada2caa91a3b6403210d5d183a7e3849b1b206ff042296 kindlegen_linux_2.6_i386_v2_9.tar.gz" | sha256sum -c && \
+# ── kindlegen ───────────────────────────────────────────────────────────────
+RUN wget -q https://github.com/zzet/fp-docker/raw/f2b41fb0af6bb903afd0e429d5487acc62cb9df8/kindlegen_linux_2.6_i386_v2_9.tar.gz && \
+    echo "9828db5a2c8970d487ada2caa91a3b6403210d5d183a7e3849b1b206ff042296  kindlegen_linux_2.6_i386_v2_9.tar.gz" | sha256sum -c - && \
     mkdir kindlegen && \
-    tar xvf kindlegen_linux_2.6_i386_v2_9.tar.gz --directory kindlegen && \
+    tar xf kindlegen_linux_2.6_i386_v2_9.tar.gz --directory kindlegen && \
     cp kindlegen/kindlegen /usr/local/bin/kindlegen && \
     chmod +x /usr/local/bin/kindlegen && \
-    rm -rf kindlegen
+    rm -rf kindlegen kindlegen_linux_2.6_i386_v2_9.tar.gz
 
+# ── pdfCropMargins ──────────────────────────────────────────────────────────
 RUN apk add --no-cache pipx
-
 ENV PATH="$PATH:/root/.local/bin"
-
 RUN pipx install pdfCropMargins
 
-# Copy files needed by npm install
-COPY package*.json ./
+# ── Production dependencies ─────────────────────────────────────────────────
+RUN corepack enable pnpm
 
-# Install app dependencies
-RUN npm install --omit=dev
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
 
-# Copy the rest of the app files (see .dockerignore)
-COPY . ./
+# ── Copy build artifacts ─────────────────────────────────────────────────────
+COPY --from=builder /build/dist ./dist
+COPY client/public ./client/public
 
-# Create uploads directory if it doesn't exist
-RUN mkdir uploads
+# ── Runtime setup ───────────────────────────────────────────────────────────
+RUN mkdir uploads && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup && \
+    chown -R appuser:appgroup /usr/src/app
+USER appuser
 
 EXPOSE 3001
-CMD [ "npm", "start" ]
+CMD ["node", "dist/server.js"]

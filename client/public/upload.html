@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ereader Friend</title>
+    <link rel="stylesheet" href="upload.css" />
+  </head>
+  <body>
+    <div class="wrapper">
+      <header class="page-header">
+        <h1>Ereader Friend</h1>
+        <p>Send ebooks to your Kobo, Kindle, or Tolino</p>
+      </header>
+
+      <form id="upload-form" novalidate>
+        <div class="card">
+          <p class="card-title">Device key</p>
+          <label for="keyinput" class="field-label">4-character key shown on your e-reader</label>
+          <input
+            id="keyinput"
+            name="key"
+            type="text"
+            class="key-input"
+            inputmode="text"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            maxlength="4"
+            placeholder="––––"
+            required
+            aria-describedby="key-hint"
+          />
+          <p class="hint" id="key-hint">
+            Open this service in your e-reader's browser to see the key.
+          </p>
+        </div>
+
+        <div class="card">
+          <p class="card-title">Ebook file</p>
+          <div
+            id="drop-zone"
+            class="zone"
+            role="button"
+            tabindex="0"
+            aria-label="Choose or drop an ebook file"
+          >
+            <input
+              id="file-input"
+              type="file"
+              name="file"
+              style="display: none"
+              aria-hidden="true"
+              tabindex="-1"
+            />
+            <div id="zone-empty">
+              <div class="zone-icon" aria-hidden="true">📚</div>
+              <p class="zone-label"><strong>Choose file</strong> or drag &amp; drop</p>
+              <p class="zone-formats">EPUB · MOBI · PDF · TXT · CBZ · CBR</p>
+            </div>
+            <div id="zone-selected" style="display: none" aria-live="polite">
+              <p class="zone-file-info">
+                <span class="zone-file-name" id="zone-file-name"></span>
+                <span class="zone-file-size" id="zone-file-size"></span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <p class="card-title">Or send a URL</p>
+          <label for="urlinput" class="field-label">Web address</label>
+          <input
+            id="urlinput"
+            name="url"
+            type="url"
+            class="url-input"
+            placeholder="https://"
+            autocomplete="off"
+          />
+          <p class="hint">The link will appear on your e-reader's screen.</p>
+        </div>
+
+        <div class="card">
+          <p class="card-title">Conversion options</p>
+          <div
+            id="options-grid"
+            class="options-grid"
+            role="group"
+            aria-label="Conversion options"
+          ></div>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn-primary" disabled>Upload and send</button>
+
+        <div
+          id="status-msg"
+          role="status"
+          aria-live="polite"
+          class="status-msg"
+          style="display: none"
+        ></div>
+        <div
+          id="progress-wrap"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+          aria-label="Upload progress"
+          class="progress-wrap"
+          style="display: none"
+        >
+          <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+        </div>
+      </form>
+
+      <div class="card instructions">
+        <p class="card-title">How it works</p>
+        <p>
+          Open this service on your Kobo, Kindle, or Tolino — it will show a unique 4-character key.
+          Enter that key above, pick a file, and press <em>Upload and send</em>. A download link
+          appears on your e-reader within seconds.
+        </p>
+        <p>
+          Files are stored temporarily on the server and deleted automatically about 30 seconds
+          after you close the e-reader browser or generate a new key.
+        </p>
+      </div>
+
+      <footer class="page-footer">
+        <span>This page: <a id="page-url" href=""></a></span>
+        <span>
+          Powered by
+          <a href="https://pgaskin.net/kepubify/" target="_blank" rel="noreferrer">Kepubify</a>,
+          <a href="https://github.com/abarker/pdfCropMargins" target="_blank" rel="noreferrer"
+            >pdfCropMargins</a
+          >
+          ·
+          <a href="https://github.com/daniel-j/send2ereader" target="_blank" rel="noreferrer"
+            >Source</a
+          >
+        </span>
+      </footer>
+    </div>
+
+    <script src="upload.js"></script>
+  </body>
+</html>

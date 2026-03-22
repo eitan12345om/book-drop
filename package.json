@@ -1,26 +1,63 @@
 {
-  "name": "send2ereader",
+  "name": "book_drop",
   "version": "1.0.0",
   "description": "Send ebooks to Kobo/Kindle ereaders easily",
-  "main": "index.js",
+  "type": "module",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "node index",
-    "postinstall": "patch-package"
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src tests",
+    "lint:fix": "oxlint --fix src tests",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "node --import tsx --test tests/keyStore.test.ts tests/utils.test.ts tests/converter.test.ts tests/app.test.ts",
+    "test:watch": "node --import tsx --test --watch tests/keyStore.test.ts tests/utils.test.ts tests/converter.test.ts tests/app.test.ts",
+    "coverage": "c8 --reporter=text --reporter=html node --import tsx --test tests/keyStore.test.ts tests/utils.test.ts tests/converter.test.ts tests/app.test.ts",
+    "prepare": "husky"
   },
-  "author": "djazz",
+  "lint-staged": {
+    "*.{ts,js}": [
+      "oxlint --fix",
+      "prettier --write"
+    ],
+    "*.{html,css,json,md}": [
+      "prettier --write"
+    ]
+  },
+  "contributors": [
+    {
+      "name": "djazz"
+    },
+    {
+      "name": "eitan12345om"
+    }
+  ],
   "license": "MIT",
   "dependencies": {
-    "@koa/multer": "^3.0.2",
-    "@koa/router": "^13.1.0",
-    "file-type": "^16.5.4",
-    "koa": "^2.15.3",
-    "koa-logger": "^3.2.1",
-    "koa-sendfile": "^3.0.0",
-    "koa-static": "^5.0.0",
-    "mkdirp": "^3.0.1",
-    "multer": "^1.4.5-lts.1",
-    "patch-package": "^8.0.0",
-    "sanitize-filename": "^1.6.3",
-    "transliteration": "^2.3.5"
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.1",
+    "file-type": "^21.3.3",
+    "helmet": "^8.1.0",
+    "multer": "^2.1.1",
+    "pino": "^10.3.1",
+    "sanitize-filename": "^1.6.4",
+    "transliteration": "^2.6.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^25.5.0",
+    "@types/supertest": "^7.2.0",
+    "c8": "^11.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "oxlint": "^1.56.0",
+    "prettier": "^3.8.1",
+    "supertest": "^7.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

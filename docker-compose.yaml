@@ -1,12 +1,14 @@
 services:
-  send2ereader:
+  ereader_friend:
     build:
       context: .
       dockerfile: ./Dockerfile
-    container_name: send2ereader
-    # Restart means, Automatic re-start the container after a shutdown unless manual stop container
+    container_name: ereader_friend
     restart: unless-stopped
-    # Ports means, Bind external and internal docker ports, only change the external port, not the internal port
-    # Format: <External Port>:<Internal Port>
     ports:
-      - 3001:3001
+      - '3001:3001'
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M

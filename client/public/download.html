@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ereader Friend</title>
+    <link rel="stylesheet" href="download.css" />
+  </head>
+  <body>
+    <div class="wrapper">
+      <header class="header">
+        <h1>Ereader Friend</h1>
+        <p>Your unique key</p>
+      </header>
+
+      <div class="card" id="key-card">
+        <div class="key-wrap">
+          <span class="key-value" id="key-display" aria-label="Generating key" aria-live="polite"
+            >––––</span
+          >
+          <button
+            class="btn-icon"
+            id="refresh-btn"
+            aria-label="Generate new key"
+            title="Generate new key"
+            disabled
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M19.146 4.854l-1.489 1.489A8 8 0 1 0 12 20a8.094 8.094 0 0 0 7.371-4.886 1 1 0 1 0-1.842-.779A6.071 6.071 0 0 1 12 18a6 6 0 1 1 4.243-10.243l-1.39 1.39a.5.5 0 0 0 .354.854H19.5A.5.5 0 0 0 20 9.5V5.207a.5.5 0 0 0-.854-.353z"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="status-row" id="status-row" role="status" aria-live="polite">
+          <span class="dot" id="status-dot" aria-hidden="true"></span>
+          <span id="status-label">Generating key…</span>
+        </div>
+      </div>
+
+      <div class="card" id="download-card" style="display: none">
+        <div class="card-title" id="download-card-title">Download</div>
+        <div class="download-list" id="download-list"></div>
+      </div>
+
+      <p class="error-msg" id="error-msg" role="alert" style="display: none"></p>
+
+      <footer class="footer">
+        <span>Send ebooks from: <a id="page-url" href=""></a></span>
+        <span
+          ><a href="https://github.com/daniel-j/send2ereader" target="_blank" rel="noreferrer"
+            >Source on GitHub</a
+          ></span
+        >
+      </footer>
+    </div>
+
+    <script src="download.js"></script>
+  </body>
+</html>
