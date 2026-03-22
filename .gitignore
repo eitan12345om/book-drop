@@ -16,6 +16,9 @@ uploads
 # Test coverage
 coverage
 
+# Test / build artifacts
+static
+
 # IDE
 .idea
 .vscode
