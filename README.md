@@ -1,4 +1,4 @@
-# ereader_friend
+# book-drop
 
 A self-hostable web service for sending ebooks to a Kobo, Kindle, or Tolino
 ereader through its built-in browser — no account, no cloud, no cables.
