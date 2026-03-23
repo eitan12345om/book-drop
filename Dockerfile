@@ -37,14 +37,15 @@ RUN apk add --no-cache curl && \
 
 # ── pdfCropMargins ──────────────────────────────────────────────────────────
 RUN apk add --no-cache pipx
-ENV PATH="$PATH:/root/.local/bin"
+ENV PIPX_HOME=/opt/pipx
+ENV PIPX_BIN_DIR=/usr/local/bin
 RUN pipx install pdfCropMargins
 
 # ── Production dependencies ─────────────────────────────────────────────────
 RUN corepack enable pnpm
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 # ── Copy build artifacts ─────────────────────────────────────────────────────
 COPY --from=builder /build/dist ./dist
