@@ -1,3 +1,7 @@
+# ── Stage 0: kepubify ─────────────────────────────────────────────────────────
+FROM golang:alpine AS kepubify-builder
+RUN go install github.com/pgaskin/kepubify/v4/cmd/kepubify@v4.0.4
+
 # ── Stage 1: Builder ─────────────────────────────────────────────────────────
 FROM node:lts-alpine AS builder
 
@@ -19,20 +23,11 @@ FROM node:lts-alpine
 WORKDIR /usr/src/app
 
 # ── kepubify ────────────────────────────────────────────────────────────────
-RUN apk add --no-cache curl && \
-    KEPUBIFY_VERSION=v4.0.4 && \
-    ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then KEPUBIFY_ARCH="linux-64bit"; \
-    elif [ "$ARCH" = "aarch64" ]; then KEPUBIFY_ARCH="linux-arm64"; \
-    else echo "Unsupported arch: $ARCH" && exit 1; fi && \
-    curl -fsSL "https://github.com/pgaskin/kepubify/releases/download/${KEPUBIFY_VERSION}/kepubify-${KEPUBIFY_ARCH}" -o /usr/local/bin/kepubify && \
-    curl -fsSL "https://github.com/pgaskin/kepubify/releases/download/${KEPUBIFY_VERSION}/SHA256SUMS" -o SHA256SUMS && \
-    grep "kepubify-${KEPUBIFY_ARCH}$" SHA256SUMS | sha256sum -c - && \
-    chmod +x /usr/local/bin/kepubify && \
-    rm SHA256SUMS
+COPY --from=kepubify-builder /go/bin/kepubify /usr/local/bin/kepubify
 
 # ── kindlegen ───────────────────────────────────────────────────────────────
-RUN curl -fsSL https://github.com/zzet/fp-docker/raw/f2b41fb0af6bb903afd0e429d5487acc62cb9df8/kindlegen_linux_2.6_i386_v2_9.tar.gz -o kindlegen_linux_2.6_i386_v2_9.tar.gz && \
+RUN apk add --no-cache curl && \
+    curl -fsSL https://github.com/zzet/fp-docker/raw/f2b41fb0af6bb903afd0e429d5487acc62cb9df8/kindlegen_linux_2.6_i386_v2_9.tar.gz -o kindlegen_linux_2.6_i386_v2_9.tar.gz && \
     echo "9828db5a2c8970d487ada2caa91a3b6403210d5d183a7e3849b1b206ff042296  kindlegen_linux_2.6_i386_v2_9.tar.gz" | sha256sum -c - && \
     mkdir kindlegen && \
     tar xf kindlegen_linux_2.6_i386_v2_9.tar.gz --directory kindlegen && \
