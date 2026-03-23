@@ -21,9 +21,13 @@ WORKDIR /usr/src/app
 # ── kepubify ────────────────────────────────────────────────────────────────
 RUN apk add --no-cache curl && \
     KEPUBIFY_VERSION=v4.0.4 && \
-    curl -fsSL "https://github.com/pgaskin/kepubify/releases/download/${KEPUBIFY_VERSION}/kepubify-linux-64bit" -o /usr/local/bin/kepubify && \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then KEPUBIFY_ARCH="linux-64bit"; \
+    elif [ "$ARCH" = "aarch64" ]; then KEPUBIFY_ARCH="linux-arm64"; \
+    else echo "Unsupported arch: $ARCH" && exit 1; fi && \
+    curl -fsSL "https://github.com/pgaskin/kepubify/releases/download/${KEPUBIFY_VERSION}/kepubify-${KEPUBIFY_ARCH}" -o /usr/local/bin/kepubify && \
     curl -fsSL "https://github.com/pgaskin/kepubify/releases/download/${KEPUBIFY_VERSION}/SHA256SUMS" -o SHA256SUMS && \
-    grep "kepubify-linux-64bit$" SHA256SUMS | sha256sum -c - && \
+    grep "kepubify-${KEPUBIFY_ARCH}$" SHA256SUMS | sha256sum -c - && \
     chmod +x /usr/local/bin/kepubify && \
     rm SHA256SUMS
 
