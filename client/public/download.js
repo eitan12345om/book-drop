@@ -1,9 +1,10 @@
 // NOTE: this file runs on old Kobo WebKit (538.1) which does not support `let`.
 // Use `var` for mutable variables; `const` is fine.
+/* eslint-disable no-var */
 const POLL_INTERVAL_MS = 5000;
-let currentKey = null;
-let pollTimer = null;
-let currentSSE = null;
+var currentKey = null;
+var pollTimer = null;
+var currentSSE = null;
 
 const keyDisplay = document.getElementById('key-display');
 const refreshBtn = document.getElementById('refresh-btn');
@@ -73,7 +74,7 @@ function startSSE(key) {
   currentSSE = es;
 
   es.onmessage = function (e) {
-    let data;
+    var data;
     try {
       data = JSON.parse(e.data);
     } catch (_) {
@@ -135,17 +136,12 @@ function renderDownloads(file, urls) {
   }
 
   if (hasUrls) {
-    for (let i = 0; i < urls.length; i++) {
-      let safeUrl;
-      try {
-        const parsed = new URL(urls[i]);
-        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-          continue;
-        }
-        safeUrl = parsed.href;
-      } catch (_) {
+    for (var i = 0; i < urls.length; i++) {
+      var safeUrl;
+      if (!/^https?:\/\//i.test(urls[i])) {
         continue;
       }
+      safeUrl = urls[i];
       const link = document.createElement('a');
       link.href = safeUrl;
       link.className = 'download-item';
@@ -179,7 +175,7 @@ function poll() {
       return;
     }
     if (xhr.status >= 200 && xhr.status < 300) {
-      let data;
+      var data;
       try {
         data = JSON.parse(xhr.responseText);
       } catch (_) {
