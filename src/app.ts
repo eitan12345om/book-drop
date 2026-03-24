@@ -153,12 +153,14 @@ export function createApp(options?: { staticDir?: string }) {
 
   app.post('/generate', generateLimiter, (req, res) => {
     if (keys.size >= MAX_ACTIVE_KEYS) {
+      logger.warn({ activeKeys: keys.size }, 'Key rejected: server busy');
       res.status(503).send('Server busy');
       return;
     }
     const agent = req.get('user-agent') ?? '';
     const key = generateUniqueKey(keys);
     if (!key) {
+      logger.warn('Key rejected: could not generate unique key');
       res.status(503).send('error');
       return;
     }
@@ -300,6 +302,7 @@ export function createApp(options?: { staticDir?: string }) {
   app.post('/upload', uploadLimiter, (req, res) => {
     upload.single('file')(req, res, async (err) => {
       if (err) {
+        logger.warn({ err: (err as Error).message }, 'Upload rejected');
         res.status(400).send((err as Error).message);
         return;
       }
@@ -343,7 +346,7 @@ export function createApp(options?: { staticDir?: string }) {
         if (!info.urls.includes(rawUrl)) {
           info.urls.push(rawUrl);
           submittedUrl = rawUrl;
-          logger.info({ key, url: rawUrl }, 'URL staged');
+          logger.info({ key, url: rawUrl, ip: req.ip }, 'URL staged');
         }
       }
 
@@ -435,7 +438,7 @@ export function createApp(options?: { staticDir?: string }) {
         }
         info.file = { name: filename, path: convertedPath, uploaded: new Date() };
         expireKey(key, keys);
-        logger.info({ key, filename, size: convertedSize }, 'File staged');
+        logger.info({ key, filename, size: convertedSize, ip: req.ip }, 'File staged');
         notifySSE(key, info);
 
         const deviceName = info.agent.includes('Kobo')
