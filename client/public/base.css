@@ -5,7 +5,7 @@
   --surface: #ffffff;
   --border: #e2ddd8;
   --text: #1c1917;
-  --text-muted: #78716c;
+  --text-muted: #6f6862;
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
   --success-bg: #f0fdf4;
@@ -134,4 +134,13 @@ a:hover {
 }
 [data-theme='dark'] .btn-theme .icon-moon {
   display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

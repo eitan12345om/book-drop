@@ -41,7 +41,7 @@
     <link rel="stylesheet" href="upload.css" />
   </head>
   <body>
-    <div class="wrapper">
+    <main class="wrapper">
       <header class="page-header">
         <h1>BookDrop</h1>
         <p>Send ebooks to your Kobo, Kindle, or Tolino</p>
@@ -80,7 +80,7 @@
 
       <form id="upload-form" novalidate>
         <div class="card">
-          <p class="card-title">Device key</p>
+          <h2 class="card-title">Device key</h2>
           <label for="keyinput" class="field-label">4-character key shown on your e-reader</label>
           <input
             id="keyinput"
@@ -95,6 +95,7 @@
             maxlength="4"
             placeholder="––––"
             required
+            aria-required="true"
             aria-describedby="key-hint"
           />
           <p class="hint" id="key-hint">
@@ -103,7 +104,7 @@
         </div>
 
         <div class="card">
-          <p class="card-title">Ebook file</p>
+          <h2 class="card-title">Ebook file</h2>
           <div
             id="drop-zone"
             class="zone"
@@ -134,7 +135,7 @@
         </div>
 
         <div class="card">
-          <p class="card-title">Or send a URL</p>
+          <h2 class="card-title">Or send a URL</h2>
           <label for="urlinput" class="field-label">Web address</label>
           <input
             id="urlinput"
@@ -148,7 +149,7 @@
         </div>
 
         <div class="card">
-          <p class="card-title">Conversion options</p>
+          <h2 class="card-title">Conversion options</h2>
           <div
             id="options-grid"
             class="options-grid"
@@ -163,6 +164,7 @@
           id="status-msg"
           role="status"
           aria-live="polite"
+          tabindex="-1"
           class="status-msg"
           style="display: none"
         ></div>
@@ -181,7 +183,7 @@
       </form>
 
       <div class="card instructions">
-        <p class="card-title">How it works</p>
+        <h2 class="card-title">How it works</h2>
         <p>
           Open this service on your Kobo, Kindle, or Tolino — it will show a unique 4-character key.
           Enter that key above, pick a file, and press <em>Upload and send</em>. A download link
@@ -211,7 +213,7 @@
           >
         </span>
       </footer>
-    </div>
+    </main>
 
     <script src="upload.js"></script>
     <script>

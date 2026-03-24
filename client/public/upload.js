@@ -208,6 +208,9 @@ function showStatus(type, message) {
   statusMsg.textContent = message;
   statusMsg.className = `status-msg status-${type}`;
   statusMsg.style.display = '';
+  if (type === 'error' || type === 'success') {
+    statusMsg.focus();
+  }
 }
 
 /** Hides the status message. */

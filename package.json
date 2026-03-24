@@ -54,6 +54,7 @@
     "transliteration": "^2.6.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
     "@playwright/test": "^1.58.2",
     "@types/compression": "^1.8.1",
     "@types/express": "^5.0.6",
