@@ -1,3 +1,8 @@
+/* Hide theme toggle on e-reader devices */
+.ereader #theme-toggle {
+  display: none;
+}
+
 /* Layout */
 .header {
   display: flex;
