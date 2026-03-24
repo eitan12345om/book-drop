@@ -162,4 +162,32 @@ describe('removeKey', () => {
     assert.strictEqual(keys.has('EFGH'), false);
     mock.timers.reset();
   });
+
+  it('calls onRemove callback if set', () => {
+    const keys = new Map<string, KeyInfo>();
+    const onRemove = mock.fn();
+    keys.set('IJKL', makeKeyInfo({ onRemove }));
+    removeKey('IJKL', keys);
+    assert.strictEqual(onRemove.mock.calls.length, 1);
+  });
+
+  it('does not throw when onRemove is not set', () => {
+    const keys = new Map<string, KeyInfo>();
+    keys.set('MNOP', makeKeyInfo());
+    assert.doesNotThrow(() => removeKey('MNOP', keys));
+  });
+});
+
+describe('expireKey — onRemove callback', () => {
+  it('calls onRemove when key expires after EXPIRE_DELAY_MS', () => {
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+    const keys = new Map<string, KeyInfo>();
+    const onRemove = mock.fn();
+    keys.set('QRST', makeKeyInfo({ onRemove }));
+    expireKey('QRST', keys);
+    assert.strictEqual(onRemove.mock.calls.length, 0);
+    mock.timers.tick(EXPIRE_DELAY_MS + 1);
+    assert.strictEqual(onRemove.mock.calls.length, 1);
+    mock.timers.reset();
+  });
 });

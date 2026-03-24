@@ -12,4 +12,5 @@ export interface KeyInfo {
   timer: ReturnType<typeof setTimeout> | null;
   downloadTimer: ReturnType<typeof setTimeout> | null;
   alive: Date;
+  onRemove?: () => void;
 }

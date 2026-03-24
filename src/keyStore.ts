@@ -33,6 +33,7 @@ export function removeKey(key: string, keys: Map<string, KeyInfo>): void {
   if (!info) {
     return;
   }
+  info.onRemove?.();
   if (info.timer) {
     clearTimeout(info.timer);
   }

@@ -20,3 +20,4 @@ export const RATE_LIMIT_MAX = envInt('RATE_LIMIT_MAX', 20);
 export const STATUS_RATE_LIMIT_MAX = envInt('STATUS_RATE_LIMIT_MAX', 120);
 export const UPLOAD_RATE_LIMIT_MAX = envInt('UPLOAD_RATE_LIMIT_MAX', 10);
 export const DELETE_RATE_LIMIT_MAX = envInt('DELETE_RATE_LIMIT_MAX', 20);
+export const EVENTS_RATE_LIMIT_MAX = envInt('EVENTS_RATE_LIMIT_MAX', 5);

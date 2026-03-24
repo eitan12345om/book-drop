@@ -1,6 +1,8 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -304,5 +306,85 @@ describe('POST /upload — unsupported file type', () => {
         contentType: 'application/octet-stream',
       });
     assert.strictEqual(res.status, 400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('GET /events/:key', () => {
+  const agent = 'Kobo/4.0 TestDevice';
+  let app: ReturnType<typeof createApp>['app'];
+  let key: string;
+
+  before(async () => {
+    ({ app } = createApp());
+    const res = await request(app).post('/generate').set('User-Agent', agent);
+    key = res.text;
+  });
+
+  it('returns 400 for invalid key format', async () => {
+    const res = await request(app).get('/events/!!').set('User-Agent', agent);
+    assert.strictEqual(res.status, 400);
+  });
+
+  it('returns 404 for unknown key', async () => {
+    const res = await request(app).get('/events/ZZZZ').set('User-Agent', agent);
+    assert.strictEqual(res.status, 404);
+  });
+
+  it('returns 403 for wrong user-agent', async () => {
+    const res = await request(app).get(`/events/${key}`).set('User-Agent', 'Mozilla/5.0');
+    assert.strictEqual(res.status, 403);
+  });
+
+  it('opens SSE stream with correct headers and sends initial state', async () => {
+    await new Promise<void>((resolve, reject) => {
+      const server = app.listen(0, () => {
+        const { port } = server.address() as AddressInfo;
+        const req = http.request(
+          {
+            hostname: 'localhost',
+            port,
+            path: `/events/${encodeURIComponent(key)}`,
+            headers: { 'User-Agent': agent },
+          },
+          (res) => {
+            try {
+              assert.strictEqual(res.statusCode, 200);
+              assert.ok(res.headers['content-type']?.startsWith('text/event-stream'));
+            } catch (e) {
+              req.destroy();
+              server.close(() => reject(e));
+              return;
+            }
+            let buf = '';
+            res.on('data', (chunk: Buffer) => {
+              buf += chunk.toString();
+              if (!buf.includes('\n\n')) {
+                return;
+              }
+              req.destroy();
+              server.close(() => {
+                try {
+                  const line = buf.split('\n').find((l) => l.startsWith('data:'))!;
+                  const payload = JSON.parse(line.replace(/^data:\s*/, ''));
+                  assert.ok('file' in payload && 'urls' in payload);
+                  resolve();
+                } catch (e) {
+                  reject(e);
+                }
+              });
+            });
+          },
+        );
+        req.on('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'ECONNRESET') {
+            server.close(() => resolve());
+            return;
+          }
+          server.close(() => reject(err));
+        });
+        req.end();
+      });
+    });
   });
 });

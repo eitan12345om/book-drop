@@ -1,6 +1,7 @@
 const POLL_INTERVAL_MS = 5000;
 let currentKey = null;
 let pollTimer = null;
+let currentSSE = null;
 
 const keyDisplay = document.getElementById('key-display');
 const refreshBtn = document.getElementById('refresh-btn');
@@ -40,6 +41,61 @@ function stopPolling() {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+}
+
+/** Closes the active SSE connection. */
+function stopSSE() {
+  if (currentSSE !== null) {
+    currentSSE.close();
+    currentSSE = null;
+  }
+}
+
+/** Handles a parsed status payload from either SSE or poll. */
+function handleStatusPayload(data) {
+  hideError();
+  const file = data.file || null;
+  const urls = data.urls || [];
+  const hasContent = (file && file.name) || urls.length > 0;
+  setStatus(
+    hasContent ? 'active' : 'waiting',
+    hasContent ? 'File ready \u2014 tap to download' : 'Waiting for a file to be sent\u2026',
+  );
+  renderDownloads(file, urls);
+}
+
+/** Opens an SSE connection for the given key; falls back to polling on error. */
+function startSSE(key) {
+  stopSSE();
+  const es = new EventSource('/events/' + encodeURIComponent(key));
+  currentSSE = es;
+
+  es.onmessage = function (e) {
+    let data;
+    try {
+      data = JSON.parse(e.data);
+    } catch (_) {
+      return;
+    }
+    handleStatusPayload(data);
+  };
+
+  es.addEventListener('expired', function () {
+    stopSSE();
+    stopPolling();
+    currentKey = null;
+    renderDownloads(null, []);
+    setStatus('idle', 'No key \u2014 tap refresh to generate one');
+    showError('Key expired. Tap refresh to get a new one.');
+  });
+
+  es.onerror = function () {
+    stopSSE();
+    // Fall back to polling if the SSE connection drops
+    if (currentKey) {
+      pollTimer = setInterval(poll, POLL_INTERVAL_MS);
+    }
+  };
 }
 
 /** Escapes HTML special characters to prevent XSS when rendering user-controlled strings. */
@@ -121,15 +177,7 @@ function poll() {
       } catch (e) {
         return;
       }
-      hideError();
-      const file = data.file || null;
-      const urls = data.urls || [];
-      const hasContent = (file && file.name) || urls.length > 0;
-      setStatus(
-        hasContent ? 'active' : 'waiting',
-        hasContent ? 'File ready \u2014 tap to download' : 'Waiting for a file to be sent\u2026',
-      );
-      renderDownloads(file, urls);
+      handleStatusPayload(data);
     } else {
       stopPolling();
       currentKey = null;
@@ -146,9 +194,10 @@ function poll() {
   xhr.send();
 }
 
-/** Requests a new session key from the server and begins polling. */
+/** Requests a new session key from the server and begins polling/SSE. */
 function requestKey() {
   stopPolling();
+  stopSSE();
   hideError();
   currentKey = null;
   keyDisplay.textContent = '\u2013\u2013\u2013\u2013';
@@ -166,7 +215,7 @@ function requestKey() {
       keyDisplay.textContent = currentKey;
       keyDisplay.setAttribute('aria-label', 'Key: ' + currentKey.split('').join(' '));
       setStatus('waiting', 'Waiting for a file to be sent\u2026');
-      pollTimer = setInterval(poll, POLL_INTERVAL_MS);
+      startSSE(currentKey);
     } else {
       showError('Could not reach the server. Is it running?');
       setStatus('idle', 'No key \u2014 tap refresh to generate one');
