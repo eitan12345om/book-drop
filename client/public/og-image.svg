@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#1c1917"/>
+
+  <!-- Subtle grid texture -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#292524" stroke-width="1"/>
+  </pattern>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+
+  <!-- Accent glow -->
+  <ellipse cx="600" cy="280" rx="420" ry="220" fill="#2563eb" opacity="0.08"/>
+
+  <!-- Book icon -->
+  <g transform="translate(490, 140)">
+    <!-- Book body -->
+    <rect x="0" y="0" width="76" height="96" rx="6" fill="#2563eb"/>
+    <!-- Spine -->
+    <rect x="0" y="0" width="10" height="96" rx="3" fill="#1d4ed8"/>
+    <!-- Lines -->
+    <rect x="18" y="22" width="44" height="5" rx="2.5" fill="#93c5fd" opacity="0.7"/>
+    <rect x="18" y="36" width="44" height="5" rx="2.5" fill="#93c5fd" opacity="0.5"/>
+    <rect x="18" y="50" width="32" height="5" rx="2.5" fill="#93c5fd" opacity="0.4"/>
+    <!-- Second book (offset) -->
+    <rect x="84" y="8" width="76" height="96" rx="6" fill="#3b82f6" opacity="0.6"/>
+    <rect x="84" y="8" width="10" height="96" rx="3" fill="#2563eb" opacity="0.6"/>
+  </g>
+
+  <!-- BookDrop wordmark -->
+  <text
+    x="600"
+    y="336"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+    font-size="88"
+    font-weight="700"
+    fill="#fafaf9"
+    text-anchor="middle"
+    letter-spacing="-2"
+  >BookDrop</text>
+
+  <!-- Tagline -->
+  <text
+    x="600"
+    y="400"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+    font-size="28"
+    font-weight="400"
+    fill="#a8a29e"
+    text-anchor="middle"
+    letter-spacing="0"
+  >Send ebooks to your Kobo, Kindle, or Tolino in seconds</text>
+
+  <!-- Bottom accent line -->
+  <rect x="540" y="440" width="120" height="3" rx="1.5" fill="#2563eb" opacity="0.8"/>
+</svg>
