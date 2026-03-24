@@ -333,6 +333,44 @@ async function checkPendingShare() {
   }
 }
 
+/** Sets a conversion checkbox by id, triggering mutual-exclusion side-effects. */
+function setOption(id, checked) {
+  const el = document.getElementById(id);
+  if (el && el.checked !== checked) {
+    el.checked = checked;
+    el.dispatchEvent(new Event('change'));
+  }
+}
+
+/** Queries the device type for a key and autoselects the matching conversion option. */
+function lookupDevice(key) {
+  fetch('/device/' + key)
+    .then(function (r) {
+      return r.ok ? r.json() : null;
+    })
+    .then(function (data) {
+      if (!data) {
+        return;
+      }
+      if (data.device === 'Kindle') {
+        setOption('kindlegen', true);
+      } else if (data.device === 'Kobo') {
+        setOption('kepubify', true);
+      } else if (data.device === 'Tolino') {
+        setOption('kepubify', false);
+        setOption('kindlegen', false);
+      }
+    })
+    .catch(function () {});
+}
+
+document.getElementById('keyinput').addEventListener('input', function (e) {
+  const key = e.target.value.trim().toUpperCase();
+  if (key.length === 4) {
+    lookupDevice(key);
+  }
+});
+
 buildOptionsGrid();
 wireMutualExclusion();
 checkPendingShare();

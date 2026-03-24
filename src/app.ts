@@ -243,6 +243,28 @@ export function createApp(options?: { staticDir?: string }) {
     });
   });
 
+  app.get('/device/:key', generateLimiter, (req, res) => {
+    const key = (req.params.key as string).toUpperCase();
+    if (!isValidKey(key)) {
+      res.status(400).send('Invalid key format');
+      return;
+    }
+    const info = keys.get(key);
+    if (!info) {
+      res.status(404).send('Unknown key');
+      return;
+    }
+    const agent = info.agent.toLowerCase();
+    const device = agent.includes('kobo')
+      ? 'Kobo'
+      : agent.includes('kindle')
+        ? 'Kindle'
+        : agent.includes('tolino')
+          ? 'Tolino'
+          : 'unknown';
+    res.json({ device });
+  });
+
   app.get('/events/:key', eventsLimiter, (req, res) => {
     const key = (req.params.key as string).toUpperCase();
     if (!isValidKey(key)) {

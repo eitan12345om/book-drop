@@ -40,6 +40,48 @@ test('upload a text file and see success message', async ({ page }) => {
   await expect(page.locator('#status-msg')).toContainText('Sent to', { timeout: 10_000 });
 });
 
+test('autoselects kindlegen when key belongs to a Kindle device', async ({ page }) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0' },
+  });
+  const key = (await apiRes.text()).trim();
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill(key);
+
+  await expect(page.locator('#kindlegen')).toBeChecked({ timeout: 3_000 });
+  await expect(page.locator('#kepubify')).not.toBeChecked();
+});
+
+test('autoselects kepubify when key belongs to a Kobo device', async ({ page }) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36' },
+  });
+  const key = (await apiRes.text()).trim();
+
+  await page.goto('/');
+  // kepubify is checked by default; fill a non-Kobo key first to clear it, then fill the Kobo key
+  await page.locator('#kindlegen').check();
+  await expect(page.locator('#kepubify')).not.toBeChecked();
+  await page.locator('#keyinput').fill(key);
+
+  await expect(page.locator('#kepubify')).toBeChecked({ timeout: 3_000 });
+  await expect(page.locator('#kindlegen')).not.toBeChecked();
+});
+
+test('clears format converters when key belongs to a Tolino device', async ({ page }) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 4.4; Tolino)' },
+  });
+  const key = (await apiRes.text()).trim();
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill(key);
+
+  await expect(page.locator('#kepubify')).not.toBeChecked({ timeout: 3_000 });
+  await expect(page.locator('#kindlegen')).not.toBeChecked();
+});
+
 test('key input is preserved after a successful upload', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
     headers: { 'User-Agent': 'Kobo/4.0 Test' },

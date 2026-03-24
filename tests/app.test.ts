@@ -310,6 +310,56 @@ describe('POST /upload — unsupported file type', () => {
 });
 
 // ---------------------------------------------------------------------------
+describe('GET /device/:key', () => {
+  it('returns 400 for an invalid key format', async () => {
+    const { app } = createApp();
+    const res = await request(app).get('/device/!!');
+    assert.strictEqual(res.status, 400);
+  });
+
+  it('returns 404 for an unknown key', async () => {
+    const { app } = createApp();
+    const res = await request(app).get('/device/ZZZZ');
+    assert.strictEqual(res.status, 404);
+  });
+
+  it('returns Kobo for a key registered by a Kobo device', async () => {
+    const { app, key } = await generateKey('Mozilla/5.0 (Linux; Kobo Touch 4.39)');
+    const res = await request(app).get(`/device/${key}`);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.device, 'Kobo');
+  });
+
+  it('returns Kindle for a key registered by a Kindle device', async () => {
+    const { app, key } = await generateKey('Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0');
+    const res = await request(app).get(`/device/${key}`);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.device, 'Kindle');
+  });
+
+  it('returns Tolino for a key registered by a Tolino device', async () => {
+    const { app, key } = await generateKey('Mozilla/5.0 (Linux; Android 4.4; Tolino)');
+    const res = await request(app).get(`/device/${key}`);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.device, 'Tolino');
+  });
+
+  it('returns unknown for an unrecognised user-agent', async () => {
+    const { app, key } = await generateKey('Mozilla/5.0 GenericBrowser/1.0');
+    const res = await request(app).get(`/device/${key}`);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.device, 'unknown');
+  });
+
+  it('does not require the caller to match the registered user-agent', async () => {
+    const { app, key } = await generateKey('Mozilla/5.0 (Linux; Kobo Touch 4.39)');
+    const res = await request(app).get(`/device/${key}`).set('User-Agent', 'SomethingElse/1.0');
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.device, 'Kobo');
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('GET /events/:key', () => {
   const agent = 'Kobo/4.0 TestDevice';
   let app: ReturnType<typeof createApp>['app'];
