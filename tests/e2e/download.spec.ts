@@ -15,11 +15,15 @@ test('generates and displays a 4-character key', async ({ page }) => {
   expect(text?.trim()).toMatch(/^[2-9A-HJ-NP-Z]{4}$/);
 });
 
-test('theme toggle works on download page', async ({ page }) => {
+test('theme toggle hidden on e-reader user-agent', async ({ page }) => {
   await page.goto('/');
-  const html = page.locator('html');
-  const btn = page.locator('#theme-toggle');
-  const initial = await html.getAttribute('data-theme');
-  await btn.click();
-  expect(await html.getAttribute('data-theme')).not.toBe(initial);
+  await expect(page.locator('#theme-toggle')).not.toBeVisible();
+});
+
+test('theme toggle visible on desktop /receive', async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: 'Mozilla/5.0 TestBrowser' });
+  const page = await context.newPage();
+  await page.goto('/receive');
+  await expect(page.locator('#theme-toggle')).toBeVisible();
+  await context.close();
 });

@@ -10,7 +10,7 @@ export function envInt(key: string, fallback: number): number {
 
 export const PORT = envInt('PORT', 3001);
 export const UPLOAD_DIR = process.env.UPLOAD_DIR ?? 'uploads';
-export const EXPIRE_DELAY_MS = envInt('EXPIRE_DELAY_MS', 30_000);
+export const EXPIRE_DELAY_MS = envInt('EXPIRE_DELAY_MS', 300_000);
 export const MAX_EXPIRE_MS = envInt('MAX_EXPIRE_MS', 3_600_000);
 export const MAX_FILE_SIZE = envInt('MAX_FILE_SIZE', 100 * 1024 * 1024);
 export const MAX_ACTIVE_KEYS = envInt('MAX_ACTIVE_KEYS', 100);

@@ -313,10 +313,11 @@ describe('POST /upload — unsupported file type', () => {
 describe('GET /events/:key', () => {
   const agent = 'Kobo/4.0 TestDevice';
   let app: ReturnType<typeof createApp>['app'];
+  let keys: ReturnType<typeof createApp>['keys'];
   let key: string;
 
   before(async () => {
-    ({ app } = createApp());
+    ({ app, keys } = createApp());
     const res = await request(app).post('/generate').set('User-Agent', agent);
     key = res.text;
   });
@@ -374,7 +375,46 @@ describe('GET /events/:key', () => {
                 }
               });
             });
+          }
+        );
+        req.on('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'ECONNRESET') {
+            server.close(() => resolve());
+            return;
+          }
+          server.close(() => reject(err));
+        });
+        req.end();
+      });
+    });
+  });
+
+  it('resets the inactivity timer when SSE connects', async () => {
+    const aliceBefore = keys.get(key)!.alive.getTime();
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
+    await new Promise<void>((resolve, reject) => {
+      const server = app.listen(0, () => {
+        const { port } = server.address() as AddressInfo;
+        const req = http.request(
+          {
+            hostname: 'localhost',
+            port,
+            path: `/events/${encodeURIComponent(key)}`,
+            headers: { 'User-Agent': agent },
           },
+          (res) => {
+            res.on('data', () => {
+              req.destroy();
+              server.close(() => {
+                try {
+                  assert.ok(keys.get(key)!.alive.getTime() > aliceBefore);
+                  resolve();
+                } catch (e) {
+                  reject(e);
+                }
+              });
+            });
+          }
         );
         req.on('error', (err: NodeJS.ErrnoException) => {
           if (err.code === 'ECONNRESET') {

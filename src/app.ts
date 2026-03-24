@@ -264,6 +264,7 @@ export function createApp(options?: { staticDir?: string }) {
     res.flushHeaders();
 
     sseClients.set(key, res);
+    expireKey(key, keys);
 
     // Send current state immediately
     const snapshot = {
