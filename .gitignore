@@ -16,6 +16,10 @@ uploads
 # Test coverage
 coverage
 
+# Playwright
+playwright-report
+test-results
+
 # Test / build artifacts
 static
 

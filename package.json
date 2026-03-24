@@ -21,6 +21,7 @@
     "test": "node --import tsx --test tests/keyStore.test.ts tests/utils.test.ts tests/converter.test.ts tests/app.test.ts",
     "test:watch": "node --import tsx --test --watch tests/keyStore.test.ts tests/utils.test.ts tests/converter.test.ts tests/app.test.ts",
     "coverage": "c8 --reporter=text --reporter=html node --import tsx --test tests/keyStore.test.ts tests/utils.test.ts tests/converter.test.ts tests/app.test.ts",
+    "e2e": "playwright test",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -52,6 +53,7 @@
     "transliteration": "^2.6.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.5.0",
