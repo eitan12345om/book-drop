@@ -1,5 +1,6 @@
-/* Design tokens */
+/* Design tokens — light mode (default) */
 :root {
+  color-scheme: light;
   --bg: #f5f4f1;
   --surface: #ffffff;
   --border: #e2ddd8;
@@ -19,8 +20,11 @@
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.04);
   --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
 }
+
+/* Dark mode — OS preference (unless user explicitly chose light) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
     --bg: #0c0a09;
     --surface: #1c1917;
     --border: #292524;
@@ -36,6 +40,25 @@
     --error-text: #fca5a5;
   }
 }
+
+/* Dark mode — explicit toggle */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0c0a09;
+  --surface: #1c1917;
+  --border: #292524;
+  --text: #fafaf9;
+  --text-muted: #a8a29e;
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --success-bg: #052e16;
+  --success-border: #166534;
+  --success-text: #86efac;
+  --error-bg: #450a0a;
+  --error-border: #991b1b;
+  --error-text: #fca5a5;
+}
+
 *,
 *::before,
 *::after {
@@ -65,6 +88,7 @@ a:hover {
 
 /* Header */
 .page-header {
+  position: relative;
   text-align: center;
   margin-bottom: 2rem;
 }
@@ -78,6 +102,50 @@ a:hover {
   color: var(--text-muted);
   margin: 0;
   font-size: 0.9rem;
+}
+
+/* Theme toggle */
+.btn-theme {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition:
+    border-color 0.12s,
+    color 0.12s;
+}
+.btn-theme:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-theme:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.btn-theme svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+.btn-theme .icon-sun {
+  display: none;
+}
+[data-theme='dark'] .btn-theme .icon-sun {
+  display: block;
+}
+[data-theme='dark'] .btn-theme .icon-moon {
+  display: none;
 }
 
 /* Card */
