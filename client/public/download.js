@@ -67,10 +67,25 @@ function handleStatusPayload(data) {
   renderDownloads(file, urls);
 }
 
-/** Opens an SSE connection for the given key; falls back to polling on error. */
+/** Opens an SSE connection for the given key; falls back to polling if SSE is unsupported or errors. */
 function startSSE(key) {
   stopSSE();
-  const es = new EventSource('/events/' + encodeURIComponent(key));
+
+  if (typeof EventSource === 'undefined') {
+    // SSE not supported — start polling immediately
+    poll();
+    pollTimer = setInterval(poll, POLL_INTERVAL_MS);
+    return;
+  }
+
+  var es;
+  try {
+    es = new EventSource('/events/' + encodeURIComponent(key));
+  } catch (_) {
+    poll();
+    pollTimer = setInterval(poll, POLL_INTERVAL_MS);
+    return;
+  }
   currentSSE = es;
 
   es.onmessage = function (e) {
@@ -96,6 +111,7 @@ function startSSE(key) {
     stopSSE();
     // Fall back to polling if the SSE connection drops
     if (currentKey) {
+      poll();
       pollTimer = setInterval(poll, POLL_INTERVAL_MS);
     }
   };
