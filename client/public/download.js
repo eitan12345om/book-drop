@@ -162,37 +162,46 @@ function renderDownloads(file, urls) {
 }
 
 /** Polls the status endpoint once and updates the UI based on the response. */
-async function poll() {
+function poll() {
   if (!currentKey) {
     return;
   }
   const key = currentKey;
-  try {
-    const res = await fetch('/status/' + encodeURIComponent(key));
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', '/status/' + encodeURIComponent(key));
+  xhr.addEventListener('load', () => {
     if (key !== currentKey) {
       return;
     }
-    if (!res.ok) {
+    if (xhr.status >= 200 && xhr.status < 300) {
+      let data;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch (_) {
+        return;
+      }
+      handleStatusPayload(data);
+    } else {
       stopPolling();
       currentKey = null;
       renderDownloads(null, []);
       setStatus('idle', 'No key \u2014 tap refresh to generate one');
-      showError((await res.text()) || 'Key expired. Tap refresh to get a new one.');
-      return;
+      showError(xhr.responseText || 'Key expired. Tap refresh to get a new one.');
     }
-    handleStatusPayload(await res.json());
-  } catch (_) {
+  });
+  xhr.addEventListener('error', () => {
     if (key !== currentKey) {
       return;
     }
     stopPolling();
     showError('Could not reach the server.');
     setStatus('idle', 'No key \u2014 tap refresh to generate one');
-  }
+  });
+  xhr.send();
 }
 
 /** Requests a new session key from the server and begins SSE. */
-async function requestKey() {
+function requestKey() {
   stopPolling();
   stopSSE();
   hideError();
@@ -203,23 +212,28 @@ async function requestKey() {
   setStatus('idle', 'Generating key\u2026');
   refreshBtn.disabled = true;
 
-  try {
-    const res = await fetch('/generate', { method: 'POST' });
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/generate');
+  xhr.addEventListener('load', () => {
     refreshBtn.disabled = false;
-    if (!res.ok) {
-      throw new Error(await res.text());
+    if (xhr.status >= 200 && xhr.status < 300) {
+      const key = xhr.responseText.trim();
+      currentKey = key;
+      keyDisplay.textContent = key;
+      keyDisplay.setAttribute('aria-label', 'Key: ' + key.split('').join(' '));
+      setStatus('waiting', 'Waiting for a file to be sent\u2026');
+      startSSE(key);
+    } else {
+      showError(xhr.responseText || 'Could not reach the server. Is it running?');
+      setStatus('idle', 'No key \u2014 tap refresh to generate one');
     }
-    const key = (await res.text()).trim();
-    currentKey = key;
-    keyDisplay.textContent = key;
-    keyDisplay.setAttribute('aria-label', 'Key: ' + key.split('').join(' '));
-    setStatus('waiting', 'Waiting for a file to be sent\u2026');
-    startSSE(key);
-  } catch (_) {
+  });
+  xhr.addEventListener('error', () => {
     refreshBtn.disabled = false;
     showError('Could not reach the server. Is it running?');
     setStatus('idle', 'No key \u2014 tap refresh to generate one');
-  }
+  });
+  xhr.send();
 }
 
 refreshBtn.addEventListener('click', requestKey);
