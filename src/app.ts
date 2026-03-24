@@ -52,6 +52,7 @@ export function createApp(options?: { staticDir?: string }) {
   function notifySSE(key: string, info: KeyInfo): void {
     const sse = sseClients.get(key);
     if (!sse) {
+      logger.warn({ key }, 'notifySSE: no SSE client registered');
       return;
     }
     const payload = {
@@ -60,9 +61,19 @@ export function createApp(options?: { staticDir?: string }) {
       urls: info.urls,
     };
     sse.write(`data: ${JSON.stringify(payload)}\n\n`);
+    (sse as any).flush?.();
   }
 
-  app.use(compression());
+  app.use(
+    compression({
+      filter: (req, res) => {
+        if (req.path.startsWith('/events/')) {
+          return false;
+        }
+        return compression.filter(req, res);
+      },
+    })
+  );
   app.use(helmet({ contentSecurityPolicy: false }));
   app.set('trust proxy', 1);
 
@@ -267,6 +278,7 @@ export function createApp(options?: { staticDir?: string }) {
 
     sseClients.set(key, res);
     expireKey(key, keys);
+    logger.info({ key }, 'SSE client connected');
 
     // Send current state immediately
     const snapshot = {
@@ -275,10 +287,12 @@ export function createApp(options?: { staticDir?: string }) {
       urls: info.urls,
     };
     res.write(`data: ${JSON.stringify(snapshot)}\n\n`);
+    (res as any).flush?.();
 
     // Close after 30 minutes to prevent indefinitely held sockets
     const maxDurationTimer = setTimeout(() => {
       res.write('event: expired\ndata: {}\n\n');
+      (res as any).flush?.();
       res.end();
       sseClients.delete(key);
       logger.info({ key }, 'SSE connection reached max duration');
