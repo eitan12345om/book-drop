@@ -1,6 +1,9 @@
 // Apply theme immediately (before first paint) to avoid flash
 (function () {
-  const stored = localStorage.getItem('theme');
+  let stored = null;
+  try {
+    stored = localStorage.getItem('theme');
+  } catch (_) {}
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   document.documentElement.setAttribute(
     'data-theme',
@@ -23,7 +26,9 @@ function initThemeToggle() {
   btn.addEventListener('click', () => {
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
+    try {
+      localStorage.setItem('theme', next);
+    } catch (_) {}
     update();
   });
 
