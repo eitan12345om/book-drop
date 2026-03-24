@@ -39,3 +39,22 @@ test('upload a text file and see success message', async ({ page }) => {
 
   await expect(page.locator('#status-msg')).toContainText('Sent to', { timeout: 10_000 });
 });
+
+test('key input is preserved after a successful upload', async ({ page }) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Kobo/4.0 Test' },
+  });
+  const key = (await apiRes.text()).trim();
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill(key);
+  await page.locator('#file-input').setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hello ebook'),
+  });
+  await page.locator('#submit-btn').click();
+  await expect(page.locator('#status-msg')).toContainText('Sent to', { timeout: 10_000 });
+
+  await expect(page.locator('#keyinput')).toHaveValue(key);
+});

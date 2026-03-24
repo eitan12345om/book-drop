@@ -164,7 +164,7 @@ function validateFile(file) {
   if (!ACCEPTED_EXTENSIONS.includes(ext)) {
     showStatus(
       'error',
-      `Unsupported format: ${file.name}\nAllowed: ${ACCEPTED_EXTENSIONS.join(', ')}`,
+      `Unsupported format: ${file.name}\nAllowed: ${ACCEPTED_EXTENSIONS.join(', ')}`
     );
     return false;
   }
@@ -296,7 +296,6 @@ document.getElementById('upload-form').addEventListener('submit', (e) => {
       showStatus('success', xhr.responseText);
       setFile(null);
       document.getElementById('urlinput').value = '';
-      document.getElementById('keyinput').value = '';
     } else {
       showStatus('error', xhr.responseText || 'Upload failed.');
     }
