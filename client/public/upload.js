@@ -275,5 +275,26 @@ document.getElementById('upload-form').addEventListener('submit', (e) => {
   xhr.send(formData);
 });
 
+/** Checks if a file was shared via the Web Share Target API and pre-populates the drop zone. */
+async function checkPendingShare() {
+  if (!('caches' in window)) {
+    return;
+  }
+  const cache = await caches.open('bookdrop-share');
+  const response = await cache.match('/pending-share');
+  if (!response) {
+    return;
+  }
+  await cache.delete('/pending-share');
+  const name = decodeURIComponent(response.headers.get('X-File-Name') || 'shared-file');
+  const file = new File([await response.blob()], name, {
+    type: response.headers.get('Content-Type') || 'application/octet-stream',
+  });
+  if (validateFile(file)) {
+    setFile(file);
+  }
+}
+
 buildOptionsGrid();
 wireMutualExclusion();
+checkPendingShare();

@@ -24,6 +24,7 @@ import {
   STATUS_RATE_LIMIT_MAX,
   UPLOAD_RATE_LIMIT_MAX,
   DELETE_RATE_LIMIT_MAX,
+  EVENTS_RATE_LIMIT_MAX,
 } from './config.js';
 import { logger } from './logger.js';
 import type { KeyInfo } from './types.js';
@@ -44,7 +45,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export function createApp(options?: { staticDir?: string }) {
   const STATIC_DIR = options?.staticDir ?? path.join(__dirname, '../client/public');
   const keys = new Map<string, KeyInfo>();
+  const sseClients = new Map<string, express.Response>();
   const app = express();
+
+  function notifySSE(key: string, info: KeyInfo): void {
+    const sse = sseClients.get(key);
+    if (!sse) {
+      return;
+    }
+    const payload = {
+      alive: info.alive,
+      file: info.file ? { name: info.file.name } : null,
+      urls: info.urls,
+    };
+    sse.write(`data: ${JSON.stringify(payload)}\n\n`);
+  }
 
   app.use(helmet({ contentSecurityPolicy: false }));
   app.set('trust proxy', 1);
@@ -129,6 +144,13 @@ export function createApp(options?: { staticDir?: string }) {
     legacyHeaders: false,
   });
 
+  const eventsLimiter = rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max: EVENTS_RATE_LIMIT_MAX,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   app.post('/generate', generateLimiter, (req, res) => {
     if (keys.size >= MAX_ACTIVE_KEYS) {
       res.status(503).send('Server busy');
@@ -149,6 +171,14 @@ export function createApp(options?: { staticDir?: string }) {
       timer: null,
       downloadTimer: null,
       alive: new Date(),
+    };
+    info.onRemove = () => {
+      const sse = sseClients.get(key);
+      if (sse) {
+        sse.write('event: expired\ndata: {}\n\n');
+        sse.end();
+        sseClients.delete(key);
+      }
     };
     keys.set(key, info);
     expireKey(key, keys);
@@ -189,6 +219,63 @@ export function createApp(options?: { staticDir?: string }) {
       alive: info.alive,
       file: info.file ? { name: info.file.name } : null,
       urls: info.urls,
+    });
+  });
+
+  app.get('/events/:key', eventsLimiter, (req, res) => {
+    const key = (req.params.key as string).toUpperCase();
+    if (!isValidKey(key)) {
+      res.status(400).json({ error: 'Invalid key format' });
+      return;
+    }
+    const info = keys.get(key);
+    if (!info) {
+      res.status(404).json({ error: 'Unknown key' });
+      return;
+    }
+    const requestAgent = req.get('user-agent') ?? '';
+    if (info.agent !== requestAgent) {
+      logger.warn({ key, expected: info.agent, got: requestAgent }, 'UA mismatch for SSE');
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    // Displace any existing connection for this key
+    const existing = sseClients.get(key);
+    if (existing) {
+      existing.end();
+      sseClients.delete(key);
+    }
+
+    res.set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.flushHeaders();
+
+    sseClients.set(key, res);
+
+    // Send current state immediately
+    const snapshot = {
+      alive: info.alive,
+      file: info.file ? { name: info.file.name } : null,
+      urls: info.urls,
+    };
+    res.write(`data: ${JSON.stringify(snapshot)}\n\n`);
+
+    // Close after 30 minutes to prevent indefinitely held sockets
+    const maxDurationTimer = setTimeout(() => {
+      res.write('event: expired\ndata: {}\n\n');
+      res.end();
+      sseClients.delete(key);
+      logger.info({ key }, 'SSE connection reached max duration');
+    }, 30 * 60_000).unref();
+
+    req.on('close', () => {
+      clearTimeout(maxDurationTimer);
+      sseClients.delete(key);
     });
   });
 
@@ -349,6 +436,7 @@ export function createApp(options?: { staticDir?: string }) {
         info.file = { name: filename, path: convertedPath, uploaded: new Date() };
         expireKey(key, keys);
         logger.info({ key, filename, size: convertedSize }, 'File staged');
+        notifySSE(key, info);
 
         const deviceName = info.agent.includes('Kobo')
           ? 'Kobo'
@@ -369,8 +457,13 @@ export function createApp(options?: { staticDir?: string }) {
         return;
       }
 
+      notifySSE(key, info);
       res.send(`URL added: ${submittedUrl}`);
     });
+  });
+
+  app.post('/share', (_req, res) => {
+    res.redirect('/');
   });
 
   app.get('/receive', (_req, res) => {
