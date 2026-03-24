@@ -81,16 +81,35 @@ function buildOptionsGrid() {
     const lbl = document.createElement('label');
     lbl.className = 'option-item';
     lbl.htmlFor = id;
-    lbl.innerHTML =
-      `<input type="checkbox" id="${id}" name="${name}"${defaultChecked ? ' checked' : ''}` +
-      ` aria-describedby="${id}-desc">` +
-      `<span>` +
-      `<span class="option-label-row">` +
-      `<span class="option-label">${label}</span>` +
-      `<span class="option-tag">${tag}</span>` +
-      `</span>` +
-      `<span class="option-desc" id="${id}-desc">${description}</span>` +
-      `</span>`;
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = id;
+    input.name = name;
+    input.checked = defaultChecked;
+    input.setAttribute('aria-describedby', `${id}-desc`);
+
+    const wrapper = document.createElement('span');
+
+    const labelRow = document.createElement('span');
+    labelRow.className = 'option-label-row';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'option-label';
+    labelEl.textContent = label;
+
+    const tagEl = document.createElement('span');
+    tagEl.className = 'option-tag';
+    tagEl.textContent = tag;
+
+    labelRow.append(labelEl, tagEl);
+
+    const descEl = document.createElement('span');
+    descEl.className = 'option-desc';
+    descEl.id = `${id}-desc`;
+    descEl.textContent = description;
+
+    wrapper.append(labelRow, descEl);
+    lbl.append(input, wrapper);
     optionsGrid.appendChild(lbl);
   });
 }
@@ -111,6 +130,7 @@ function wireMutualExclusion() {
 }
 
 let selectedFile = null;
+let currentUploadId = 0;
 
 /** Returns a human-readable file size string. */
 function formatSize(bytes) {
@@ -223,6 +243,18 @@ document.getElementById('upload-form').addEventListener('submit', (e) => {
     return;
   }
 
+  if (urlVal) {
+    try {
+      const parsed = new URL(urlVal);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw new Error();
+      }
+    } catch {
+      showStatus('error', 'Please enter a valid http or https URL.');
+      return;
+    }
+  }
+
   // Build FormData explicitly so drag-and-drop files are included
   const formData = new FormData();
   formData.set('key', key);
@@ -238,6 +270,7 @@ document.getElementById('upload-form').addEventListener('submit', (e) => {
     }
   });
 
+  const uploadId = ++currentUploadId;
   submitBtn.disabled = true;
   setProgress(0, true);
   showStatus('info', 'Uploading\u2026');
@@ -254,6 +287,9 @@ document.getElementById('upload-form').addEventListener('submit', (e) => {
   });
 
   xhr.addEventListener('load', () => {
+    if (uploadId !== currentUploadId) {
+      return;
+    }
     submitBtn.disabled = false;
     setProgress(0, false);
     if (xhr.status >= 200 && xhr.status < 300) {
@@ -267,6 +303,9 @@ document.getElementById('upload-form').addEventListener('submit', (e) => {
   });
 
   xhr.addEventListener('error', () => {
+    if (uploadId !== currentUploadId) {
+      return;
+    }
     submitBtn.disabled = false;
     setProgress(0, false);
     showStatus('error', 'Could not reach the server. Is it running?');
