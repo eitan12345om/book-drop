@@ -43,6 +43,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "compression": "^1.8.1",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.1",
     "file-type": "^21.3.3",
@@ -54,6 +55,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@types/compression": "^1.8.1",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.5.0",

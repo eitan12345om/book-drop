@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import helmet from 'helmet';
 import multer from 'multer';
 import fs from 'fs';
@@ -61,6 +62,7 @@ export function createApp(options?: { staticDir?: string }) {
     sse.write(`data: ${JSON.stringify(payload)}\n\n`);
   }
 
+  app.use(compression());
   app.use(helmet({ contentSecurityPolicy: false }));
   app.set('trust proxy', 1);
 
