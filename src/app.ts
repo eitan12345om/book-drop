@@ -68,11 +68,17 @@ export function createApp(options?: { staticDir?: string }) {
     const start = Date.now();
     res.on('finish', () => {
       logger.info(
-        { method: req.method, url: req.url, status: res.statusCode, ms: Date.now() - start },
+        {
+          method: req.method,
+          url: req.url,
+          status: res.statusCode,
+          ms: Date.now() - start,
+          ua: req.get('user-agent'),
+        },
         '%s %s %d',
         req.method,
         req.url,
-        res.statusCode,
+        res.statusCode
       );
     });
     next();
@@ -378,7 +384,7 @@ export function createApp(options?: { staticDir?: string }) {
           res
             .status(400)
             .send(
-              `Unsupported file type: ${req.file.originalname} (${detected?.mime ?? mimetype})`,
+              `Unsupported file type: ${req.file.originalname} (${detected?.mime ?? mimetype})`
             );
           deleteFile(req.file.path);
           return;

@@ -1,3 +1,5 @@
+// NOTE: this file runs on old Kobo WebKit (538.1) which does not support `let`.
+// Use `var` for mutable variables; `const` is fine.
 const POLL_INTERVAL_MS = 5000;
 let currentKey = null;
 let pollTimer = null;
@@ -59,7 +61,7 @@ function handleStatusPayload(data) {
   const hasContent = (file && file.name) || urls.length > 0;
   setStatus(
     hasContent ? 'active' : 'waiting',
-    hasContent ? 'File ready \u2014 tap to download' : 'Waiting for a file to be sent\u2026',
+    hasContent ? 'File ready \u2014 tap to download' : 'Waiting for a file to be sent\u2026'
   );
   renderDownloads(file, urls);
 }
@@ -151,9 +153,9 @@ function renderDownloads(file, urls) {
       link.rel = 'noopener noreferrer';
       link.innerHTML =
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M12.232 4.232a2.5 2.5 0 0 1 3.536 3.536l-1.225 1.224a.75.75 0 0 0 1.061 1.06l1.224-1.224a4 4 0 0 0-5.656-5.656l-3 3a4 4 0 0 0 .225 5.865.75.75 0 0 0 .977-1.138 2.5 2.5 0 0 1-.142-3.667l3-3Z"/><path d="M11.603 7.963a.75.75 0 0 0-.977 1.138 2.5 2.5 0 0 1 .142 3.667l-3 3a2.5 2.5 0 0 1-3.536-3.536l1.225-1.224a.75.75 0 0 0-1.061-1.06l-1.224 1.224a4 4 0 1 0 5.656 5.656l3-3a4 4 0 0 0-.225-5.865Z"/></svg>';
-      const span = document.createElement('span');
-      span.textContent = urls[i];
-      link.appendChild(span);
+      const urlSpan = document.createElement('span');
+      urlSpan.textContent = urls[i];
+      link.appendChild(urlSpan);
       downloadList.appendChild(link);
     }
   }
@@ -169,7 +171,10 @@ function poll() {
   const key = currentKey;
   const xhr = new XMLHttpRequest();
   xhr.open('GET', '/status/' + encodeURIComponent(key));
-  xhr.addEventListener('load', () => {
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState !== 4) {
+      return;
+    }
     if (key !== currentKey) {
       return;
     }
@@ -181,6 +186,10 @@ function poll() {
         return;
       }
       handleStatusPayload(data);
+    } else if (xhr.status === 0) {
+      stopPolling();
+      showError('Could not reach the server.');
+      setStatus('idle', 'No key \u2014 tap refresh to generate one');
     } else {
       stopPolling();
       currentKey = null;
@@ -188,15 +197,7 @@ function poll() {
       setStatus('idle', 'No key \u2014 tap refresh to generate one');
       showError(xhr.responseText || 'Key expired. Tap refresh to get a new one.');
     }
-  });
-  xhr.addEventListener('error', () => {
-    if (key !== currentKey) {
-      return;
-    }
-    stopPolling();
-    showError('Could not reach the server.');
-    setStatus('idle', 'No key \u2014 tap refresh to generate one');
-  });
+  };
   xhr.send();
 }
 
@@ -214,7 +215,10 @@ function requestKey() {
 
   const xhr = new XMLHttpRequest();
   xhr.open('POST', '/generate');
-  xhr.addEventListener('load', () => {
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState !== 4) {
+      return;
+    }
     refreshBtn.disabled = false;
     if (xhr.status >= 200 && xhr.status < 300) {
       const key = xhr.responseText.trim();
@@ -227,12 +231,7 @@ function requestKey() {
       showError(xhr.responseText || 'Could not reach the server. Is it running?');
       setStatus('idle', 'No key \u2014 tap refresh to generate one');
     }
-  });
-  xhr.addEventListener('error', () => {
-    refreshBtn.disabled = false;
-    showError('Could not reach the server. Is it running?');
-    setStatus('idle', 'No key \u2014 tap refresh to generate one');
-  });
+  };
   xhr.send();
 }
 
