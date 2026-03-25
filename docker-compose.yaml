@@ -1,9 +1,9 @@
 services:
-  ereader_friend:
+  book-drop:
     build:
       context: .
       dockerfile: ./Dockerfile
-    container_name: ereader_friend
+    container_name: book-drop
     restart: unless-stopped
     ports:
       - '3001:3001'
