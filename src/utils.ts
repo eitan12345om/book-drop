@@ -4,6 +4,7 @@ import JSZip from 'jszip';
 import { transliterate } from 'transliteration';
 import { logger } from './logger.js';
 import type { MetadataDiff } from './types.js';
+import { GOOGLE_BOOKS_API_KEY } from './config.js';
 
 export const KEY_REGEX = /^[23456789ACDEFGHJKLMNPRSTUVWXYZ]{4}$/;
 
@@ -133,7 +134,12 @@ export async function fetchGoogleBooksMetadata(
     throw new Error('No title or author to search');
   }
   const parts = [title && `intitle:${title}`, author && `inauthor:${author}`].filter(Boolean);
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(parts.join('+'))}&maxResults=1`;
+  const url = new URL('https://www.googleapis.com/books/v1/volumes');
+  url.searchParams.set('q', parts.join('+'));
+  url.searchParams.set('maxResults', '1');
+  if (GOOGLE_BOOKS_API_KEY) {
+    url.searchParams.set('key', GOOGLE_BOOKS_API_KEY);
+  }
   const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
   if (!res.ok) {
     throw new Error(`Google Books API error: ${res.status}`);

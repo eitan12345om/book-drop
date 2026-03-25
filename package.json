@@ -10,8 +10,8 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "start": "node dist/server.js",
-    "dev": "tsx watch src/server.ts",
+    "start": "node --env-file=.env dist/server.js",
+    "dev": "tsx --env-file=.env watch src/server.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src tests",
