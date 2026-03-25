@@ -100,3 +100,28 @@ test('key input is preserved after a successful upload', async ({ page }) => {
 
   await expect(page.locator('#keyinput')).toHaveValue(key);
 });
+
+test('update metadata option is disabled when no file is selected', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#fetchmetadata')).toBeDisabled();
+});
+
+test('update metadata option is disabled for non-EPUB files', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles({
+    name: 'test.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('fake pdf'),
+  });
+  await expect(page.locator('#fetchmetadata')).toBeDisabled();
+});
+
+test('update metadata option is enabled for EPUB files', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles({
+    name: 'test.epub',
+    mimeType: 'application/epub+zip',
+    buffer: Buffer.from('fake epub'),
+  });
+  await expect(page.locator('#fetchmetadata')).toBeEnabled();
+});

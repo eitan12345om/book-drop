@@ -70,6 +70,16 @@ const OPTIONS = [
       "Replaces accented and non-Latin characters in the filename with ASCII equivalents (e.g. Ü→U, é→e). Helps older devices that can't handle Unicode filenames.",
     defaultChecked: false,
   },
+  {
+    id: 'fetchmetadata',
+    name: 'fetchmetadata',
+    label: 'Update metadata',
+    tag: 'EPUB only',
+    description:
+      "Looks up title, author, publisher, and description from Google Books and updates the EPUB's internal metadata. You'll see what changed on the download page.",
+    defaultChecked: false,
+    enabledExtensions: ['.epub'],
+  },
 ];
 
 const MUTUALLY_EXCLUSIVE = ['kepubify', 'kindlegen'];
@@ -77,7 +87,7 @@ const MUTUALLY_EXCLUSIVE = ['kepubify', 'kindlegen'];
 /** Renders the conversion option checkboxes into the options grid. */
 function buildOptionsGrid() {
   const optionsGrid = document.getElementById('options-grid');
-  OPTIONS.forEach(({ id, name, label, tag, description, defaultChecked }) => {
+  OPTIONS.forEach(({ id, name, label, tag, description, defaultChecked, enabledExtensions }) => {
     const lbl = document.createElement('label');
     lbl.className = 'option-item';
     lbl.htmlFor = id;
@@ -87,6 +97,11 @@ function buildOptionsGrid() {
     input.name = name;
     input.checked = defaultChecked;
     input.setAttribute('aria-describedby', `${id}-desc`);
+    if (enabledExtensions) {
+      input.disabled = true;
+      input.dataset.enabledExtensions = enabledExtensions.join(',');
+      lbl.classList.add('option-disabled');
+    }
 
     const wrapper = document.createElement('span');
 
@@ -111,6 +126,29 @@ function buildOptionsGrid() {
     wrapper.append(labelRow, descEl);
     lbl.append(input, wrapper);
     optionsGrid.appendChild(lbl);
+  });
+}
+
+/** Enables or disables options that restrict to certain file extensions based on the selected file. */
+function updateOptionAvailability(file) {
+  OPTIONS.forEach(({ id, enabledExtensions }) => {
+    if (!enabledExtensions) {
+      return;
+    }
+    const input = document.getElementById(id);
+    if (!input) {
+      return;
+    }
+    const ext = file ? '.' + file.name.split('.').pop().toLowerCase() : null;
+    const enabled = ext !== null && enabledExtensions.includes(ext);
+    input.disabled = !enabled;
+    if (!enabled) {
+      input.checked = false;
+    }
+    const label = input.closest('label');
+    if (label) {
+      label.classList.toggle('option-disabled', !enabled);
+    }
   });
 }
 
@@ -156,6 +194,7 @@ function setFile(file) {
     dropZone.classList.remove('has-file');
     dropZone.setAttribute('aria-label', 'Choose or drop an ebook file');
   }
+  updateOptionAvailability(file);
 }
 
 /** Returns true if the file's extension is in ACCEPTED_EXTENSIONS, showing an error otherwise. */

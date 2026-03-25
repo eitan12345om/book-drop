@@ -149,6 +149,39 @@
   height: 1.1rem;
 }
 
+/* Metadata diff */
+.metadata-diff {
+  padding: 0.6rem 1rem 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.metadata-diff-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr auto 1fr;
+  gap: 0.4rem;
+  align-items: baseline;
+  font-size: 0.78rem;
+}
+.metadata-field {
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: capitalize;
+}
+.metadata-before {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  word-break: break-word;
+}
+.metadata-arrow {
+  color: var(--text-muted);
+}
+.metadata-after {
+  color: var(--text);
+  word-break: break-word;
+}
+
 /* Error */
 .error-msg {
   text-align: center;

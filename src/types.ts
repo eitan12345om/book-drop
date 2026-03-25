@@ -1,7 +1,17 @@
+export interface MetadataField {
+  before: string;
+  after: string;
+}
+
+export interface MetadataDiff {
+  [field: string]: MetadataField;
+}
+
 export interface FileInfo {
   name: string;
   path: string;
   uploaded: Date;
+  metadataDiff?: MetadataDiff;
 }
 
 export interface KeyInfo {

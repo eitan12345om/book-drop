@@ -48,6 +48,7 @@
     "express-rate-limit": "^8.3.1",
     "file-type": "^21.3.3",
     "helmet": "^8.1.0",
+    "jszip": "^3.10.1",
     "multer": "^2.1.1",
     "pino": "^10.3.1",
     "sanitize-filename": "^1.6.4",

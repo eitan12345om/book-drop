@@ -1,16 +1,243 @@
-import { describe, it, mock } from 'node:test';
+import { describe, it, mock, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
+import fsp from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import JSZip from 'jszip';
 import {
   isValidKey,
   isValidUrl,
   isEreaderAgent,
   doTransliterate,
   deleteFile,
+  readEpubMetadata,
+  writeEpubMetadata,
+  fetchGoogleBooksMetadata,
+  updateEpubMetadata,
   ALLOWED_TYPES,
   ALLOWED_EXTENSIONS,
 } from '../src/utils.js';
 import { envInt } from '../src/config.js';
+
+// ── EPUB metadata helpers ────────────────────────────────────────────────────
+
+/** Builds a minimal valid EPUB ZIP at a temp path with the given DC metadata fields. */
+async function makeTempEpub(metadata: Record<string, string>): Promise<string> {
+  const dcElements = Object.entries(metadata)
+    .map(([k, v]) => `    <dc:${k}>${v}</dc:${k}>`)
+    .join('\n');
+  const opf = `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+${dcElements}
+  </metadata>
+</package>`;
+  const container = `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`;
+  const zip = new JSZip();
+  zip.file('META-INF/container.xml', container);
+  zip.file('OEBPS/content.opf', opf);
+  const buf = await zip.generateAsync({ type: 'nodebuffer' });
+  const tmpPath = path.join(
+    os.tmpdir(),
+    `test-${Date.now()}-${Math.random().toString(36).slice(2)}.epub`
+  );
+  await fsp.writeFile(tmpPath, buf);
+  return tmpPath;
+}
+
+describe('readEpubMetadata', () => {
+  it('extracts title, creator, publisher from OPF', async () => {
+    const tmpPath = await makeTempEpub({
+      title: 'Pride and Prejudice',
+      creator: 'Jane Austen',
+      publisher: 'T. Egerton',
+    });
+    try {
+      const meta = await readEpubMetadata(tmpPath);
+      assert.strictEqual(meta.title, 'Pride and Prejudice');
+      assert.strictEqual(meta.creator, 'Jane Austen');
+      assert.strictEqual(meta.publisher, 'T. Egerton');
+    } finally {
+      await fsp.unlink(tmpPath).catch(() => {});
+    }
+  });
+
+  it('returns empty string for missing fields', async () => {
+    const tmpPath = await makeTempEpub({ title: 'Only Title' });
+    try {
+      const meta = await readEpubMetadata(tmpPath);
+      assert.strictEqual(meta.title, 'Only Title');
+      assert.strictEqual(meta.creator, '');
+      assert.strictEqual(meta.publisher, '');
+    } finally {
+      await fsp.unlink(tmpPath).catch(() => {});
+    }
+  });
+});
+
+describe('writeEpubMetadata', () => {
+  it('patches existing fields and round-trips correctly', async () => {
+    const tmpPath = await makeTempEpub({ title: 'Old Title', creator: 'Old Author' });
+    try {
+      await writeEpubMetadata(tmpPath, { title: 'New Title', creator: 'New Author' });
+      const meta = await readEpubMetadata(tmpPath);
+      assert.strictEqual(meta.title, 'New Title');
+      assert.strictEqual(meta.creator, 'New Author');
+    } finally {
+      await fsp.unlink(tmpPath).catch(() => {});
+    }
+  });
+
+  it('inserts fields that were not present before', async () => {
+    const tmpPath = await makeTempEpub({ title: 'A Book' });
+    try {
+      await writeEpubMetadata(tmpPath, { publisher: 'New Publisher' });
+      const meta = await readEpubMetadata(tmpPath);
+      assert.strictEqual(meta.title, 'A Book');
+      assert.strictEqual(meta.publisher, 'New Publisher');
+    } finally {
+      await fsp.unlink(tmpPath).catch(() => {});
+    }
+  });
+});
+
+describe('fetchGoogleBooksMetadata', () => {
+  let originalFetch: typeof global.fetch;
+
+  before(() => {
+    originalFetch = global.fetch;
+  });
+
+  after(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('returns mapped fields from a Google Books response', async () => {
+    global.fetch = mock.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        totalItems: 1,
+        items: [
+          {
+            volumeInfo: {
+              title: 'Pride and Prejudice',
+              authors: ['Jane Austen'],
+              publisher: 'Penguin',
+              publishedDate: '2002',
+              description: 'A classic novel.',
+              categories: ['Fiction'],
+            },
+          },
+        ],
+      }),
+    })) as unknown as typeof fetch;
+
+    const meta = await fetchGoogleBooksMetadata('Pride and Prejudice', 'Jane Austen');
+    assert.strictEqual(meta.title, 'Pride and Prejudice');
+    assert.strictEqual(meta.creator, 'Jane Austen');
+    assert.strictEqual(meta.publisher, 'Penguin');
+    assert.strictEqual(meta.date, '2002');
+    assert.strictEqual(meta.subject, 'Fiction');
+  });
+
+  it('throws when no results are returned', async () => {
+    global.fetch = mock.fn(async () => ({
+      ok: true,
+      json: async () => ({ totalItems: 0, items: [] }),
+    })) as unknown as typeof fetch;
+
+    await assert.rejects(() => fetchGoogleBooksMetadata('Unknown Book XYZ', ''), /No results/);
+  });
+
+  it('throws when the API returns a non-ok status', async () => {
+    global.fetch = mock.fn(async () => ({ ok: false, status: 429 })) as unknown as typeof fetch;
+
+    await assert.rejects(
+      () => fetchGoogleBooksMetadata('A Book', 'An Author'),
+      /Google Books API error/
+    );
+  });
+});
+
+describe('updateEpubMetadata', () => {
+  let originalFetch: typeof global.fetch;
+
+  before(() => {
+    originalFetch = global.fetch;
+  });
+
+  after(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('returns a diff of changed fields', async () => {
+    const tmpPath = await makeTempEpub({ title: 'Old Title', creator: 'Old Author' });
+    try {
+      global.fetch = mock.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          totalItems: 1,
+          items: [
+            {
+              volumeInfo: {
+                title: 'New Title',
+                authors: ['New Author'],
+                publisher: 'Some Publisher',
+              },
+            },
+          ],
+        }),
+      })) as unknown as typeof fetch;
+
+      const diff = await updateEpubMetadata(tmpPath);
+      assert.strictEqual(diff.title?.before, 'Old Title');
+      assert.strictEqual(diff.title?.after, 'New Title');
+      assert.strictEqual(diff.creator?.before, 'Old Author');
+      assert.strictEqual(diff.creator?.after, 'New Author');
+      assert.ok('publisher' in diff);
+    } finally {
+      await fsp.unlink(tmpPath).catch(() => {});
+    }
+  });
+
+  it('returns empty diff when fetched metadata matches existing', async () => {
+    const tmpPath = await makeTempEpub({ title: 'Same Title', creator: 'Same Author' });
+    try {
+      global.fetch = mock.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          totalItems: 1,
+          items: [{ volumeInfo: { title: 'Same Title', authors: ['Same Author'] } }],
+        }),
+      })) as unknown as typeof fetch;
+
+      const diff = await updateEpubMetadata(tmpPath);
+      assert.strictEqual(Object.keys(diff).length, 0);
+    } finally {
+      await fsp.unlink(tmpPath).catch(() => {});
+    }
+  });
+
+  it('propagates fetch errors to the caller', async () => {
+    const tmpPath = await makeTempEpub({ title: 'A Book', creator: 'An Author' });
+    try {
+      global.fetch = mock.fn(async () => ({
+        ok: true,
+        json: async () => ({ totalItems: 0, items: [] }),
+      })) as unknown as typeof fetch;
+
+      await assert.rejects(() => updateEpubMetadata(tmpPath), /No results/);
+    } finally {
+      await fsp.unlink(tmpPath).catch(() => {});
+    }
+  });
+});
 
 describe('isValidKey', () => {
   it('accepts a valid 4-char key', () => {

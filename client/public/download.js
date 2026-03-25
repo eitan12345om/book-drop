@@ -149,6 +149,35 @@ function renderDownloads(file, urls) {
     span.textContent = file.name;
     a.appendChild(span);
     downloadList.appendChild(a);
+
+    var diff = file.metadataDiff;
+    if (diff && Object.keys(diff).length > 0) {
+      var diffEl = document.createElement('div');
+      diffEl.className = 'metadata-diff';
+      Object.keys(diff).forEach(function (field) {
+        var change = diff[field];
+        var row = document.createElement('div');
+        row.className = 'metadata-diff-row';
+        var fieldEl = document.createElement('span');
+        fieldEl.className = 'metadata-field';
+        fieldEl.textContent = field;
+        var beforeEl = document.createElement('span');
+        beforeEl.className = 'metadata-before';
+        beforeEl.textContent = change.before || '(none)';
+        var arrowEl = document.createElement('span');
+        arrowEl.className = 'metadata-arrow';
+        arrowEl.textContent = '\u2192';
+        var afterEl = document.createElement('span');
+        afterEl.className = 'metadata-after';
+        afterEl.textContent = change.after;
+        row.appendChild(fieldEl);
+        row.appendChild(beforeEl);
+        row.appendChild(arrowEl);
+        row.appendChild(afterEl);
+        diffEl.appendChild(row);
+      });
+      downloadList.appendChild(diffEl);
+    }
   }
 
   if (hasUrls) {

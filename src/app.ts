@@ -35,10 +35,12 @@ import {
   isValidUrl,
   deleteFile,
   doTransliterate,
+  updateEpubMetadata,
   TYPE_EPUB,
   ALLOWED_TYPES,
   ALLOWED_EXTENSIONS,
 } from './utils.js';
+import type { MetadataDiff } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -57,7 +59,7 @@ export function createApp(options?: { staticDir?: string }) {
     }
     const payload = {
       alive: info.alive,
-      file: info.file ? { name: info.file.name } : null,
+      file: info.file ? { name: info.file.name, metadataDiff: info.file.metadataDiff } : null,
       urls: info.urls,
     };
     sse.write(`data: ${JSON.stringify(payload)}\n\n`);
@@ -238,7 +240,7 @@ export function createApp(options?: { staticDir?: string }) {
     expireKey(key, keys);
     res.json({
       alive: info.alive,
-      file: info.file ? { name: info.file.name } : null,
+      file: info.file ? { name: info.file.name, metadataDiff: info.file.metadataDiff } : null,
       urls: info.urls,
     });
   });
@@ -478,10 +480,21 @@ export function createApp(options?: { staticDir?: string }) {
           return;
         }
 
+        let metadataDiff: MetadataDiff | undefined;
+        if (req.body?.fetchmetadata && mimetype === TYPE_EPUB) {
+          try {
+            logger.info({ key }, 'Fetching metadata from Google Books');
+            metadataDiff = await updateEpubMetadata(convertedPath);
+            logger.info({ key, changes: Object.keys(metadataDiff).length }, 'Metadata updated');
+          } catch (metaErr) {
+            logger.warn({ err: metaErr, key }, 'Metadata fetch skipped');
+          }
+        }
+
         if (info.file?.path) {
           deleteFile(info.file.path);
         }
-        info.file = { name: filename, path: convertedPath, uploaded: new Date() };
+        info.file = { name: filename, path: convertedPath, uploaded: new Date(), metadataDiff };
         expireKey(key, keys);
         logger.info({ key, filename, size: convertedSize, ip: req.ip }, 'File staged');
         notifySSE(key, info);
