@@ -17,6 +17,7 @@ Optional conversions (requires external tools — see below):
 - EPUB → KEPUB (Kobo, via kepubify) — better typography and font control
 - EPUB → MOBI (Kindle, via KindleGen) — Kindle doesn't support EPUB natively
 - PDF margin cropping (via pdfCropMargins) — fills more of the small screen
+- Update EPUB metadata from Google Books — patches title, author, publisher, etc. and shows a before/after diff on the download page (requires a `GOOGLE_BOOKS_API_KEY`)
 
 ## Running locally
 
@@ -56,16 +57,17 @@ Uses Node.js's built-in test runner (`node:test`) — no extra test framework ne
 
 Copy `.env.example` to `.env` to customise these values.
 
-| Variable               | Default     | Description                                                |
-| ---------------------- | ----------- | ---------------------------------------------------------- |
-| `PORT`                 | `3001`      | HTTP port the server listens on                            |
-| `UPLOAD_DIR`           | `uploads`   | Directory for temporary file storage                       |
-| `EXPIRE_DELAY_MS`      | `30000`     | Inactivity timeout per key (ms)                            |
-| `MAX_EXPIRE_MS`        | `3600000`   | Hard maximum key lifetime (ms)                             |
-| `MAX_FILE_SIZE`        | `838860800` | Upload size limit in bytes (800 MB)                        |
-| `RATE_LIMIT_WINDOW_MS` | `900000`    | Rate-limit window for `/generate` (ms)                     |
-| `RATE_LIMIT_MAX`       | `20`        | Max key generations per window per IP                      |
-| `LOG_LEVEL`            | `info`      | Pino log level (`trace`, `debug`, `info`, `warn`, `error`) |
+| Variable               | Default     | Description                                                                                   |
+| ---------------------- | ----------- | --------------------------------------------------------------------------------------------- |
+| `PORT`                 | `3001`      | HTTP port the server listens on                                                               |
+| `UPLOAD_DIR`           | `uploads`   | Directory for temporary file storage                                                          |
+| `EXPIRE_DELAY_MS`      | `30000`     | Inactivity timeout per key (ms)                                                               |
+| `MAX_EXPIRE_MS`        | `3600000`   | Hard maximum key lifetime (ms)                                                                |
+| `MAX_FILE_SIZE`        | `838860800` | Upload size limit in bytes (800 MB)                                                           |
+| `RATE_LIMIT_WINDOW_MS` | `900000`    | Rate-limit window for `/generate` (ms)                                                        |
+| `RATE_LIMIT_MAX`       | `20`        | Max key generations per window per IP                                                         |
+| `LOG_LEVEL`            | `info`      | Pino log level (`trace`, `debug`, `info`, `warn`, `error`)                                    |
+| `GOOGLE_BOOKS_API_KEY` | _(unset)_   | Google Books API key for EPUB metadata enrichment; without it the API may rate-limit requests |
 
 ## Docker
 
