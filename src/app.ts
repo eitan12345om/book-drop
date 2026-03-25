@@ -172,6 +172,8 @@ export function createApp(options?: { staticDir?: string }) {
     legacyHeaders: false,
   });
 
+  app.get('/health', (_req, res) => res.send('ok'));
+
   app.post('/generate', generateLimiter, (req, res) => {
     if (keys.size >= MAX_ACTIVE_KEYS) {
       logger.warn({ activeKeys: keys.size }, 'Key rejected: server busy');
