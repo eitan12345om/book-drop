@@ -103,7 +103,7 @@ function startSSE(key) {
     stopPolling();
     currentKey = null;
     renderDownloads(null, []);
-    setStatus('idle', 'No key \u2014 tap refresh to generate one');
+    setStatus('idle', '');
     showError('Key expired. Tap refresh to get a new one.');
   });
 
@@ -230,12 +230,12 @@ function poll() {
     } else if (xhr.status === 0) {
       stopPolling();
       showError('Could not reach the server.');
-      setStatus('idle', 'No key \u2014 tap refresh to generate one');
+      setStatus('idle', '');
     } else {
       stopPolling();
       currentKey = null;
       renderDownloads(null, []);
-      setStatus('idle', 'No key \u2014 tap refresh to generate one');
+      setStatus('idle', '');
       showError(xhr.responseText || 'Key expired. Tap refresh to get a new one.');
     }
   };
@@ -270,7 +270,7 @@ function requestKey() {
       startSSE(key);
     } else {
       showError(xhr.responseText || 'Could not reach the server. Is it running?');
-      setStatus('idle', 'No key \u2014 tap refresh to generate one');
+      setStatus('idle', '');
     }
   };
   xhr.send();

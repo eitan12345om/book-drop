@@ -61,7 +61,7 @@ Copy `.env.example` to `.env` to customise these values.
 | ---------------------- | ----------- | --------------------------------------------------------------------------------------------- |
 | `PORT`                 | `3001`      | HTTP port the server listens on                                                               |
 | `UPLOAD_DIR`           | `uploads`   | Directory for temporary file storage                                                          |
-| `EXPIRE_DELAY_MS`      | `30000`     | Inactivity timeout per key (ms)                                                               |
+| `EXPIRE_DELAY_MS`      | `300000`    | Inactivity timeout per key (ms)                                                               |
 | `MAX_EXPIRE_MS`        | `3600000`   | Hard maximum key lifetime (ms)                                                                |
 | `MAX_FILE_SIZE`        | `838860800` | Upload size limit in bytes (800 MB)                                                           |
 | `RATE_LIMIT_WINDOW_MS` | `900000`    | Rate-limit window for `/generate` (ms)                                                        |
