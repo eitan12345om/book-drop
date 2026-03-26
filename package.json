@@ -1,12 +1,26 @@
 {
-  "name": "book_drop",
+  "name": "book-drop",
   "version": "1.0.0",
   "description": "Send ebooks to Kobo/Kindle ereaders easily",
   "homepage": "https://bookdrop.cc",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eitan12345om/book-drop"
+    "url": "git+https://github.com/eitan12345om/book-drop.git"
   },
+  "bugs": {
+    "url": "https://github.com/eitan12345om/book-drop/issues"
+  },
+  "keywords": [
+    "ebook",
+    "kobo",
+    "kindle",
+    "ereader",
+    "tolino",
+    "transfer",
+    "epub",
+    "mobi",
+    "pdf"
+  ],
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
@@ -36,10 +50,12 @@
   },
   "contributors": [
     {
-      "name": "djazz"
+      "name": "djazz",
+      "url": "https://github.com/daniel-j"
     },
     {
-      "name": "eitan12345om"
+      "name": "eitan12345om",
+      "url": "https://github.com/eitan12345om"
     }
   ],
   "license": "MIT",
