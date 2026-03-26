@@ -182,15 +182,15 @@ function setFile(file) {
   selectedFile = file;
   submitBtn.disabled = !file;
   if (file) {
-    zoneEmpty.style.display = 'none';
-    zoneSelected.style.display = '';
+    zoneEmpty.classList.add('hidden');
+    zoneSelected.classList.remove('hidden');
     zoneFileName.textContent = file.name;
     zoneFileSize.textContent = formatSize(file.size);
     dropZone.classList.add('has-file');
     dropZone.setAttribute('aria-label', `Selected: ${file.name}`);
   } else {
-    zoneEmpty.style.display = '';
-    zoneSelected.style.display = 'none';
+    zoneEmpty.classList.remove('hidden');
+    zoneSelected.classList.add('hidden');
     dropZone.classList.remove('has-file');
     dropZone.setAttribute('aria-label', 'Choose or drop an ebook file');
   }
@@ -246,7 +246,7 @@ fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 function showStatus(type, message) {
   statusMsg.textContent = message;
   statusMsg.className = `status-msg status-${type}`;
-  statusMsg.style.display = '';
+  statusMsg.classList.remove('hidden');
   if (type === 'error' || type === 'success') {
     statusMsg.focus();
   }
@@ -254,7 +254,7 @@ function showStatus(type, message) {
 
 /** Hides the status message. */
 function hideStatus() {
-  statusMsg.style.display = 'none';
+  statusMsg.classList.add('hidden');
 }
 
 statusMsg.addEventListener('click', () => {
@@ -265,9 +265,9 @@ statusMsg.addEventListener('click', () => {
 
 /** Updates the progress bar visibility and fill percentage. */
 function setProgress(value, visible) {
-  progressWrap.style.display = visible ? '' : 'none';
+  progressWrap.classList.toggle('hidden', !visible);
   progressWrap.setAttribute('aria-valuenow', value);
-  progressFill.style.width = `${value}%`;
+  progressFill.style.setProperty('--progress', `${value}%`);
 }
 
 document.getElementById('upload-form').addEventListener('submit', (e) => {

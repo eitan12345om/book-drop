@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+import type { IncomingMessage } from 'node:http';
 import express from 'express';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -53,13 +55,24 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
   const sseClients = new Map<string, express.Response>();
   const app = express();
 
+  function generateNonce(): string {
+    return crypto.randomBytes(16).toString('base64');
+  }
+
+  const nonceMap = new WeakMap<IncomingMessage, string>();
+
   async function serveHtml(
     file: string,
+    nonce: string,
     res: express.Response,
     next: express.NextFunction
   ): Promise<void> {
     try {
-      const content = await fsp.readFile(path.join(VIEWS_DIR, file), 'utf-8');
+      const raw = await fsp.readFile(path.join(VIEWS_DIR, file), 'utf-8');
+      const content = raw.replace(/NONCE_PLACEHOLDER/g, nonce);
+      if (content === raw) {
+        logger.warn({ file }, 'serveHtml: no NONCE_PLACEHOLDER found — nonce not injected');
+      }
       res.set('Cache-Control', 'no-store');
       res.type('html').send(content);
     } catch (err) {
@@ -92,7 +105,29 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
       },
     })
   );
-  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use((req, _res, next) => {
+    nonceMap.set(req, generateNonce());
+    next();
+  });
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", (req) => `'nonce-${nonceMap.get(req) ?? ''}'`],
+          styleSrc: ["'self'"],
+          imgSrc: ["'self'", 'data:', 'blob:'],
+          connectSrc: ["'self'"],
+          fontSrc: ["'self'"],
+          workerSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+          frameAncestors: ["'none'"],
+        },
+      },
+    })
+  );
   app.set('trust proxy', 1);
 
   app.use((req, res, next) => {
@@ -545,8 +580,8 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
     res.redirect('/');
   });
 
-  app.get('/receive', (_req, res, next) => {
-    void serveHtml('download.html', res, next);
+  app.get('/receive', (req, res, next) => {
+    void serveHtml('download.html', nonceMap.get(req) ?? '', res, next);
   });
 
   app.get('/:filename', (req, res, next) => {
@@ -592,7 +627,7 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
   app.get('/', (req, res, next) => {
     const agent = req.get('user-agent') ?? '';
     const page = isEreaderAgent(agent) ? 'download.html' : 'upload.html';
-    void serveHtml(page, res, next);
+    void serveHtml(page, nonceMap.get(req) ?? '', res, next);
   });
 
   return { app, keys };

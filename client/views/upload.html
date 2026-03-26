@@ -116,7 +116,7 @@
               id="file-input"
               type="file"
               name="file"
-              style="display: none"
+              class="hidden"
               aria-hidden="true"
               tabindex="-1"
             />
@@ -125,7 +125,7 @@
               <p class="zone-label"><strong>Choose file</strong> or drag &amp; drop</p>
               <p class="zone-formats">EPUB · MOBI · PDF · TXT · CBZ · CBR</p>
             </div>
-            <div id="zone-selected" style="display: none" aria-live="polite">
+            <div id="zone-selected" class="hidden" aria-live="polite">
               <p class="zone-file-info">
                 <span class="zone-file-name" id="zone-file-name"></span>
                 <span class="zone-file-size" id="zone-file-size"></span>
@@ -166,8 +166,7 @@
           role="status"
           aria-live="polite"
           tabindex="-1"
-          class="status-msg"
-          style="display: none"
+          class="status-msg hidden"
         ></div>
         <div
           id="progress-wrap"
@@ -176,10 +175,9 @@
           aria-valuemax="100"
           aria-valuenow="0"
           aria-label="Upload progress"
-          class="progress-wrap"
-          style="display: none"
+          class="progress-wrap hidden"
         >
-          <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+          <div id="progress-fill" class="progress-fill"></div>
         </div>
       </form>
 
@@ -217,7 +215,7 @@
     </main>
 
     <script src="upload.js"></script>
-    <script>
+    <script nonce="NONCE_PLACEHOLDER">
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
     </script>
   </body>

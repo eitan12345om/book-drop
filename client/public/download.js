@@ -29,12 +29,12 @@ function setStatus(state, label) {
 /** Displays an error banner with the given message. */
 function showError(msg) {
   errorMsg.textContent = msg;
-  errorMsg.style.display = '';
+  errorMsg.classList.remove('hidden');
 }
 
 /** Hides the error banner. */
 function hideError() {
-  errorMsg.style.display = 'none';
+  errorMsg.classList.add('hidden');
   errorMsg.textContent = '';
 }
 
@@ -124,7 +124,7 @@ function renderDownloads(file, urls) {
   const hasContent = hasFile || hasUrls;
 
   if (!hasContent) {
-    downloadCard.style.display = 'none';
+    downloadCard.classList.add('hidden');
     downloadList.innerHTML = '';
     return;
   }
@@ -201,7 +201,7 @@ function renderDownloads(file, urls) {
     }
   }
 
-  downloadCard.style.display = '';
+  downloadCard.classList.remove('hidden');
 }
 
 /** Polls the status endpoint once and updates the UI based on the response. */

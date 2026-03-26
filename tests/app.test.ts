@@ -19,8 +19,14 @@ before(async () => {
   // Create minimal stub HTML files so the route tests don't depend on a build
   await fs.mkdir(STATIC_DIR, { recursive: true });
   await fs.mkdir(VIEWS_DIR, { recursive: true });
-  await fs.writeFile(path.join(VIEWS_DIR, 'upload.html'), '<html><body>upload</body></html>');
-  await fs.writeFile(path.join(VIEWS_DIR, 'download.html'), '<html><body>key</body></html>');
+  await fs.writeFile(
+    path.join(VIEWS_DIR, 'upload.html'),
+    '<html><body>upload<script nonce="NONCE_PLACEHOLDER"></script></body></html>'
+  );
+  await fs.writeFile(
+    path.join(VIEWS_DIR, 'download.html'),
+    '<html><body>key<script nonce="NONCE_PLACEHOLDER"></script></body></html>'
+  );
 });
 
 after(async () => {
@@ -202,6 +208,7 @@ describe('GET /', () => {
     const res = await request(app).get('/').set('User-Agent', 'Mozilla/5.0 Chrome/120');
     assert.strictEqual(res.status, 200);
     assert.ok(res.text.includes('upload'));
+    assert.ok(!res.text.includes('NONCE_PLACEHOLDER'), 'nonce placeholder must be replaced');
   });
 
   it('serves the download page for a Kobo device', async () => {
@@ -211,6 +218,7 @@ describe('GET /', () => {
       .set('User-Agent', 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36');
     assert.strictEqual(res.status, 200);
     assert.ok(res.text.includes('key'));
+    assert.ok(!res.text.includes('NONCE_PLACEHOLDER'), 'nonce placeholder must be replaced');
   });
 
   it('serves the download page for a Kindle device', async () => {
@@ -220,6 +228,7 @@ describe('GET /', () => {
       .set('User-Agent', 'Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0');
     assert.strictEqual(res.status, 200);
     assert.ok(res.text.includes('key'));
+    assert.ok(!res.text.includes('NONCE_PLACEHOLDER'), 'nonce placeholder must be replaced');
   });
 });
 
@@ -229,6 +238,35 @@ describe('GET /receive', () => {
     const res = await request(app).get('/receive').set('User-Agent', 'Mozilla/5.0 Chrome/120');
     assert.strictEqual(res.status, 200);
     assert.ok(res.text.includes('key'));
+    assert.ok(!res.text.includes('NONCE_PLACEHOLDER'), 'nonce placeholder must be replaced');
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('CSP / nonce injection', () => {
+  it('sets Cache-Control: no-store on HTML responses', async () => {
+    const { app } = createApp({ staticDir: STATIC_DIR, viewsDir: VIEWS_DIR });
+    const res = await request(app).get('/').set('User-Agent', 'Mozilla/5.0 Chrome/120');
+    assert.strictEqual(res.status, 200);
+    assert.ok(
+      res.headers['cache-control']?.includes('no-store'),
+      'HTML must not be cached (nonce reuse risk)'
+    );
+  });
+
+  it('injects the same nonce into the CSP header and the HTML body', async () => {
+    const { app } = createApp({ staticDir: STATIC_DIR, viewsDir: VIEWS_DIR });
+    const res = await request(app).get('/').set('User-Agent', 'Mozilla/5.0 Chrome/120');
+    assert.strictEqual(res.status, 200);
+    // Extract nonce from HTML (nonce="<value>")
+    const nonceMatch = res.text.match(/nonce="([^"]+)"/);
+    assert.ok(nonceMatch, 'HTML should contain a nonce attribute');
+    const nonce = nonceMatch[1];
+    // CSP header (report-only or enforced) should reference the same nonce
+    const cspHeader =
+      res.headers['content-security-policy-report-only'] ?? res.headers['content-security-policy'];
+    assert.ok(cspHeader, 'CSP header must be present');
+    assert.ok(cspHeader.includes(`'nonce-${nonce}'`), `CSP header should contain nonce-${nonce}`);
   });
 });
 

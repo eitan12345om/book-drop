@@ -294,6 +294,7 @@
 }
 .progress-fill {
   height: 100%;
+  width: var(--progress, 0%);
   background: var(--accent);
   border-radius: 2px;
   transition: width 0.2s ease;
