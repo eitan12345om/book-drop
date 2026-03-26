@@ -3,6 +3,7 @@ import compression from 'compression';
 import helmet from 'helmet';
 import multer from 'multer';
 import fs from 'fs';
+import fsp from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { fileTypeFromFile } from 'file-type';
@@ -45,11 +46,26 @@ import type { MetadataDiff } from './types.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** Creates and returns the Express application and the active keys map. */
-export function createApp(options?: { staticDir?: string }) {
+export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
   const STATIC_DIR = options?.staticDir ?? path.join(__dirname, '../client/public');
+  const VIEWS_DIR = options?.viewsDir ?? path.join(__dirname, '../client/views');
   const keys = new Map<string, KeyInfo>();
   const sseClients = new Map<string, express.Response>();
   const app = express();
+
+  async function serveHtml(
+    file: string,
+    res: express.Response,
+    next: express.NextFunction
+  ): Promise<void> {
+    try {
+      const content = await fsp.readFile(path.join(VIEWS_DIR, file), 'utf-8');
+      res.set('Cache-Control', 'no-store');
+      res.type('html').send(content);
+    } catch (err) {
+      next(err);
+    }
+  }
 
   function notifySSE(key: string, info: KeyInfo): void {
     const sse = sseClients.get(key);
@@ -529,8 +545,8 @@ export function createApp(options?: { staticDir?: string }) {
     res.redirect('/');
   });
 
-  app.get('/receive', (_req, res) => {
-    res.sendFile(path.join(STATIC_DIR, 'download.html'));
+  app.get('/receive', (_req, res, next) => {
+    void serveHtml('download.html', res, next);
   });
 
   app.get('/:filename', (req, res, next) => {
@@ -573,10 +589,10 @@ export function createApp(options?: { staticDir?: string }) {
     }
   });
 
-  app.get('/', (req, res) => {
+  app.get('/', (req, res, next) => {
     const agent = req.get('user-agent') ?? '';
     const page = isEreaderAgent(agent) ? 'download.html' : 'upload.html';
-    res.sendFile(path.join(STATIC_DIR, page));
+    void serveHtml(page, res, next);
   });
 
   return { app, keys };

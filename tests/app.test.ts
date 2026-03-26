@@ -12,19 +12,20 @@ import type { KeyInfo } from '../src/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = path.join(__dirname, '../static');
+const VIEWS_DIR = path.join(__dirname, '../static-views');
 
 before(async () => {
   await fs.mkdir('uploads', { recursive: true });
   // Create minimal stub HTML files so the route tests don't depend on a build
   await fs.mkdir(STATIC_DIR, { recursive: true });
-  await fs.writeFile(path.join(STATIC_DIR, 'upload.html'), '<html><body>upload</body></html>');
-  await fs.writeFile(path.join(STATIC_DIR, 'download.html'), '<html><body>key</body></html>');
+  await fs.mkdir(VIEWS_DIR, { recursive: true });
+  await fs.writeFile(path.join(VIEWS_DIR, 'upload.html'), '<html><body>upload</body></html>');
+  await fs.writeFile(path.join(VIEWS_DIR, 'download.html'), '<html><body>key</body></html>');
 });
 
 after(async () => {
   await fs.rm('uploads', { recursive: true, force: true });
-  await fs.rm(path.join(STATIC_DIR, 'upload.html'), { force: true });
-  await fs.rm(path.join(STATIC_DIR, 'download.html'), { force: true });
+  await fs.rm(VIEWS_DIR, { recursive: true, force: true });
 });
 
 async function generateKey(agent = 'Mozilla/5.0 TestBrowser') {
@@ -197,14 +198,14 @@ describe('POST /upload', () => {
 // ---------------------------------------------------------------------------
 describe('GET /', () => {
   it('serves the upload page for a regular browser', async () => {
-    const { app } = createApp({ staticDir: STATIC_DIR });
+    const { app } = createApp({ staticDir: STATIC_DIR, viewsDir: VIEWS_DIR });
     const res = await request(app).get('/').set('User-Agent', 'Mozilla/5.0 Chrome/120');
     assert.strictEqual(res.status, 200);
     assert.ok(res.text.includes('upload'));
   });
 
   it('serves the download page for a Kobo device', async () => {
-    const { app } = createApp({ staticDir: STATIC_DIR });
+    const { app } = createApp({ staticDir: STATIC_DIR, viewsDir: VIEWS_DIR });
     const res = await request(app)
       .get('/')
       .set('User-Agent', 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36');
@@ -213,7 +214,7 @@ describe('GET /', () => {
   });
 
   it('serves the download page for a Kindle device', async () => {
-    const { app } = createApp({ staticDir: STATIC_DIR });
+    const { app } = createApp({ staticDir: STATIC_DIR, viewsDir: VIEWS_DIR });
     const res = await request(app)
       .get('/')
       .set('User-Agent', 'Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0');
@@ -224,7 +225,7 @@ describe('GET /', () => {
 
 describe('GET /receive', () => {
   it('always serves the download page regardless of user-agent', async () => {
-    const { app } = createApp({ staticDir: STATIC_DIR });
+    const { app } = createApp({ staticDir: STATIC_DIR, viewsDir: VIEWS_DIR });
     const res = await request(app).get('/receive').set('User-Agent', 'Mozilla/5.0 Chrome/120');
     assert.strictEqual(res.status, 200);
     assert.ok(res.text.includes('key'));
