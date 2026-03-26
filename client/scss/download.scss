@@ -39,6 +39,7 @@
   background: var(--surface);
   @include m.theme-prop(color, 'text');
   cursor: pointer;
+  touch-action: manipulation;
   @include m.flex-shrink(0);
 }
 

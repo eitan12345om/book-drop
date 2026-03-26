@@ -77,6 +77,7 @@
   padding: 2rem 1.5rem;
   text-align: center;
   cursor: pointer;
+  touch-action: manipulation;
   transition:
     border-color 0.12s,
     background 0.12s;
@@ -251,6 +252,7 @@
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
+  touch-action: manipulation;
   transition:
     background 0.12s,
     transform 0.08s;

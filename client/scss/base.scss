@@ -126,6 +126,7 @@ a:hover {
   @include m.theme-prop(background, 'surface');
   @include m.theme-prop(color, 'text-muted');
   cursor: pointer;
+  touch-action: manipulation;
   @include m.flex-shrink(0);
   transition:
     border-color 0.12s,
