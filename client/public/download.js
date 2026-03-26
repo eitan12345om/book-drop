@@ -22,7 +22,7 @@ pageUrlLink.textContent = window.location.href;
 /** Updates the connection status indicator dot and label. */
 function setStatus(state, label) {
   statusDot.className =
-    'dot' + (state === 'active' ? ' dot-active' : state === 'waiting' ? ' dot-waiting' : '');
+    'dot' + (state === 'active' ? ' dot-active' : state === 'waiting' ? ' dot-waiting' : ' hidden');
   statusLabel.textContent = label;
 }
 
@@ -236,7 +236,7 @@ function poll() {
       currentKey = null;
       renderDownloads(null, []);
       setStatus('idle', '');
-      showError(xhr.responseText || 'Key expired. Tap refresh to get a new one.');
+      showError('Key expired. Tap refresh to get a new one.');
     }
   };
   xhr.send();
