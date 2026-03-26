@@ -21,6 +21,7 @@ const zoneSelected = document.getElementById('zone-selected');
 const zoneFileName = document.getElementById('zone-file-name');
 const zoneFileSize = document.getElementById('zone-file-size');
 const submitBtn = document.getElementById('submit-btn');
+const urlInput = document.getElementById('urlinput');
 const statusMsg = document.getElementById('status-msg');
 const progressWrap = document.getElementById('progress-wrap');
 const progressFill = document.getElementById('progress-fill');
@@ -183,10 +184,15 @@ function formatSize(bytes) {
     : `${Math.ceil(bytes / 1024)} KB`;
 }
 
+/** Enables the submit button when a file is selected or a URL is entered. */
+function updateSubmitState() {
+  submitBtn.disabled = !selectedFile && !urlInput.value.trim();
+}
+
 /** Updates UI to reflect the currently selected file, or clears it if file is null. */
 function setFile(file) {
   selectedFile = file;
-  submitBtn.disabled = !file;
+  updateSubmitState();
   if (file) {
     zoneEmpty.classList.add('hidden');
     zoneSelected.classList.remove('hidden');
@@ -247,6 +253,7 @@ dropZone.addEventListener('drop', (e) => {
   handleFiles(e.dataTransfer.files);
 });
 fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+urlInput.addEventListener('input', updateSubmitState);
 
 /** Displays a status message of the given type ('info', 'success', or 'error'). */
 function showStatus(type, message) {
@@ -285,7 +292,7 @@ document.getElementById('upload-form').addEventListener('submit', (e) => {
     return;
   }
 
-  const urlVal = document.getElementById('urlinput').value.trim();
+  const urlVal = urlInput.value.trim();
   if (!selectedFile && !urlVal) {
     showStatus('error', 'Please choose a file or enter a URL.');
     return;
@@ -343,7 +350,8 @@ document.getElementById('upload-form').addEventListener('submit', (e) => {
     if (xhr.status >= 200 && xhr.status < 300) {
       showStatus('success', xhr.responseText);
       setFile(null);
-      document.getElementById('urlinput').value = '';
+      urlInput.value = '';
+      updateSubmitState();
     } else {
       showStatus('error', xhr.responseText || 'Upload failed.');
     }
