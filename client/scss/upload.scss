@@ -3,31 +3,6 @@
 
 // ─── Header ───────────────────────────────────────────────────────────────────
 
-.page-header {
-  position: relative;
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.page-header h1 {
-  font-size: 1.6rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0 0 0.3rem;
-}
-
-.page-header p {
-  @include m.theme-prop(color, 'text-muted');
-  margin: 0;
-  font-size: 0.9rem;
-}
-
-.page-header .btn-theme {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
 // ─── Fields ───────────────────────────────────────────────────────────────────
 
 .field-label {

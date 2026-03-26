@@ -2,29 +2,6 @@
 @use 'tokens' as t;
 @use 'mixins' as m;
 
-// ─── Layout ───────────────────────────────────────────────────────────────────
-
-.header {
-  @include m.flex;
-  @include m.justify-content(space-between);
-  @include m.align-items(flex-start);
-  margin-bottom: 1.25rem;
-}
-
-.header h1 {
-  margin: 0 0 0.25rem;
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.header p {
-  margin: 0;
-  @include m.theme-prop(color, 'text-muted');
-  font-size: 0.9rem;
-}
-
-// ─── Card ─────────────────────────────────────────────────────────────────────
-
 // ─── Key display ──────────────────────────────────────────────────────────────
 
 .key-wrap {
