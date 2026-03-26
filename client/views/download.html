@@ -43,7 +43,7 @@
       <header class="header">
         <div>
           <h1>BookDrop</h1>
-          <p>Your unique key</p>
+          <p>Receive ebooks from your computer</p>
         </div>
         <button
           id="theme-toggle"
@@ -79,6 +79,7 @@
       </header>
 
       <div class="card" id="key-card">
+        <h2 class="card-title">Your unique key</h2>
         <div class="key-wrap">
           <span class="key-value" id="key-display" aria-label="Generating key" aria-live="polite"
             >––––</span
@@ -114,6 +115,18 @@
       </div>
 
       <p class="error-msg hidden" id="error-msg" role="alert"></p>
+
+      <div class="card instructions">
+        <h2 class="card-title">How it works</h2>
+        <p>
+          Visit BookDrop on your computer or phone, enter the key shown above, pick a file, and
+          press <em>Upload and send</em>. A download link will appear here within seconds.
+        </p>
+        <p>
+          Files are stored temporarily on the server and deleted automatically a few minutes after
+          you close this browser or generate a new key.
+        </p>
+      </div>
 
       <footer class="footer">
         <span>Send ebooks from: <a id="page-url" href=""></a></span>

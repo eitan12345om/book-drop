@@ -28,21 +28,6 @@
   right: 0;
 }
 
-// ─── Card ─────────────────────────────────────────────────────────────────────
-
-.card {
-  padding: 1.5rem;
-}
-
-.card-title {
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  @include m.theme-prop(color, 'text-muted');
-  margin: 0 0 1.1rem;
-}
-
 // ─── Fields ───────────────────────────────────────────────────────────────────
 
 .field-label {
@@ -387,23 +372,6 @@
   background: var(--accent);
   border-radius: 2px;
   transition: width 0.2s ease;
-}
-
-// ─── Instructions ─────────────────────────────────────────────────────────────
-
-.instructions {
-  margin-top: 1rem;
-}
-
-.instructions p {
-  font-size: 0.85rem;
-  @include m.theme-prop(color, 'text-muted');
-  line-height: 1.65;
-  margin: 0 0 0.6rem;
-}
-
-.instructions p:last-child {
-  margin-bottom: 0;
 }
 
 // ─── Footer ───────────────────────────────────────────────────────────────────

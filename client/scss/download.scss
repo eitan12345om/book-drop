@@ -25,19 +25,6 @@
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
-.card {
-  overflow: hidden;
-}
-
-.card-title {
-  padding: 0.75rem 1.25rem 0;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  @include m.theme-prop(color, 'text-muted');
-}
-
 // ─── Key display ──────────────────────────────────────────────────────────────
 
 .key-wrap {
@@ -45,7 +32,6 @@
   @include m.align-items(center);
   @include m.justify-content(center);
   @include m.flex-gap-row(0.75rem);
-  padding: 1.75rem 1rem;
 }
 
 .key-value {
@@ -152,7 +138,6 @@
 // ─── Download list ────────────────────────────────────────────────────────────
 
 .download-list {
-  padding: 0.75rem 1rem;
   @include m.flex(column);
   @include m.flex-gap-col(0.5rem);
 }
