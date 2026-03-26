@@ -2,7 +2,7 @@
 
 A self-hostable web service for sending ebooks to a Kobo, Kindle, or Tolino through its built-in browser — no account, no cloud, no cables.
 
-Live at [bookdrop.cc](https://bookdrop.cc) · Forked from [send2ereader](https://send2ereader.net)
+Live at [bookdrop.cc](https://bookdrop.cc) · Forked from [send2ereader](https://github.com/daniel-j/send2ereader) by [djazz](https://github.com/daniel-j)
 
 ## How it works
 
@@ -33,13 +33,13 @@ Optional conversions (requires external tools — see below):
 
 ```sh
 pnpm install
-pnpm dev        # starts Express on :3001, serving client/public/ directly
+pnpm dev        # watches SCSS and TypeScript; starts Express on :3001
 ```
 
 ### Production
 
 ```sh
-pnpm build      # compiles TypeScript to dist/
+pnpm build      # compiles SCSS to client/public/ and TypeScript to dist/
 pnpm start      # runs dist/server.js
 ```
 
