@@ -1,16 +1,3 @@
-// Apply theme immediately (before first paint) to avoid flash
-(function () {
-  let stored = null;
-  try {
-    stored = localStorage.getItem('theme');
-  } catch (_) {}
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  document.documentElement.setAttribute(
-    'data-theme',
-    stored === 'dark' || (!stored && prefersDark) ? 'dark' : 'light',
-  );
-})();
-
 function initThemeToggle() {
   const btn = document.getElementById('theme-toggle');
   if (!btn) {

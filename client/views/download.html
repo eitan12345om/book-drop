@@ -7,18 +7,33 @@
 
     <!-- No indexing — this is a per-device session page -->
     <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta name="theme-color" content="#1c1917" />
 
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <script src="theme.js"></script>
+    <script nonce="NONCE_PLACEHOLDER">
+      (function () {
+        let stored = null;
+        try {
+          stored = localStorage.getItem('theme');
+        } catch (_) {}
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute(
+          'data-theme',
+          stored === 'dark' || (!stored && prefersDark) ? 'dark' : 'light'
+        );
+      })();
+    </script>
+    <script src="theme.js" defer></script>
     <script nonce="NONCE_PLACEHOLDER">
       if (/Kobo|Kindle|Tolino/i.test(navigator.userAgent)) {
         document.documentElement.classList.add('ereader');
       }
     </script>
+    <link rel="preload" href="base.css" as="style" />
     <link rel="stylesheet" href="base.css" />
     <link rel="stylesheet" href="download.css" />
   </head>
