@@ -11,6 +11,7 @@ import {
   STATUS_RATE_LIMIT_MAX,
   DELETE_RATE_LIMIT_MAX,
   EVENTS_RATE_LIMIT_MAX,
+  DOWNLOAD_RATE_LIMIT_MAX,
 } from '../config.js';
 import { logger } from '../logger.js';
 import type { KeyInfo } from '../types.js';
@@ -47,6 +48,12 @@ export function makeKeysRouter(
   const eventsLimiter = rateLimit({
     windowMs: RATE_LIMIT_WINDOW_MS,
     max: EVENTS_RATE_LIMIT_MAX,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  const downloadLimiter = rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max: DOWNLOAD_RATE_LIMIT_MAX,
     standardHeaders: true,
     legacyHeaders: false,
   });
@@ -182,13 +189,13 @@ export function makeKeysRouter(
     res.send('ok');
   });
 
-  router.get('/:filename', (req, res, next) => {
+  router.get('/:filename', downloadLimiter, (req, res, next) => {
     const key = (req.query.key as string | undefined)?.toUpperCase();
     if (!key || !isValidKey(key)) {
       return next();
     }
 
-    const filename = decodeURIComponent(req.params.filename);
+    const filename = decodeURIComponent(req.params.filename as string);
     const info = keys.get(key);
     if (!info?.file || info.file.name !== filename) {
       return next();

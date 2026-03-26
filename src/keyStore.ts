@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'fs';
 import type { KeyInfo } from './types.js';
 import { logger } from './logger.js';
@@ -10,7 +11,7 @@ export const KEY_LENGTH = 4;
 export function randomKey(): string {
   return Array.from(
     { length: KEY_LENGTH },
-    () => KEY_CHARS[Math.floor(Math.random() * KEY_CHARS.length)]
+    () => KEY_CHARS[crypto.randomInt(KEY_CHARS.length)]
   ).join('');
 }
 
