@@ -249,7 +249,9 @@
 
     <script src="upload.js" nonce="NONCE_PLACEHOLDER" defer></script>
     <script nonce="NONCE_PLACEHOLDER">
-      if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+      window.addEventListener('load', function () {
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+      });
     </script>
   </body>
 </html>
