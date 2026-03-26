@@ -7,6 +7,7 @@
 
     <!-- No indexing — this is a per-device session page -->
     <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#1c1917" />
 
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
@@ -101,18 +102,24 @@
       <footer class="footer">
         <span>Send ebooks from: <a id="page-url" href=""></a></span>
         <span
-          ><a href="https://github.com/eitan12345om/book-drop" target="_blank" rel="noreferrer"
+          ><a
+            href="https://github.com/eitan12345om/book-drop"
+            target="_blank"
+            rel="noopener noreferrer"
             >Source</a
           >
           ·
-          <a href="https://github.com/daniel-j/send2ereader" target="_blank" rel="noreferrer"
+          <a
+            href="https://github.com/daniel-j/send2ereader"
+            target="_blank"
+            rel="noopener noreferrer"
             >Forked from send2ereader by djazz</a
           ></span
         >
       </footer>
     </main>
 
-    <script src="download.js"></script>
+    <script src="download.js" nonce="NONCE_PLACEHOLDER" defer></script>
     <script nonce="NONCE_PLACEHOLDER">
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
     </script>
