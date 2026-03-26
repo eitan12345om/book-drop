@@ -21,7 +21,7 @@ function spawnProcess(
   args: string[],
   cwd: string,
   isSuccess: (code: number | null) => boolean = (code) => code === 0,
-  timeoutMs = 55_000,
+  timeoutMs = 55_000
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     let output = '';
@@ -66,14 +66,14 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
       [basename(inputPath), '-dont_append_source', '-c1', '-o', basename(outPath)],
       dirname(inputPath),
       // kindlegen uses exit code 1 for success with warnings
-      (code) => code === 0 || code === 1,
+      (code) => code === 0 || code === 1
     );
     return outPath;
   } catch (err) {
     const msg = sanitizeOutput(
       (err as Error).message,
       [basename(inputPath), 'infile.epub'],
-      [basename(outPath), 'outfile.mobi'],
+      [basename(outPath), 'outfile.mobi']
     );
     throw new Error(msg, { cause: err });
   } finally {
@@ -89,14 +89,14 @@ export async function convertWithKepubify(inputPath: string): Promise<string> {
     await spawnProcess(
       'kepubify',
       ['-v', '-u', '-o', basename(outPath), basename(inputPath)],
-      dirname(inputPath),
+      dirname(inputPath)
     );
     return outPath;
   } catch (err) {
     const msg = sanitizeOutput(
       (err as Error).message,
       [basename(inputPath), 'infile.epub'],
-      [basename(outPath), 'outfile.kepub.epub'],
+      [basename(outPath), 'outfile.kepub.epub']
     );
     throw new Error(msg, { cause: err });
   } finally {
@@ -110,13 +110,17 @@ export async function convertWithPdfCropMargins(inputPath: string): Promise<stri
   const base = basename(inputPath, '.pdf');
   const outPath = join(dir, `${base}_cropped.pdf`);
   try {
-    await spawnProcess('pdfcropmargins', ['-s', '-u', '-o', outPath, basename(inputPath)], dir);
+    await spawnProcess(
+      'pdfcropmargins',
+      ['-s', '-u', '-o', basename(outPath), basename(inputPath)],
+      dir
+    );
     return outPath;
   } catch (err) {
     const msg = sanitizeOutput(
       (err as Error).message,
       [basename(inputPath), 'infile.pdf'],
-      [basename(outPath), 'outfile.pdf'],
+      [basename(outPath), 'outfile.pdf']
     );
     throw new Error(msg, { cause: err });
   } finally {
