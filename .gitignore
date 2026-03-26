@@ -5,6 +5,11 @@ node_modules
 dist
 *.js.map
 
+# Compiled CSS — generated from client/scss/ by pnpm build:css
+client/public/base.css
+client/public/upload.css
+client/public/download.css
+
 # Environment — never commit real secrets
 .env
 .env.local

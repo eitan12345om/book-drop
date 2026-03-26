@@ -90,11 +90,17 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
 
   app.post('/share', (_req, res) => res.redirect('/'));
   app.get('/receive', (req, res, next) => {
-    void serveHtml(VIEWS_DIR, 'download.html', nonceMap.get(req) ?? '', res, next);
+    const ereaderClass = isEreaderAgent(req.get('user-agent') ?? '') ? 'ereader' : '';
+    void serveHtml(VIEWS_DIR, 'download.html', nonceMap.get(req) ?? '', res, next, {
+      EREADER_CLASS_PLACEHOLDER: ereaderClass,
+    });
   });
   app.get('/', (req, res, next) => {
-    const page = isEreaderAgent(req.get('user-agent') ?? '') ? 'download.html' : 'upload.html';
-    void serveHtml(VIEWS_DIR, page, nonceMap.get(req) ?? '', res, next);
+    const ua = req.get('user-agent') ?? '';
+    const isEreader = isEreaderAgent(ua);
+    const page = isEreader ? 'download.html' : 'upload.html';
+    const extras = isEreader ? { EREADER_CLASS_PLACEHOLDER: 'ereader' } : undefined;
+    void serveHtml(VIEWS_DIR, page, nonceMap.get(req) ?? '', res, next, extras);
   });
 
   return { app, keys };

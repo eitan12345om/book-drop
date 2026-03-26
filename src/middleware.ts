@@ -5,19 +5,25 @@ import { isValidKey } from './utils.js';
 import { logger } from './logger.js';
 import type { KeyInfo } from './types.js';
 
-/** Reads an HTML file from viewsDir, injects nonce, sends with no-store cache headers. */
+/** Reads an HTML file from viewsDir, injects nonce and any extra placeholder replacements, sends with no-store cache headers. */
 export async function serveHtml(
   viewsDir: string,
   file: string,
   nonce: string,
   res: express.Response,
-  next: express.NextFunction
+  next: express.NextFunction,
+  extras?: Record<string, string>
 ): Promise<void> {
   try {
     const raw = await fsp.readFile(path.join(viewsDir, file), 'utf-8');
-    const content = raw.replace(/NONCE_PLACEHOLDER/g, nonce);
+    let content = raw.replace(/NONCE_PLACEHOLDER/g, nonce);
     if (content === raw) {
       logger.warn({ file }, 'serveHtml: no NONCE_PLACEHOLDER found — nonce not injected');
+    }
+    if (extras) {
+      for (const [key, value] of Object.entries(extras)) {
+        content = content.replaceAll(key, value);
+      }
     }
     res.set('Cache-Control', 'no-store');
     res.type('html').send(content);

@@ -1,0 +1,248 @@
+@use 'sass:map';
+@use 'tokens' as t;
+@use 'mixins' as m;
+
+// ─── Layout ───────────────────────────────────────────────────────────────────
+
+.header {
+  @include m.flex;
+  @include m.justify-content(space-between);
+  @include m.align-items(flex-start);
+  margin-bottom: 1.25rem;
+}
+
+.header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.header p {
+  margin: 0;
+  @include m.theme-prop(color, 'text-muted');
+  font-size: 0.9rem;
+}
+
+// ─── Card ─────────────────────────────────────────────────────────────────────
+
+.card {
+  overflow: hidden;
+}
+
+.card-title {
+  padding: 0.75rem 1.25rem 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  @include m.theme-prop(color, 'text-muted');
+}
+
+// ─── Key display ──────────────────────────────────────────────────────────────
+
+.key-wrap {
+  @include m.flex;
+  @include m.align-items(center);
+  @include m.justify-content(center);
+  @include m.flex-gap-row(0.75rem);
+  padding: 1.75rem 1rem;
+}
+
+.key-value {
+  font-family: t.$font-mono;
+  font-size: 3.75rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  line-height: 1;
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+// ─── Refresh button ───────────────────────────────────────────────────────────
+
+.btn-icon {
+  // Padding-based centering: (2.75rem button - 1rem icon) / 2 = 0.875rem
+  // Works on all browsers regardless of flex support
+  display: inline-block;
+  display: -webkit-inline-flex;
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0.875rem;
+  border: 1px solid m.token('border');
+  border: 1px solid var(--border);
+  border-radius: t.$radius-sm;
+  background: m.token('surface');
+  background: var(--surface);
+  @include m.theme-prop(color, 'text');
+  cursor: pointer;
+  @include m.flex-shrink(0);
+}
+
+.btn-icon:hover {
+  border-color: m.token('accent');
+  border-color: var(--accent);
+  @include m.theme-prop(color, 'accent');
+}
+
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-icon svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+
+// ─── Status row ───────────────────────────────────────────────────────────────
+
+.status-row {
+  @include m.flex;
+  @include m.align-items(center);
+  @include m.justify-content(center);
+  @include m.flex-gap-row(0.5rem);
+  font-size: 0.82rem;
+  @include m.theme-prop(color, 'text-muted');
+  padding-bottom: 0.5rem;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: m.token('text-muted');
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.dot-active {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+.dot-waiting {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+  -webkit-animation: pulse 2s infinite;
+  animation: pulse 2s infinite;
+}
+
+@-webkit-keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+// ─── Download list ────────────────────────────────────────────────────────────
+
+.download-list {
+  padding: 0.75rem 1rem;
+  @include m.flex(column);
+  @include m.flex-gap-col(0.5rem);
+}
+
+.download-item {
+  @include m.flex;
+  @include m.align-items(center);
+  @include m.flex-gap-row(0.75rem);
+  padding: 0.75rem 1rem;
+  background: m.token('bg');
+  background: var(--bg);
+  border: 1px solid m.token('border');
+  border: 1px solid var(--border);
+  border-radius: t.$radius-sm;
+  text-decoration: none;
+  color: m.token('text');
+  color: var(--text);
+  font-size: 0.925rem;
+  word-break: break-all;
+}
+
+.download-item:hover {
+  border-color: m.token('accent');
+  border-color: var(--accent);
+  background: rgba(37, 99, 235, 0.04);
+  @include m.theme-prop(color, 'accent');
+}
+
+.download-item svg {
+  @include m.flex-shrink(0);
+  opacity: 0.5;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+// ─── Metadata diff ────────────────────────────────────────────────────────────
+
+.metadata-diff {
+  padding: 0.6rem 1rem 0.75rem;
+  border-top: 1px solid m.token('border');
+  border-top: 1px solid var(--border);
+  @include m.flex(column);
+  @include m.flex-gap-col(0.35rem);
+}
+
+.metadata-diff-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr auto 1fr;
+  gap: 0.4rem;
+  align-items: baseline;
+  font-size: 0.78rem;
+}
+
+.metadata-field {
+  @include m.theme-prop(color, 'text-muted');
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.metadata-before {
+  @include m.theme-prop(color, 'text-muted');
+  text-decoration: line-through;
+  word-break: break-word;
+}
+
+.metadata-arrow {
+  @include m.theme-prop(color, 'text-muted');
+}
+
+.metadata-after {
+  @include m.theme-prop(color, 'text');
+  word-break: break-word;
+}
+
+// ─── Error ────────────────────────────────────────────────────────────────────
+
+.error-msg {
+  text-align: center;
+  @include m.theme-prop(color, 'error-text');
+  font-size: 0.875rem;
+  margin: 0 0 1rem;
+}
+
+// ─── Footer ───────────────────────────────────────────────────────────────────
+
+.footer {
+  margin-top: 2rem;
+  @include m.flex(column);
+  @include m.flex-gap-col(0.25rem);
+  font-size: 0.8rem;
+  @include m.theme-prop(color, 'text-muted');
+  text-align: center;
+}

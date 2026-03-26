@@ -11,8 +11,9 @@
   "main": "dist/server.js",
   "scripts": {
     "start": "node --env-file=.env dist/server.js",
-    "dev": "tsx watch --env-file=.env src/server.ts",
-    "build": "tsc",
+    "dev": "concurrently \"sass --watch client/scss/base.scss:client/public/base.css client/scss/upload.scss:client/public/upload.css client/scss/download.scss:client/public/download.css\" \"tsx watch --env-file=.env src/server.ts\"",
+    "build:css": "sass client/scss/base.scss:client/public/base.css client/scss/upload.scss:client/public/upload.css client/scss/download.scss:client/public/download.css --style=compressed --no-source-map",
+    "build": "pnpm build:css && tsc",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src tests",
     "lint:fix": "oxlint --fix src tests",
@@ -29,7 +30,7 @@
       "oxlint --fix",
       "prettier --write"
     ],
-    "*.{html,css,json,md}": [
+    "*.{html,css,scss,json,md}": [
       "prettier --write"
     ]
   },
@@ -63,10 +64,12 @@
     "@types/node": "^25.5.0",
     "@types/supertest": "^7.2.0",
     "c8": "^11.0.0",
+    "concurrently": "^9.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "oxlint": "^1.56.0",
     "prettier": "^3.8.1",
+    "sass": "^1.98.0",
     "supertest": "^7.2.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

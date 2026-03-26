@@ -1,0 +1,78 @@
+@use 'sass:map';
+@use 'tokens' as t;
+
+// Generate CSS custom properties from a token map.
+@mixin token-vars($map) {
+  @each $name, $value in $map {
+    --#{$name}: #{$value};
+  }
+}
+
+// Return the light-mode fallback value for a token.
+// Use for compound property declarations alongside var():
+//   border: 1px solid token('border');
+//   border: 1px solid var(--border);
+@function token($name) {
+  @return map.get(t.$light, $name);
+}
+
+// ─── Flex helpers with webkit prefixes (WebKit 536+) ─────────────────────────
+
+@mixin flex($direction: row) {
+  display: -webkit-flex;
+  display: flex;
+  @if $direction != row {
+    -webkit-flex-direction: $direction;
+    flex-direction: $direction;
+  }
+}
+
+@mixin inline-flex {
+  display: -webkit-inline-flex;
+  display: inline-flex;
+}
+
+@mixin align-items($value) {
+  -webkit-align-items: $value;
+  align-items: $value;
+}
+
+@mixin justify-content($value) {
+  -webkit-justify-content: $value;
+  justify-content: $value;
+}
+
+@mixin flex-wrap($value) {
+  -webkit-flex-wrap: $value;
+  flex-wrap: $value;
+}
+
+@mixin flex-shrink($value) {
+  -webkit-flex-shrink: $value;
+  flex-shrink: $value;
+}
+
+// ─── Gap fallbacks (gap on flex unsupported before Chrome 84 / Safari 14.1) ──
+
+// Adds left margin to every child except the first — equivalent to row gap.
+@mixin flex-gap-row($size) {
+  > * + * {
+    margin-left: $size;
+  }
+}
+
+// Adds top margin to every child except the first — equivalent to column gap.
+@mixin flex-gap-col($size) {
+  > * + * {
+    margin-top: $size;
+  }
+}
+
+// ─── Apply a CSS property with plain fallback + var() override ────────────────
+
+// Apply a CSS property with a plain fallback (old browsers) and var() override (modern browsers).
+// Old browsers that don't understand var() drop that declaration and keep the fallback line.
+@mixin theme-prop($property, $token-name) {
+  #{$property}: map.get(t.$light, $token-name);
+  #{$property}: var(--#{$token-name});
+}

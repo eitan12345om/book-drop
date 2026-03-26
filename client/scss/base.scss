@@ -1,0 +1,173 @@
+@use 'sass:map';
+@use 'tokens' as t;
+@use 'mixins' as m;
+
+// ─── Theme variable blocks ────────────────────────────────────────────────────
+
+:root {
+  color-scheme: light;
+  @include m.token-vars(t.$light);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    @include m.token-vars(t.$dark);
+  }
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  @include m.token-vars(t.$dark);
+}
+
+// E-reader: override accent to black (grayscale e-ink), hide toggle
+html.ereader {
+  @include m.token-vars(t.$ereader);
+}
+
+// ─── Reset ────────────────────────────────────────────────────────────────────
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+// ─── Base elements ────────────────────────────────────────────────────────────
+
+body {
+  margin: 0;
+  @include m.theme-prop(background, 'bg');
+  @include m.theme-prop(color, 'text');
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  @include m.theme-prop(color, 'accent');
+}
+
+a:hover {
+  @include m.theme-prop(color, 'accent-hover');
+}
+
+// ─── Layout ───────────────────────────────────────────────────────────────────
+
+.wrapper {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 5rem;
+}
+
+// ─── Card ─────────────────────────────────────────────────────────────────────
+
+.card {
+  background: m.token('surface');
+  background: var(--surface);
+  border: 1px solid m.token('border');
+  border: 1px solid var(--border);
+  border-radius: t.$radius-lg;
+  box-shadow: t.$shadow;
+  margin-bottom: 1rem;
+}
+
+// ─── Theme toggle ─────────────────────────────────────────────────────────────
+
+.btn-theme {
+  // Padding-based centering: (2.75rem button - 1rem icon) / 2 = 0.875rem
+  display: inline-block;
+  display: -webkit-inline-flex;
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0.875rem;
+  border: 1px solid m.token('border');
+  border: 1px solid var(--border);
+  border-radius: t.$radius-sm;
+  background: m.token('surface');
+  background: var(--surface);
+  @include m.theme-prop(color, 'text-muted');
+  cursor: pointer;
+  @include m.flex-shrink(0);
+  transition:
+    border-color 0.12s,
+    color 0.12s;
+}
+
+.btn-theme:hover {
+  border-color: m.token('accent');
+  border-color: var(--accent);
+  @include m.theme-prop(color, 'accent');
+}
+
+.btn-theme:focus-visible {
+  outline: 2px solid m.token('accent');
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-theme svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+
+.btn-theme .icon-sun {
+  display: none;
+}
+
+[data-theme='dark'] .btn-theme .icon-sun {
+  display: block;
+}
+
+[data-theme='dark'] .btn-theme .icon-moon {
+  display: none;
+}
+
+// ─── E-reader overrides ───────────────────────────────────────────────────────
+
+html.ereader {
+  // Hide the theme toggle (useless on e-ink)
+  .btn-theme {
+    display: none;
+  }
+
+  // Remove shadows (e-ink can't render depth)
+  .card {
+    box-shadow: none;
+  }
+
+  // Links: use black as fallback for browsers without CSS variable support
+  a {
+    color: map.get(t.$ereader, 'accent');
+    color: var(--accent);
+  }
+
+  // Disable all animations — e-ink screens refresh slowly and animations cause flickering
+  *,
+  *::before,
+  *::after {
+    -webkit-animation: none !important;
+    animation: none !important;
+  }
+}
+
+// ─── Reduced motion ───────────────────────────────────────────────────────────
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+.hidden {
+  display: none;
+}
