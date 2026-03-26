@@ -60,6 +60,7 @@ const OPTIONS = [
     description:
       'Trims white borders from PDF pages so text fills more of the small screen. Most useful for academic papers or scanned books with wide margins.',
     defaultChecked: false,
+    enabledExtensions: ['.pdf'],
   },
   {
     id: 'transliteration',
