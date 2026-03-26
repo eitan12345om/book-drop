@@ -26,8 +26,9 @@ const progressWrap = document.getElementById('progress-wrap');
 const progressFill = document.getElementById('progress-fill');
 const pageUrlLink = document.getElementById('page-url');
 
-pageUrlLink.href = window.location.href;
-pageUrlLink.textContent = window.location.href;
+const receiveUrl = window.location.origin + '/receive';
+pageUrlLink.href = receiveUrl;
+pageUrlLink.textContent = receiveUrl;
 
 if (!isIOS) {
   fileInput.accept = ACCEPT_ATTR;

@@ -16,8 +16,9 @@ const downloadList = document.getElementById('download-list');
 const errorMsg = document.getElementById('error-msg');
 const pageUrlLink = document.getElementById('page-url');
 
-pageUrlLink.href = window.location.href;
-pageUrlLink.textContent = window.location.href;
+const uploadUrl = window.location.origin + '/';
+pageUrlLink.href = uploadUrl;
+pageUrlLink.textContent = uploadUrl;
 
 /** Updates the connection status indicator dot and label. */
 function setStatus(state, label) {
