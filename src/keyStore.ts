@@ -10,7 +10,7 @@ export const KEY_LENGTH = 4;
 export function randomKey(): string {
   return Array.from(
     { length: KEY_LENGTH },
-    () => KEY_CHARS[Math.floor(Math.random() * KEY_CHARS.length)],
+    () => KEY_CHARS[Math.floor(Math.random() * KEY_CHARS.length)]
   ).join('');
 }
 
@@ -61,6 +61,6 @@ export function expireKey(key: string, keys: Map<string, KeyInfo>): void {
   if (info.timer) {
     clearTimeout(info.timer);
   }
-  info.timer = setTimeout(() => removeKey(key, keys), EXPIRE_DELAY_MS);
+  info.timer = setTimeout(() => removeKey(key, keys), EXPIRE_DELAY_MS).unref();
   info.alive = new Date();
 }

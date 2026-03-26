@@ -18,9 +18,9 @@
     "lint:fix": "oxlint --fix src tests",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "node --import tsx --test tests/keyStore.test.ts tests/utils.test.ts tests/converter.test.ts tests/app.test.ts",
-    "test:watch": "node --import tsx --test --watch tests/keyStore.test.ts tests/utils.test.ts tests/converter.test.ts tests/app.test.ts",
-    "coverage": "c8 --reporter=text --reporter=html node --import tsx --test tests/keyStore.test.ts tests/utils.test.ts tests/converter.test.ts tests/app.test.ts",
+    "test": "node --import tsx --test 'tests/*.test.ts'",
+    "test:watch": "node --import tsx --test --watch 'tests/*.test.ts'",
+    "coverage": "c8 --reporter=text --reporter=html node --import tsx --test 'tests/*.test.ts'",
     "e2e": "playwright test",
     "prepare": "husky"
   },
