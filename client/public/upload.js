@@ -42,7 +42,8 @@ const OPTIONS = [
     tag: 'Kobo · EPUB',
     description:
       "Converts EPUB to Kobo's .kepub format — enables better typography, font control, and page turns. Only runs when sending an EPUB to a Kobo.",
-    defaultChecked: true,
+    defaultChecked: false,
+    enabledExtensions: ['.epub'],
   },
   {
     id: 'kindlegen',
@@ -52,6 +53,7 @@ const OPTIONS = [
     description:
       "Converts EPUB to MOBI so Kindle can open it — Kindle doesn't natively support EPUB. Only runs when sending an EPUB to a Kindle.",
     defaultChecked: false,
+    enabledExtensions: ['.epub'],
   },
   {
     id: 'pdfcropmargins',
@@ -98,11 +100,10 @@ function buildOptionsGrid() {
     input.id = id;
     input.name = name;
     input.checked = defaultChecked;
+    input.dataset.defaultChecked = defaultChecked;
     input.setAttribute('aria-describedby', `${id}-desc`);
     if (enabledExtensions) {
-      input.disabled = true;
       input.dataset.enabledExtensions = enabledExtensions.join(',');
-      lbl.classList.add('option-disabled');
     }
 
     const wrapper = document.createElement('span');
@@ -142,10 +143,13 @@ function updateOptionAvailability(file) {
       return;
     }
     const ext = file ? '.' + file.name.split('.').pop().toLowerCase() : null;
-    const enabled = ext !== null && enabledExtensions.includes(ext);
+    const enabled = ext === null || enabledExtensions.includes(ext);
+    const wasDisabled = input.disabled;
     input.disabled = !enabled;
     if (!enabled) {
       input.checked = false;
+    } else if (wasDisabled) {
+      input.checked = input.dataset.defaultChecked === 'true';
     }
     const label = input.closest('label');
     if (label) {
