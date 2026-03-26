@@ -14,7 +14,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY src ./src
 COPY tsconfig.json ./
-COPY client/scss ./client/scss
+COPY client ./client
 
 RUN pnpm build
 
@@ -50,7 +50,7 @@ RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 # ── Copy build artifacts ─────────────────────────────────────────────────────
 COPY --from=builder /build/dist ./dist
-COPY client/public ./client/public
+COPY --from=builder /build/client/public ./client/public
 COPY client/views ./client/views
 
 # ── Runtime setup ───────────────────────────────────────────────────────────
