@@ -32,8 +32,7 @@
   border: 1px solid m.token('border');
   border: 1px solid var(--border);
   border-radius: t.$radius-sm;
-  background: m.token('bg');
-  background: var(--bg);
+  @include m.theme-prop(background, 'bg');
   @include m.theme-prop(color, 'text');
   transition:
     border-color 0.12s,
@@ -42,8 +41,7 @@
 
 .key-input:focus {
   outline: none;
-  border-color: m.token('accent');
-  border-color: var(--accent);
+  @include m.theme-prop(border-color, 'accent');
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
@@ -55,8 +53,7 @@
   border: 1px solid m.token('border');
   border: 1px solid var(--border);
   border-radius: t.$radius-sm;
-  background: m.token('bg');
-  background: var(--bg);
+  @include m.theme-prop(background, 'bg');
   @include m.theme-prop(color, 'text');
   font-size: 1rem;
   font-family: inherit;
@@ -67,8 +64,7 @@
 
 .url-input:focus {
   outline: none;
-  border-color: m.token('accent');
-  border-color: var(--accent);
+  @include m.theme-prop(border-color, 'accent');
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
@@ -95,16 +91,13 @@
 
 .zone:hover,
 .zone.dragging {
-  border-color: m.token('accent');
-  border-color: var(--accent);
+  @include m.theme-prop(border-color, 'accent');
   background: rgba(37, 99, 235, 0.04);
 }
 
 .zone.has-file {
-  border-color: m.token('success-border');
-  border-color: var(--success-border);
-  background: m.token('success-bg');
-  background: var(--success-bg);
+  @include m.theme-prop(border-color, 'success-border');
+  @include m.theme-prop(background, 'success-bg');
 }
 
 .zone-icon {
@@ -189,8 +182,7 @@
 }
 
 .option-item:has(input:checked) {
-  border-color: m.token('accent');
-  border-color: var(--accent);
+  @include m.theme-prop(border-color, 'accent');
   background: rgba(37, 99, 235, 0.04);
 }
 
@@ -206,8 +198,7 @@
 
 .option-item input[type='checkbox'] {
   margin-top: 0.2rem;
-  accent-color: m.token('accent');
-  accent-color: var(--accent);
+  @include m.theme-prop(accent-color, 'accent');
   width: 1rem;
   height: 1rem;
   @include m.flex-shrink(0);
@@ -231,8 +222,7 @@
   font-weight: 500;
   letter-spacing: 0.02em;
   @include m.theme-prop(color, 'text-muted');
-  background: m.token('bg');
-  background: var(--bg);
+  @include m.theme-prop(background, 'bg');
   border-radius: 3px;
   padding: 0.1em 0.45em;
   line-height: 1.6;
@@ -253,8 +243,7 @@
   display: block;
   width: 100%;
   padding: 0.8rem 1.5rem;
-  background: m.token('accent');
-  background: var(--accent);
+  @include m.theme-prop(background, 'accent');
   color: #fff;
   border: none;
   border-radius: t.$radius;
@@ -269,8 +258,7 @@
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: m.token('accent-hover');
-  background: var(--accent-hover);
+  @include m.theme-prop(background, 'accent-hover');
 }
 
 .btn-primary:active:not(:disabled) {
@@ -300,40 +288,33 @@
 }
 
 .status-success {
-  background: m.token('success-bg');
-  background: var(--success-bg);
+  @include m.theme-prop(background, 'success-bg');
   border: 1px solid m.token('success-border');
   border: 1px solid var(--success-border);
-  color: m.token('success-text');
-  color: var(--success-text);
+  @include m.theme-prop(color, 'success-text');
   cursor: pointer;
 }
 
 .status-error {
-  background: m.token('error-bg');
-  background: var(--error-bg);
+  @include m.theme-prop(background, 'error-bg');
   border: 1px solid m.token('error-border');
   border: 1px solid var(--error-border);
-  color: m.token('error-text');
-  color: var(--error-text);
+  @include m.theme-prop(color, 'error-text');
   cursor: pointer;
 }
 
 .status-info {
-  background: m.token('surface');
-  background: var(--surface);
+  @include m.theme-prop(background, 'surface');
   border: 1px solid m.token('border');
   border: 1px solid var(--border);
-  color: m.token('text-muted');
-  color: var(--text-muted);
+  @include m.theme-prop(color, 'text-muted');
 }
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 
 .progress-wrap {
   height: 4px;
-  background: m.token('border');
-  background: var(--border);
+  @include m.theme-prop(background, 'border');
   border-radius: 2px;
   overflow: hidden;
   margin-top: 0.7rem;
@@ -343,8 +324,7 @@
   height: 100%;
   // --progress is set dynamically by JS; 0% is the initial fallback
   width: var(--progress, 0%);
-  background: m.token('accent');
-  background: var(--accent);
+  @include m.theme-prop(background, 'accent');
   border-radius: 2px;
   transition: width 0.2s ease;
 }
@@ -365,8 +345,7 @@
 }
 
 .page-footer a {
-  color: m.token('text-muted');
-  color: var(--text-muted);
+  @include m.theme-prop(color, 'text-muted');
 }
 
 .page-footer a:hover {

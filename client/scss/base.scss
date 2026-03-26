@@ -92,8 +92,7 @@ a:hover {
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 .card {
-  background: m.token('surface');
-  background: var(--surface);
+  @include m.theme-prop(background, 'surface');
   border: 1px solid m.token('border');
   border: 1px solid var(--border);
   border-radius: t.$radius-lg;
@@ -124,8 +123,7 @@ a:hover {
   border: 1px solid m.token('border');
   border: 1px solid var(--border);
   border-radius: t.$radius-sm;
-  background: m.token('surface');
-  background: var(--surface);
+  @include m.theme-prop(background, 'surface');
   @include m.theme-prop(color, 'text-muted');
   cursor: pointer;
   @include m.flex-shrink(0);
@@ -135,8 +133,7 @@ a:hover {
 }
 
 .btn-theme:hover {
-  border-color: m.token('accent');
-  border-color: var(--accent);
+  @include m.theme-prop(border-color, 'accent');
   @include m.theme-prop(color, 'accent');
 }
 
