@@ -14,6 +14,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY src ./src
 COPY tsconfig.json ./
+COPY client/scss ./client/scss
 
 RUN pnpm build
 
