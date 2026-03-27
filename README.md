@@ -60,6 +60,7 @@ Copy `.env.example` to `.env` to customise these values.
 
 | Variable               | Default      | Description                                                                                   |
 | ---------------------- | ------------ | --------------------------------------------------------------------------------------------- |
+| `NODE_ENV`             | _(unset)_    | Set to `test` to disable HSTS and `upgrade-insecure-requests` (e.g. for local HTTP dev)       |
 | `PORT`                 | `3001`       | HTTP port the server listens on                                                               |
 | `UPLOAD_DIR`           | `uploads`    | Directory for temporary file storage                                                          |
 | `EXPIRE_DELAY_MS`      | `300000`     | Inactivity timeout per key (ms)                                                               |
