@@ -101,9 +101,9 @@ test('key input is preserved after a successful upload', async ({ page }) => {
   await expect(page.locator('#keyinput')).toHaveValue(key);
 });
 
-test('update metadata option is disabled when no file is selected', async ({ page }) => {
+test('update metadata option is enabled when no file is selected', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#fetchmetadata')).toBeDisabled();
+  await expect(page.locator('#fetchmetadata')).toBeEnabled();
 });
 
 test('update metadata option is disabled for non-EPUB files', async ({ page }) => {

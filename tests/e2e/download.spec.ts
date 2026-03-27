@@ -21,7 +21,10 @@ test('theme toggle hidden on e-reader user-agent', async ({ page }) => {
 });
 
 test('theme toggle visible on desktop /receive', async ({ browser }) => {
-  const context = await browser.newContext({ userAgent: 'Mozilla/5.0 TestBrowser' });
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 TestBrowser',
+    baseURL: 'http://localhost:3001',
+  });
   const page = await context.newPage();
   await page.goto('/receive');
   await expect(page.locator('#theme-toggle')).toBeVisible();
