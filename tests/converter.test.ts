@@ -13,16 +13,16 @@ import {
 describe('convertWithKindlegen', () => {
   it('rejects with an error when kindlegen is not available or the file is invalid', async () => {
     await assert.rejects(
-      () => convertWithKindlegen('/tmp/_book_drop_test.epub'),
+      () => convertWithKindlegen('/tmp/_book-drop_test.epub'),
       (err: Error) => {
         assert.ok(err instanceof Error);
         // Error message is sanitized: always contains the tool name
         assert.ok(
           err.message.toLowerCase().includes('kindlegen'),
-          `Expected 'kindlegen' in error: ${err.message}`,
+          `Expected 'kindlegen' in error: ${err.message}`
         );
         return true;
-      },
+      }
     );
   });
 });
@@ -30,15 +30,15 @@ describe('convertWithKindlegen', () => {
 describe('convertWithKepubify', () => {
   it('rejects with an error when kepubify is not available or the file is invalid', async () => {
     await assert.rejects(
-      () => convertWithKepubify('/tmp/_book_drop_test.epub'),
+      () => convertWithKepubify('/tmp/_book-drop_test.epub'),
       (err: Error) => {
         assert.ok(err instanceof Error);
         assert.ok(
           err.message.toLowerCase().includes('kepubify'),
-          `Expected 'kepubify' in error: ${err.message}`,
+          `Expected 'kepubify' in error: ${err.message}`
         );
         return true;
-      },
+      }
     );
   });
 });
@@ -46,15 +46,15 @@ describe('convertWithKepubify', () => {
 describe('convertWithPdfCropMargins', () => {
   it('rejects with an error when pdfcropmargins is not available or the file is invalid', async () => {
     await assert.rejects(
-      () => convertWithPdfCropMargins('/tmp/_book_drop_test.pdf'),
+      () => convertWithPdfCropMargins('/tmp/_book-drop_test.pdf'),
       (err: Error) => {
         assert.ok(err instanceof Error);
         assert.ok(
           err.message.toLowerCase().includes('pdfcropmargins'),
-          `Expected 'pdfcropmargins' in error: ${err.message}`,
+          `Expected 'pdfcropmargins' in error: ${err.message}`
         );
         return true;
-      },
+      }
     );
   });
 });
