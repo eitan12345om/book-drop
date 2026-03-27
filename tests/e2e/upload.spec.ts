@@ -26,7 +26,7 @@ test('upload a text file and see success message', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
     headers: { 'User-Agent': 'Kobo/4.0 Test' },
   });
-  const key = (await apiRes.text()).trim();
+  const key = (await apiRes.json()).key as string;
 
   await page.goto('/');
   await page.locator('#keyinput').fill(key);
@@ -44,7 +44,7 @@ test('autoselects kindlegen when key belongs to a Kindle device', async ({ page 
   const apiRes = await page.request.post('/generate', {
     headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0' },
   });
-  const key = (await apiRes.text()).trim();
+  const key = (await apiRes.json()).key as string;
 
   await page.goto('/');
   await page.locator('#keyinput').fill(key);
@@ -57,7 +57,7 @@ test('autoselects kepubify when key belongs to a Kobo device', async ({ page }) 
   const apiRes = await page.request.post('/generate', {
     headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36' },
   });
-  const key = (await apiRes.text()).trim();
+  const key = (await apiRes.json()).key as string;
 
   await page.goto('/');
   // kepubify is checked by default; fill a non-Kobo key first to clear it, then fill the Kobo key
@@ -73,7 +73,7 @@ test('clears format converters when key belongs to a Tolino device', async ({ pa
   const apiRes = await page.request.post('/generate', {
     headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 4.4; Tolino)' },
   });
-  const key = (await apiRes.text()).trim();
+  const key = (await apiRes.json()).key as string;
 
   await page.goto('/');
   await page.locator('#keyinput').fill(key);
@@ -86,7 +86,7 @@ test('key input is preserved after a successful upload', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
     headers: { 'User-Agent': 'Kobo/4.0 Test' },
   });
-  const key = (await apiRes.text()).trim();
+  const key = (await apiRes.json()).key as string;
 
   await page.goto('/');
   await page.locator('#keyinput').fill(key);
@@ -99,6 +99,17 @@ test('key input is preserved after a successful upload', async ({ page }) => {
   await expect(page.locator('#status-msg')).toContainText('Sent to', { timeout: 10_000 });
 
   await expect(page.locator('#keyinput')).toHaveValue(key);
+});
+
+test('pre-fills key from URL parameter and auto-selects device', async ({ page }) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36' },
+  });
+  const key = (await apiRes.json()).key as string;
+
+  await page.goto(`/?key=${key}`);
+  await expect(page.locator('#keyinput')).toHaveValue(key);
+  await expect(page.locator('#kepubify')).toBeChecked({ timeout: 5_000 });
 });
 
 test('update metadata option is enabled when no file is selected', async ({ page }) => {

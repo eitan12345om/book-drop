@@ -5,6 +5,8 @@ const POLL_INTERVAL_MS = 5000;
 var currentKey = null;
 var pollTimer = null;
 var currentSSE = null;
+var qrImg = document.getElementById('qr-code');
+var qrFigure = document.getElementById('qr-figure');
 
 const keyDisplay = document.getElementById('key-display');
 const refreshBtn = document.getElementById('refresh-btn');
@@ -102,6 +104,7 @@ function startSSE(key) {
   es.addEventListener('expired', function () {
     stopSSE();
     stopPolling();
+    hideQR();
     currentKey = null;
     renderDownloads(null, []);
     setStatus('idle', '');
@@ -234,6 +237,7 @@ function poll() {
       setStatus('idle', '');
     } else {
       stopPolling();
+      hideQR();
       currentKey = null;
       renderDownloads(null, []);
       setStatus('idle', '');
@@ -248,6 +252,7 @@ function requestKey() {
   stopPolling();
   stopSSE();
   hideError();
+  hideQR();
   currentKey = null;
   keyDisplay.textContent = '\u2013\u2013\u2013\u2013';
   keyDisplay.setAttribute('aria-label', 'Generating key');
@@ -263,11 +268,20 @@ function requestKey() {
     }
     refreshBtn.disabled = false;
     if (xhr.status >= 200 && xhr.status < 300) {
-      const key = xhr.responseText.trim();
+      var data;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch (_) {
+        showError('Unexpected server response.');
+        setStatus('idle', '');
+        return;
+      }
+      const key = data.key;
       currentKey = key;
       keyDisplay.textContent = key;
       keyDisplay.setAttribute('aria-label', 'Key: ' + key.split('').join(' '));
       setStatus('waiting', 'Waiting for a file to be sent\u2026');
+      updateQR(key);
       startSSE(key);
     } else {
       showError(xhr.responseText || 'Could not reach the server. Is it running?');
@@ -275,6 +289,30 @@ function requestKey() {
     }
   };
   xhr.send();
+}
+
+/** Shows the QR code image for the given key. */
+function updateQR(key) {
+  if (!qrImg || !qrFigure) {
+    return;
+  }
+  qrImg.src = '/qr/' + encodeURIComponent(key);
+  qrFigure.style.visibility = 'visible';
+  var divider = document.querySelector('.key-card-divider');
+  if (divider) {
+    divider.style.visibility = 'visible';
+  }
+}
+
+/** Hides the QR code and divider. */
+function hideQR() {
+  if (qrFigure) {
+    qrFigure.style.visibility = 'hidden';
+  }
+  var divider = document.querySelector('.key-card-divider');
+  if (divider) {
+    divider.style.visibility = 'hidden';
+  }
 }
 
 refreshBtn.addEventListener('click', requestKey);

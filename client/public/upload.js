@@ -430,3 +430,21 @@ document.getElementById('keyinput').addEventListener('input', function (e) {
 buildOptionsGrid();
 wireMutualExclusion();
 checkPendingShare();
+
+// Pre-fill key from ?key= URL parameter (e.g. when arriving via QR code scan)
+(function () {
+  const params = new URLSearchParams(location.search);
+  const urlKey = params.get('key');
+  if (!urlKey) {
+    return;
+  }
+  const input = document.getElementById('keyinput');
+  if (!input) {
+    return;
+  }
+  const trimmed = urlKey.toUpperCase().slice(0, 4);
+  input.value = trimmed;
+  if (trimmed.length === 4) {
+    lookupDevice(trimmed);
+  }
+})();

@@ -38,15 +38,24 @@ after(async () => {
 async function generateKey(agent = 'Mozilla/5.0 TestBrowser') {
   const { app, keys } = createApp();
   const res = await request(app).post('/generate').set('User-Agent', agent);
-  return { app, keys, key: res.text, status: res.status };
+  return { app, keys, key: res.body.key as string, status: res.status };
 }
 
 // ---------------------------------------------------------------------------
 describe('POST /generate', () => {
   it('returns 200 with a 4-character key', async () => {
-    const { key, status } = await generateKey();
-    assert.strictEqual(status, 200);
-    assert.match(key, /^[2-9A-Z]{4}$/);
+    const { app } = createApp();
+    const res = await request(app).post('/generate').set('User-Agent', 'TestBrowser/1.0');
+    assert.strictEqual(res.status, 200);
+    assert.match(res.body.key, /^[2-9A-Z]{4}$/);
+  });
+
+  it('GET /qr/:key returns a PNG image', async () => {
+    const { app, key } = await generateKey('Kobo/1.0 Test');
+    const res = await request(app).get(`/qr/${key}`).set('User-Agent', 'Kobo/1.0 Test');
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.headers['content-type'], 'image/png');
+    assert.ok(res.body.length > 0);
   });
 
   it('stores the user-agent in the key info', async () => {
@@ -60,10 +69,10 @@ describe('POST /generate', () => {
     const agent = 'TestBrowser/1.0';
     const r1 = await request(app).post('/generate').set('User-Agent', agent);
     const r2 = await request(app).post('/generate').set('User-Agent', agent);
-    assert.strictEqual(r1.text.length, 4);
-    assert.strictEqual(r2.text.length, 4);
-    assert.ok(keys.has(r1.text));
-    assert.ok(keys.has(r2.text));
+    assert.strictEqual(r1.body.key.length, 4);
+    assert.strictEqual(r2.body.key.length, 4);
+    assert.ok(keys.has(r1.body.key));
+    assert.ok(keys.has(r2.body.key));
   });
 });
 
@@ -445,7 +454,7 @@ describe('GET /events/:key', () => {
   before(async () => {
     ({ app, keys } = createApp());
     const res = await request(app).post('/generate').set('User-Agent', agent);
-    key = res.text;
+    key = res.body.key;
   });
 
   it('returns 400 for invalid key format', async () => {

@@ -6,9 +6,10 @@ Live at [bookdrop.cc](https://bookdrop.cc) · Forked from [send2ereader](https:/
 
 ## How it works
 
-1. Open the site in your ereader's browser — it shows a unique 4-character key.
-2. On your computer, enter the key, pick a file, and click **Upload and send**.
-3. A download link appears on the ereader within seconds.
+1. Open the site in your ereader's browser — it shows a 4-character key and a QR code.
+2. Scan the QR code with your phone to open the upload page with the key pre-filled, or enter the key manually on any computer.
+3. Pick a file and click **Upload and send**.
+4. A download link appears on the ereader within seconds.
 
 Supported formats: EPUB, MOBI, PDF, CBZ, CBR, HTML, TXT.
 

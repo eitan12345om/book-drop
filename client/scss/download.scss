@@ -64,7 +64,7 @@
 .status-row {
   @include m.flex;
   @include m.align-items(center);
-  @include m.justify-content(center);
+  @include m.justify-content(flex-start);
   @include m.flex-gap-row(0.5rem);
   font-size: 0.82rem;
   @include m.theme-prop(color, 'text-muted');
@@ -183,6 +183,48 @@
 .metadata-after {
   @include m.theme-prop(color, 'text');
   word-break: break-word;
+}
+
+// ─── Key card two-column layout ───────────────────────────────────────────────
+
+.key-card-inner {
+  @include m.flex;
+  @include m.align-items(center);
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+}
+
+.key-card-right {
+  min-width: 0;
+}
+
+// ─── QR code ──────────────────────────────────────────────────────────────────
+
+#qr-figure {
+  @include m.flex-shrink(0);
+  margin: 0;
+  padding: 0;
+  visibility: hidden;
+
+  img {
+    display: block;
+    width: 160px;
+    height: 160px;
+    border-radius: t.$radius-sm;
+  }
+}
+
+.key-card-divider {
+  border: none;
+  visibility: hidden;
+  width: 1px;
+  height: 128px; // 80% of 160px QR height
+  background: m.token('border');
+  background: var(--border);
+  margin: 0;
+  @include m.flex-shrink(0);
+  -webkit-align-self: center;
+  align-self: center;
 }
 
 // ─── Error ────────────────────────────────────────────────────────────────────

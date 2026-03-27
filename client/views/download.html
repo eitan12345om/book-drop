@@ -80,32 +80,44 @@
 
       <div class="card" id="key-card">
         <h2 class="card-title">Your unique key</h2>
-        <div class="key-wrap">
-          <span class="key-value" id="key-display" aria-label="Generating key" aria-live="polite"
-            >––––</span
-          >
-          <button
-            class="btn-icon"
-            id="refresh-btn"
-            aria-label="Generate new key"
-            title="Generate new key"
-            disabled
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                d="M19.146 4.854l-1.489 1.489A8 8 0 1 0 12 20a8.094 8.094 0 0 0 7.371-4.886 1 1 0 1 0-1.842-.779A6.071 6.071 0 0 1 12 18a6 6 0 1 1 4.243-10.243l-1.39 1.39a.5.5 0 0 0 .354.854H19.5A.5.5 0 0 0 20 9.5V5.207a.5.5 0 0 0-.854-.353z"
-              />
-            </svg>
-          </button>
-        </div>
-        <div class="status-row" id="status-row" role="status" aria-live="polite">
-          <span class="dot" id="status-dot" aria-hidden="true"></span>
-          <span id="status-label">Generating key…</span>
+        <div class="key-card-inner">
+          <figure id="qr-figure" aria-label="QR code to open upload page">
+            <img id="qr-code" alt="" width="160" height="160" />
+          </figure>
+          <hr class="key-card-divider" aria-hidden="true" />
+          <div class="key-card-right">
+            <div class="key-wrap">
+              <span
+                class="key-value"
+                id="key-display"
+                aria-label="Generating key"
+                aria-live="polite"
+                >––––</span
+              >
+              <button
+                class="btn-icon"
+                id="refresh-btn"
+                aria-label="Generate new key"
+                title="Generate new key"
+                disabled
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M19.146 4.854l-1.489 1.489A8 8 0 1 0 12 20a8.094 8.094 0 0 0 7.371-4.886 1 1 0 1 0-1.842-.779A6.071 6.071 0 0 1 12 18a6 6 0 1 1 4.243-10.243l-1.39 1.39a.5.5 0 0 0 .354.854H19.5A.5.5 0 0 0 20 9.5V5.207a.5.5 0 0 0-.854-.353z"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="status-row" id="status-row" role="status" aria-live="polite">
+              <span class="dot" id="status-dot" aria-hidden="true"></span>
+              <span id="status-label">Generating key…</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -119,8 +131,9 @@
       <div class="card instructions">
         <h2 class="card-title">How it works</h2>
         <p>
-          Visit BookDrop on your computer or phone, enter the key shown above, pick a file, and
-          press <em>Upload and send</em>. A download link will appear here within seconds.
+          Scan the QR code with your phone or computer to open the upload page with the key
+          pre-filled, or visit BookDrop and type the key manually. Pick a file and press
+          <em>Upload and send</em>. A download link will appear here within seconds.
         </p>
         <p>
           Files are stored temporarily on the server and deleted automatically a few minutes after

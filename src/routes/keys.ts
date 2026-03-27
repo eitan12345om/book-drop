@@ -1,5 +1,6 @@
 import path from 'path';
 import express from 'express';
+import QRCode from 'qrcode';
 import { generateUniqueKey, expireKey, removeKey, clearFile } from '../keyStore.js';
 import {
   MAX_EXPIRE_MS,
@@ -31,7 +32,7 @@ export function makeKeysRouter(
   const eventsLimiter = makeLimiter(EVENTS_RATE_LIMIT_MAX);
   const downloadLimiter = makeLimiter(DOWNLOAD_RATE_LIMIT_MAX);
 
-  router.post('/generate', generateLimiter, (req, res) => {
+  router.post('/generate', generateLimiter, async (req, res) => {
     if (keys.size >= MAX_ACTIVE_KEYS) {
       logger.warn({ activeKeys: keys.size }, 'Key rejected: server busy');
       res.status(503).send('Server busy');
@@ -81,7 +82,18 @@ export function makeKeysRouter(
     }, MAX_EXPIRE_MS).unref();
 
     logger.info({ key, ip, activeKeys: keys.size }, 'Generated key');
-    res.send(key);
+
+    res.json({ key });
+  });
+
+  router.get('/qr/:key', generateLimiter, requireKey, async (req, res) => {
+    const key: string = res.locals.key;
+    const origin = `${req.protocol}://${req.get('host')}`;
+    const uploadUrl = `${origin}/?key=${key}`;
+    const png = await QRCode.toBuffer(uploadUrl, { margin: 1 });
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'no-store');
+    res.send(png);
   });
 
   router.get('/status/:key', statusLimiter, requireMatchingAgent, (req, res) => {
