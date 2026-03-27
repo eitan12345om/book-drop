@@ -1,5 +1,6 @@
 import fs from 'fs';
 import fsp from 'fs/promises';
+import type express from 'express';
 import JSZip from 'jszip';
 import { transliterate } from 'transliteration';
 import { logger } from './logger.js';
@@ -49,6 +50,11 @@ export function isValidUrl(raw: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Returns the real client IP, preferring Cloudflare's CF-Connecting-IP header over req.ip. */
+export function clientIp(req: express.Request): string {
+  return (req.headers['cf-connecting-ip'] as string) ?? req.ip ?? 'unknown';
 }
 
 /** Schedules an async unlink of filePath, logging non-ENOENT errors. */

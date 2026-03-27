@@ -5,10 +5,12 @@ import fsp from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import JSZip from 'jszip';
+import type express from 'express';
 import {
   isValidKey,
   isValidUrl,
   isEreaderAgent,
+  clientIp,
   doTransliterate,
   deleteFile,
   readEpubMetadata,
@@ -333,6 +335,26 @@ describe('doTransliterate', () => {
   it('handles filenames with multiple dots (preserves only the last extension)', () => {
     const result = doTransliterate('my.book.name.epub');
     assert.ok(result.endsWith('.epub'));
+  });
+});
+
+describe('clientIp', () => {
+  it('returns CF-Connecting-IP when present', () => {
+    const req = {
+      headers: { 'cf-connecting-ip': '1.2.3.4' },
+      ip: '10.0.0.1',
+    } as unknown as express.Request;
+    assert.strictEqual(clientIp(req), '1.2.3.4');
+  });
+
+  it('falls back to req.ip when CF-Connecting-IP is absent', () => {
+    const req = { headers: {}, ip: '10.0.0.1' } as unknown as express.Request;
+    assert.strictEqual(clientIp(req), '10.0.0.1');
+  });
+
+  it('returns unknown when both are absent', () => {
+    const req = { headers: {}, ip: undefined } as unknown as express.Request;
+    assert.strictEqual(clientIp(req), 'unknown');
   });
 });
 

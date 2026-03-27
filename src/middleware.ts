@@ -1,9 +1,26 @@
 import fsp from 'fs/promises';
 import path from 'path';
 import type express from 'express';
-import { isValidKey } from './utils.js';
+import rateLimit from 'express-rate-limit';
+import { isValidKey, clientIp } from './utils.js';
 import { logger } from './logger.js';
 import type { KeyInfo } from './types.js';
+import { RATE_LIMIT_WINDOW_MS } from './config.js';
+
+/** Creates a rate limiter keyed by real client IP (CF-Connecting-IP → req.ip). */
+export function makeLimiter(
+  max: number,
+  extras?: Partial<Parameters<typeof rateLimit>[0]>
+): ReturnType<typeof rateLimit> {
+  return rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => clientIp(req),
+    ...extras,
+  });
+}
 
 /** Reads an HTML file from viewsDir, injects nonce and any extra placeholder replacements, sends with no-store cache headers. */
 export async function serveHtml(
