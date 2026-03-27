@@ -125,7 +125,7 @@
 
 .zone-file-info {
   @include m.flex(column);
-  @include m.align-items(center);
+  @include m.webkit(align-items, center);
   @include m.flex-gap-col(0.25rem);
   margin: 0;
 }
@@ -170,7 +170,7 @@
 
 .option-item {
   @include m.flex;
-  @include m.align-items(flex-start);
+  @include m.webkit(align-items, flex-start);
   @include m.flex-gap-row(0.6rem);
   padding: 0.7rem 0.85rem;
   border: 1px solid m.token('border');
@@ -202,14 +202,14 @@
   @include m.theme-prop(accent-color, 'accent');
   width: 1rem;
   height: 1rem;
-  @include m.flex-shrink(0);
+  @include m.webkit(flex-shrink, 0);
   cursor: pointer;
 }
 
 .option-label-row {
   @include m.flex;
-  @include m.align-items(center);
-  @include m.flex-wrap(wrap);
+  @include m.webkit(align-items, center);
+  @include m.webkit(flex-wrap, wrap);
   @include m.flex-gap-row(0.4rem);
 }
 

@@ -6,8 +6,8 @@
 
 .key-wrap {
   @include m.flex;
-  @include m.align-items(center);
-  @include m.justify-content(center);
+  @include m.webkit(align-items, center);
+  @include m.webkit(justify-content, center);
   @include m.flex-gap-row(0.75rem);
 }
 
@@ -40,7 +40,7 @@
   @include m.theme-prop(color, 'text');
   cursor: pointer;
   touch-action: manipulation;
-  @include m.flex-shrink(0);
+  @include m.webkit(flex-shrink, 0);
 }
 
 .btn-icon:hover {
@@ -63,8 +63,8 @@
 
 .status-row {
   @include m.flex;
-  @include m.align-items(center);
-  @include m.justify-content(flex-start);
+  @include m.webkit(align-items, center);
+  @include m.webkit(justify-content, flex-start);
   @include m.flex-gap-row(0.5rem);
   font-size: 0.82rem;
   @include m.theme-prop(color, 'text-muted');
@@ -76,7 +76,7 @@
   height: 7px;
   border-radius: 50%;
   @include m.theme-prop(background, 'text-muted');
-  flex-shrink: 0;
+  @include m.webkit(flex-shrink, 0);
 }
 
 .dot-active {
@@ -120,7 +120,7 @@
 
 .download-item {
   @include m.flex;
-  @include m.align-items(center);
+  @include m.webkit(align-items, center);
   @include m.flex-gap-row(0.75rem);
   padding: 0.75rem 1rem;
   @include m.theme-prop(background, 'bg');
@@ -140,7 +140,7 @@
 }
 
 .download-item svg {
-  @include m.flex-shrink(0);
+  @include m.webkit(flex-shrink, 0);
   opacity: 0.5;
   width: 1.1rem;
   height: 1.1rem;
@@ -189,9 +189,8 @@
 
 .key-card-inner {
   @include m.flex;
-  @include m.align-items(center);
-  -webkit-justify-content: space-between;
-  justify-content: space-between;
+  @include m.webkit(align-items, center);
+  @include m.webkit(justify-content, space-between);
 }
 
 .key-card-right {
@@ -201,7 +200,7 @@
 // ─── QR code ──────────────────────────────────────────────────────────────────
 
 #qr-figure {
-  @include m.flex-shrink(0);
+  @include m.webkit(flex-shrink, 0);
   margin: 0;
   padding: 0;
   visibility: hidden;
@@ -222,9 +221,8 @@
   background: m.token('border');
   background: var(--border);
   margin: 0;
-  @include m.flex-shrink(0);
-  -webkit-align-self: center;
-  align-self: center;
+  @include m.webkit(flex-shrink, 0);
+  @include m.webkit(align-self, center);
 }
 
 // ─── Error ────────────────────────────────────────────────────────────────────
@@ -234,6 +232,30 @@
   @include m.theme-prop(color, 'error-text');
   font-size: 0.875rem;
   margin: 0 0 1rem;
+}
+
+// ─── Responsive: stack key card vertically on small screens ───────────────────
+
+@media (max-width: 600px) {
+  .key-card-inner {
+    @include m.webkit(flex-direction, column);
+    @include m.webkit(align-items, stretch);
+    @include m.flex-gap-col(1rem);
+  }
+
+  .key-card-divider {
+    width: 80%;
+    height: 1px;
+    @include m.webkit(align-self, center);
+  }
+
+  #qr-figure img {
+    margin: 0 auto;
+  }
+
+  .status-row {
+    @include m.webkit(justify-content, center);
+  }
 }
 
 // ─── Footer ───────────────────────────────────────────────────────────────────

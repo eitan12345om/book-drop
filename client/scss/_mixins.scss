@@ -32,24 +32,9 @@
   display: inline-flex;
 }
 
-@mixin align-items($value) {
-  -webkit-align-items: $value;
-  align-items: $value;
-}
-
-@mixin justify-content($value) {
-  -webkit-justify-content: $value;
-  justify-content: $value;
-}
-
-@mixin flex-wrap($value) {
-  -webkit-flex-wrap: $value;
-  flex-wrap: $value;
-}
-
-@mixin flex-shrink($value) {
-  -webkit-flex-shrink: $value;
-  flex-shrink: $value;
+@mixin webkit($property, $value) {
+  -webkit-#{$property}: $value;
+  #{$property}: $value;
 }
 
 // ─── Gap fallbacks (gap on flex unsupported before Chrome 84 / Safari 14.1) ──
