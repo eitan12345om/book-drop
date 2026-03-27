@@ -9,6 +9,7 @@ import type { KeyInfo } from '../src/types.js';
 function makeKeyInfo(agent: string): KeyInfo {
   return {
     created: new Date(),
+    ip: '127.0.0.1',
     agent,
     file: null,
     urls: [],

@@ -4,6 +4,30 @@ import type { KeyInfo } from './types.js';
 import { logger } from './logger.js';
 import { EXPIRE_DELAY_MS } from './config.js';
 
+let diskUsageBytes = 0;
+export function addDiskUsage(bytes: number): void {
+  diskUsageBytes += bytes;
+}
+export function subtractDiskUsage(bytes: number): void {
+  diskUsageBytes = Math.max(0, diskUsageBytes - bytes);
+}
+export function getDiskUsage(): number {
+  return diskUsageBytes;
+}
+
+/** Subtracts the file's size from the disk counter, unlinks it, and nulls info.file. */
+export function clearFile(info: KeyInfo): void {
+  if (info.file) {
+    subtractDiskUsage(info.file.size);
+    fs.unlink(info.file.path, (err) => {
+      if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        logger.error({ err }, 'Error deleting file');
+      }
+    });
+    info.file = null;
+  }
+}
+
 export const KEY_CHARS = '23456789ACDEFGHJKLMNPRSTUVWXYZ';
 export const KEY_LENGTH = 4;
 
@@ -41,14 +65,7 @@ export function removeKey(key: string, keys: Map<string, KeyInfo>): void {
   if (info.downloadTimer) {
     clearTimeout(info.downloadTimer);
   }
-  if (info.file) {
-    fs.unlink(info.file.path, (err) => {
-      if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
-        logger.error({ err, key }, 'Error deleting file for key');
-      }
-    });
-    info.file = null;
-  }
+  clearFile(info);
   keys.delete(key);
   logger.info({ key }, 'Key removed');
 }

@@ -2,33 +2,29 @@ import path from 'path';
 import fs from 'fs';
 import express from 'express';
 import multer from 'multer';
-import rateLimit from 'express-rate-limit';
 import sanitize from 'sanitize-filename';
 import { fileTypeFromFile } from 'file-type';
-import { expireKey } from '../keyStore.js';
+import { expireKey, clearFile, addDiskUsage, getDiskUsage } from '../keyStore.js';
 import {
   convertWithKindlegen,
   convertWithKepubify,
   convertWithPdfCropMargins,
 } from '../converter.js';
-import {
-  MAX_FILE_SIZE,
-  UPLOAD_DIR,
-  RATE_LIMIT_WINDOW_MS,
-  UPLOAD_RATE_LIMIT_MAX,
-} from '../config.js';
+import { MAX_FILE_SIZE, MAX_DISK_BYTES, UPLOAD_DIR, UPLOAD_RATE_LIMIT_MAX } from '../config.js';
 import { logger } from '../logger.js';
 import type { KeyInfo, MetadataDiff } from '../types.js';
 import {
   isValidKey,
   isValidUrl,
   deleteFile,
+  clientIp,
   doTransliterate,
   updateEpubMetadata,
   TYPE_EPUB,
   ALLOWED_TYPES,
   ALLOWED_EXTENSIONS,
 } from '../utils.js';
+import { makeLimiter } from '../middleware.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -128,12 +124,7 @@ export function makeUploadRouter(
 ): express.Router {
   const router = express.Router();
 
-  const uploadLimiter = rateLimit({
-    windowMs: RATE_LIMIT_WINDOW_MS,
-    max: UPLOAD_RATE_LIMIT_MAX,
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
+  const uploadLimiter = makeLimiter(UPLOAD_RATE_LIMIT_MAX);
 
   const storage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
@@ -219,7 +210,7 @@ export function makeUploadRouter(
         if (!info.urls.includes(rawUrl)) {
           info.urls.push(rawUrl);
           submittedUrl = rawUrl;
-          logger.info({ key, url: rawUrl, ip: req.ip }, 'URL staged');
+          logger.info({ key, url: rawUrl, ip: clientIp(req) }, 'URL staged');
         }
       }
 
@@ -286,6 +277,17 @@ export function makeUploadRouter(
           return;
         }
 
+        const projectedUsage = getDiskUsage() + convertedSize - (info.file?.size ?? 0);
+        if (projectedUsage > MAX_DISK_BYTES) {
+          deleteFile(convertedPath);
+          logger.warn(
+            { key, convertedSize, diskUsage: getDiskUsage() },
+            'Upload rejected: disk limit reached'
+          );
+          res.status(507).send('Insufficient storage');
+          return;
+        }
+
         let metadataDiff: MetadataDiff | undefined;
         if (req.body?.fetchmetadata && mimetype === TYPE_EPUB) {
           try {
@@ -297,18 +299,18 @@ export function makeUploadRouter(
           }
         }
 
-        if (info.file?.path) {
-          deleteFile(info.file.path);
-        }
+        clearFile(info);
+        addDiskUsage(convertedSize);
         info.file = {
           name: finalFilename,
           path: convertedPath,
+          size: convertedSize,
           uploaded: new Date(),
           metadataDiff,
         };
         expireKey(key, keys);
         logger.info(
-          { key, filename: finalFilename, size: convertedSize, ip: req.ip },
+          { key, filename: finalFilename, size: convertedSize, ip: clientIp(req) },
           'File staged'
         );
         notifySSE(key, info);

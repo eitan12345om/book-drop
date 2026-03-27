@@ -22,4 +22,6 @@ export const UPLOAD_RATE_LIMIT_MAX = envInt('UPLOAD_RATE_LIMIT_MAX', 10);
 export const DELETE_RATE_LIMIT_MAX = envInt('DELETE_RATE_LIMIT_MAX', 20);
 export const EVENTS_RATE_LIMIT_MAX = envInt('EVENTS_RATE_LIMIT_MAX', 5);
 export const DOWNLOAD_RATE_LIMIT_MAX = envInt('DOWNLOAD_RATE_LIMIT_MAX', 20);
+export const MAX_KEYS_PER_IP = envInt('MAX_KEYS_PER_IP', 3);
+export const MAX_DISK_BYTES = envInt('MAX_DISK_BYTES', 1 * 1024 * 1024 * 1024);
 export const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY ?? '';

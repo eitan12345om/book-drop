@@ -7,7 +7,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createApp } from '../src/app.js';
-import { MAX_ACTIVE_KEYS } from '../src/config.js';
+import { MAX_ACTIVE_KEYS, MAX_KEYS_PER_IP, MAX_DISK_BYTES } from '../src/config.js';
+import { addDiskUsage, subtractDiskUsage } from '../src/keyStore.js';
 import type { KeyInfo } from '../src/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -94,7 +95,7 @@ describe('GET /status/:key', () => {
     const agent = 'TestBrowser/1.0';
     const { app, keys, key } = await generateKey(agent);
     const info = keys.get(key)!;
-    info.file = { name: 'book.epub', path: '/tmp/book.epub', uploaded: new Date() };
+    info.file = { name: 'book.epub', path: '/tmp/book.epub', size: 0, uploaded: new Date() };
 
     const res = await request(app).get(`/status/${key}`).set('User-Agent', agent);
     assert.strictEqual(res.status, 200);
@@ -114,7 +115,7 @@ describe('DELETE /file/:key', () => {
     const agent = 'TestBrowser/1.0';
     const { app, keys, key } = await generateKey(agent);
     const info = keys.get(key)!;
-    info.file = { name: 'test.epub', path: '/tmp/nonexistent.epub', uploaded: new Date() };
+    info.file = { name: 'test.epub', path: '/tmp/nonexistent.epub', size: 0, uploaded: new Date() };
 
     const del = await request(app).delete(`/file/${key}`);
     assert.strictEqual(del.status, 200);
@@ -271,11 +272,26 @@ describe('CSP / nonce injection', () => {
 });
 
 // ---------------------------------------------------------------------------
+describe('POST /generate — per-IP limit', () => {
+  it('returns 429 when MAX_KEYS_PER_IP is reached from the same IP', async () => {
+    const { app } = createApp();
+    const agent = 'TestBrowser/1.0';
+    for (let i = 0; i < MAX_KEYS_PER_IP; i++) {
+      const res = await request(app).post('/generate').set('User-Agent', agent);
+      assert.strictEqual(res.status, 200);
+    }
+    const res = await request(app).post('/generate').set('User-Agent', agent);
+    assert.strictEqual(res.status, 429);
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('POST /generate — capacity', () => {
   it('returns 503 when MAX_ACTIVE_KEYS is reached', async () => {
     const { app, keys } = createApp();
     const fakeInfo: KeyInfo = {
       created: new Date(),
+      ip: '1.2.3.4',
       agent: 'test',
       file: null,
       urls: [],
@@ -298,7 +314,7 @@ describe('GET /:filename', () => {
     const { app, keys, key } = await generateKey(agent);
     const tmpFile = path.join('uploads', `test-serve-${Date.now()}.txt`);
     await fs.writeFile(tmpFile, 'ebook content here');
-    keys.get(key)!.file = { name: 'mybook.txt', path: tmpFile, uploaded: new Date() };
+    keys.get(key)!.file = { name: 'mybook.txt', path: tmpFile, size: 0, uploaded: new Date() };
 
     const res = await request(app).get(`/mybook.txt?key=${key}`).set('User-Agent', agent);
     assert.strictEqual(res.status, 200);
@@ -313,6 +329,7 @@ describe('GET /:filename', () => {
     keys.get(key)!.file = {
       name: 'real.txt',
       path: '/tmp/nonexistent.txt',
+      size: 0,
       uploaded: new Date(),
     };
 
@@ -330,6 +347,26 @@ describe('GET /:filename', () => {
     const { app } = createApp({ staticDir: STATIC_DIR });
     const res = await request(app).get('/somefile.epub?key=!!');
     assert.strictEqual(res.status, 404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('POST /upload — disk limit', () => {
+  it('returns 507 when disk usage is at the limit', async () => {
+    const { app, key } = await generateKey();
+    addDiskUsage(MAX_DISK_BYTES);
+    try {
+      const res = await request(app)
+        .post('/upload')
+        .field('key', key)
+        .attach('file', Buffer.from('This is a test ebook.'), {
+          filename: 'test.txt',
+          contentType: 'text/plain',
+        });
+      assert.strictEqual(res.status, 507);
+    } finally {
+      subtractDiskUsage(MAX_DISK_BYTES);
+    }
   });
 });
 

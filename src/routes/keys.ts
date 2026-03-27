@@ -1,12 +1,11 @@
 import path from 'path';
 import express from 'express';
-import rateLimit from 'express-rate-limit';
-import { generateUniqueKey, expireKey, removeKey } from '../keyStore.js';
+import { generateUniqueKey, expireKey, removeKey, clearFile } from '../keyStore.js';
 import {
   MAX_EXPIRE_MS,
   MAX_ACTIVE_KEYS,
+  MAX_KEYS_PER_IP,
   FILE_DELETE_DELAY_MS,
-  RATE_LIMIT_WINDOW_MS,
   RATE_LIMIT_MAX,
   STATUS_RATE_LIMIT_MAX,
   DELETE_RATE_LIMIT_MAX,
@@ -15,8 +14,8 @@ import {
 } from '../config.js';
 import { logger } from '../logger.js';
 import type { KeyInfo } from '../types.js';
-import { isValidKey, deleteFile } from '../utils.js';
-import { makeRequireKey, makeRequireMatchingAgent } from '../middleware.js';
+import { isValidKey, clientIp } from '../utils.js';
+import { makeRequireKey, makeRequireMatchingAgent, makeLimiter } from '../middleware.js';
 
 export function makeKeysRouter(
   keys: Map<string, KeyInfo>,
@@ -26,42 +25,23 @@ export function makeKeysRouter(
   const requireKey = makeRequireKey(keys);
   const requireMatchingAgent = makeRequireMatchingAgent(keys);
 
-  const generateLimiter = rateLimit({
-    windowMs: RATE_LIMIT_WINDOW_MS,
-    max: RATE_LIMIT_MAX,
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-  const statusLimiter = rateLimit({
-    windowMs: RATE_LIMIT_WINDOW_MS,
-    max: STATUS_RATE_LIMIT_MAX,
-    standardHeaders: true,
-    legacyHeaders: false,
-    skipSuccessfulRequests: true,
-  });
-  const deleteLimiter = rateLimit({
-    windowMs: RATE_LIMIT_WINDOW_MS,
-    max: DELETE_RATE_LIMIT_MAX,
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-  const eventsLimiter = rateLimit({
-    windowMs: RATE_LIMIT_WINDOW_MS,
-    max: EVENTS_RATE_LIMIT_MAX,
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-  const downloadLimiter = rateLimit({
-    windowMs: RATE_LIMIT_WINDOW_MS,
-    max: DOWNLOAD_RATE_LIMIT_MAX,
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
+  const generateLimiter = makeLimiter(RATE_LIMIT_MAX);
+  const statusLimiter = makeLimiter(STATUS_RATE_LIMIT_MAX, { skipSuccessfulRequests: true });
+  const deleteLimiter = makeLimiter(DELETE_RATE_LIMIT_MAX);
+  const eventsLimiter = makeLimiter(EVENTS_RATE_LIMIT_MAX);
+  const downloadLimiter = makeLimiter(DOWNLOAD_RATE_LIMIT_MAX);
 
   router.post('/generate', generateLimiter, (req, res) => {
     if (keys.size >= MAX_ACTIVE_KEYS) {
       logger.warn({ activeKeys: keys.size }, 'Key rejected: server busy');
       res.status(503).send('Server busy');
+      return;
+    }
+    const ip = clientIp(req);
+    const keysForIp = [...keys.values()].filter((k) => k.ip === ip).length;
+    if (keysForIp >= MAX_KEYS_PER_IP) {
+      logger.warn({ ip, keysForIp }, 'Key rejected: per-IP limit reached');
+      res.status(429).send('Too many active sessions');
       return;
     }
     const agent = req.get('user-agent') ?? '';
@@ -74,6 +54,7 @@ export function makeKeysRouter(
 
     const info: KeyInfo = {
       created: new Date(),
+      ip,
       agent,
       file: null,
       urls: [],
@@ -99,7 +80,7 @@ export function makeKeysRouter(
       }
     }, MAX_EXPIRE_MS).unref();
 
-    logger.info({ key, ip: req.ip, activeKeys: keys.size }, 'Generated key');
+    logger.info({ key, ip, activeKeys: keys.size }, 'Generated key');
     res.send(key);
   });
 
@@ -182,10 +163,7 @@ export function makeKeysRouter(
       res.status(400).send(`Unknown key: ${key}`);
       return;
     }
-    if (info.file) {
-      deleteFile(info.file.path);
-      info.file = null;
-    }
+    clearFile(info);
     res.send('ok');
   });
 
@@ -210,8 +188,7 @@ export function makeKeysRouter(
         info.downloadTimer = setTimeout(() => {
           if (info.file) {
             logger.info({ key, filename }, 'File deleted after download delay');
-            deleteFile(info.file.path);
-            info.file = null;
+            clearFile(info);
           }
         }, FILE_DELETE_DELAY_MS).unref();
       }

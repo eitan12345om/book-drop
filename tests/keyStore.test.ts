@@ -7,6 +7,9 @@ import {
   generateUniqueKey,
   expireKey,
   removeKey,
+  clearFile,
+  addDiskUsage,
+  getDiskUsage,
 } from '../src/keyStore.js';
 import { EXPIRE_DELAY_MS } from '../src/config.js';
 import type { KeyInfo } from '../src/types.js';
@@ -14,6 +17,7 @@ import type { KeyInfo } from '../src/types.js';
 function makeKeyInfo(overrides: Partial<KeyInfo> = {}): KeyInfo {
   return {
     created: new Date(),
+    ip: '127.0.0.1',
     agent: 'TestBrowser/1.0',
     file: null,
     urls: [],
@@ -175,6 +179,45 @@ describe('removeKey', () => {
     const keys = new Map<string, KeyInfo>();
     keys.set('MNOP', makeKeyInfo());
     assert.doesNotThrow(() => removeKey('MNOP', keys));
+  });
+});
+
+describe('clearFile', () => {
+  it('subtracts the file size from the disk usage counter', () => {
+    const info = makeKeyInfo({
+      file: { name: 'test.epub', path: '/tmp/x.epub', size: 500, uploaded: new Date() },
+    });
+    addDiskUsage(500);
+    const before = getDiskUsage();
+    clearFile(info);
+    assert.strictEqual(getDiskUsage(), before - 500);
+  });
+
+  it('sets info.file to null', () => {
+    const info = makeKeyInfo({
+      file: { name: 'test.epub', path: '/tmp/x.epub', size: 0, uploaded: new Date() },
+    });
+    clearFile(info);
+    assert.strictEqual(info.file, null);
+  });
+
+  it('is a no-op when info.file is already null', () => {
+    const info = makeKeyInfo();
+    const before = getDiskUsage();
+    assert.doesNotThrow(() => clearFile(info));
+    assert.strictEqual(getDiskUsage(), before);
+  });
+
+  it('decrements disk usage when removeKey is called with a staged file', () => {
+    const keys = new Map<string, KeyInfo>();
+    const info = makeKeyInfo({
+      file: { name: 'book.epub', path: '/tmp/book.epub', size: 1000, uploaded: new Date() },
+    });
+    addDiskUsage(1000);
+    const before = getDiskUsage();
+    keys.set('ABCD', info);
+    removeKey('ABCD', keys);
+    assert.strictEqual(getDiskUsage(), before - 1000);
   });
 });
 

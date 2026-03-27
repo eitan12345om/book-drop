@@ -10,12 +10,14 @@ export interface MetadataDiff {
 export interface FileInfo {
   name: string;
   path: string;
+  size: number;
   uploaded: Date;
   metadataDiff?: MetadataDiff;
 }
 
 export interface KeyInfo {
   created: Date;
+  ip: string;
   agent: string;
   file: FileInfo | null;
   urls: string[];
