@@ -64,6 +64,22 @@ describe('POST /generate', () => {
     assert.strictEqual(keys.get(key)?.agent, agent);
   });
 
+  it('removes the old key when a valid abandon key is provided', async () => {
+    const { app, key: oldKey, keys } = await generateKey('TestBrowser/1.0');
+    assert.ok(keys.has(oldKey));
+    await request(app).post(`/generate?abandon=${oldKey}`).set('User-Agent', 'TestBrowser/1.0');
+    assert.ok(!keys.has(oldKey), 'old key should be removed from the store');
+  });
+
+  it('ignores an unknown abandon key without error', async () => {
+    const { app } = createApp();
+    const res = await request(app)
+      .post('/generate?abandon=ZZZZ')
+      .set('User-Agent', 'TestBrowser/1.0');
+    assert.strictEqual(res.status, 200);
+    assert.match(res.body.key, /^[2-9A-Z]{4}$/);
+  });
+
   it('generates unique keys on successive calls', async () => {
     const { app, keys } = createApp();
     const agent = 'TestBrowser/1.0';

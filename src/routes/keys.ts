@@ -81,6 +81,12 @@ export function makeKeysRouter(
       }
     }, MAX_EXPIRE_MS).unref();
 
+    const abandonKey =
+      typeof req.query.abandon === 'string' ? req.query.abandon.toUpperCase() : null;
+    if (abandonKey && isValidKey(abandonKey) && keys.has(abandonKey)) {
+      removeKey(abandonKey, keys);
+    }
+
     logger.info({ key, ip, activeKeys: keys.size }, 'Generated key');
 
     res.json({ key });

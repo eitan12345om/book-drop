@@ -41,6 +41,22 @@ test('shows QR code after key is generated', async ({ page }) => {
   expect(src).toMatch(/^\/qr\/[2-9A-Z]{4}$/);
 });
 
+test('old key is deleted when refresh generates a new key', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#key-display')).not.toHaveText('\u2013\u2013\u2013\u2013', {
+    timeout: 5000,
+  });
+  const oldKey = (await page.locator('#key-display').textContent())?.trim();
+
+  await page.locator('#refresh-btn').click();
+  await expect(page.locator('#key-display')).not.toHaveText('\u2013\u2013\u2013\u2013', {
+    timeout: 5000,
+  });
+
+  const res = await page.request.get(`/status/${oldKey}`);
+  expect(res.status()).toBe(404);
+});
+
 test('QR code updates when refresh button is clicked', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#key-display')).not.toHaveText('\u2013\u2013\u2013\u2013', {

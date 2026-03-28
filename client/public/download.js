@@ -253,6 +253,7 @@ function requestKey() {
   stopSSE();
   hideError();
   hideQR();
+  var abandonKey = currentKey;
   currentKey = null;
   keyDisplay.textContent = '\u2013\u2013\u2013\u2013';
   keyDisplay.setAttribute('aria-label', 'Generating key');
@@ -261,7 +262,10 @@ function requestKey() {
   refreshBtn.disabled = true;
 
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', '/generate');
+  xhr.open(
+    'POST',
+    abandonKey ? '/generate?abandon=' + encodeURIComponent(abandonKey) : '/generate'
+  );
   xhr.onreadystatechange = function () {
     if (xhr.readyState !== 4) {
       return;
