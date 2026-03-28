@@ -461,6 +461,16 @@ describe('GET /device/:key', () => {
 });
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+describe('malformed URLs', () => {
+  it('returns 400 for invalid UTF-8 percent-encoding without stack trace', async () => {
+    const { app } = createApp();
+    const res = await request(app).get('/%2f%c0').set('User-Agent', 'TestBrowser/1.0');
+    assert.strictEqual(res.status, 400);
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('GET /events/:key', () => {
   const agent = 'Kobo/4.0 TestDevice';
   let app: ReturnType<typeof createApp>['app'];

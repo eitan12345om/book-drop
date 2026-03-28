@@ -107,5 +107,16 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
     void serveHtml(VIEWS_DIR, page, nonceMap.get(req) ?? '', res, next, extras);
   });
 
+  // Catch URIError from malformed percent-encoded URLs (e.g. invalid UTF-8 sequences)
+  app.use(
+    (err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (err instanceof URIError) {
+        res.status(400).send('Bad Request');
+        return;
+      }
+      next(err);
+    }
+  );
+
   return { app, keys };
 }
