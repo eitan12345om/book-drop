@@ -283,7 +283,49 @@ function setProgress(value, visible) {
   progressFill.style.setProperty('--progress', `${value}%`);
 }
 
-document.getElementById('upload-form').addEventListener('submit', (e) => {
+/**
+ * Wraps a single XHR upload attempt in a Promise.
+ * Resolves with the XHR on load (caller checks xhr.status).
+ * Rejects on network-level error.
+ */
+function attemptUpload(formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/upload', true);
+    xhr.upload.addEventListener('progress', (ev) => {
+      if (ev.lengthComputable) {
+        onProgress(Math.round((ev.loaded / ev.total) * 100));
+      }
+    });
+    xhr.addEventListener('load', () => resolve(xhr));
+    xhr.addEventListener('error', () => reject(new Error('network')));
+    xhr.send(formData);
+  });
+}
+
+/**
+ * Builds FormData for an upload. Pass fileOverride to substitute a pre-read
+ * File (used on retry); omit to use the current selectedFile.
+ */
+function buildFormData(key, urlVal, fileOverride) {
+  const file = fileOverride !== undefined ? fileOverride : selectedFile;
+  const formData = new FormData();
+  formData.set('key', key);
+  if (file) {
+    formData.set('file', file, file.name);
+  }
+  if (urlVal) {
+    formData.set('url', urlVal);
+  }
+  OPTIONS.forEach(({ id, name }) => {
+    if (document.getElementById(id).checked) {
+      formData.set(name, 'on');
+    }
+  });
+  return formData;
+}
+
+document.getElementById('upload-form').addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const key = document.getElementById('keyinput').value.trim().toUpperCase();
@@ -310,38 +352,19 @@ document.getElementById('upload-form').addEventListener('submit', (e) => {
     }
   }
 
-  // Build FormData explicitly so drag-and-drop files are included
-  const formData = new FormData();
-  formData.set('key', key);
-  if (selectedFile) {
-    formData.set('file', selectedFile, selectedFile.name);
-  }
-  if (urlVal) {
-    formData.set('url', urlVal);
-  }
-  OPTIONS.forEach(({ id, name }) => {
-    if (document.getElementById(id).checked) {
-      formData.set(name, 'on');
-    }
-  });
-
   const uploadId = ++currentUploadId;
   submitBtn.disabled = true;
   setProgress(0, true);
   showStatus('info', 'Uploading\u2026');
 
-  const xhr = new XMLHttpRequest();
-  xhr.open('POST', '/upload', true);
+  const fileAtSubmit = selectedFile; // capture before any async gaps
 
-  xhr.upload.addEventListener('progress', (ev) => {
-    if (ev.lengthComputable) {
-      const pct = Math.round((ev.loaded / ev.total) * 100);
-      setProgress(pct, true);
-      showStatus('info', pct < 100 ? `Uploading\u2026 ${pct}%` : 'Processing\u2026 please wait');
-    }
-  });
+  const onProgress = (pct) => {
+    setProgress(pct, true);
+    showStatus('info', pct < 100 ? `Uploading\u2026 ${pct}%` : 'Processing\u2026 please wait');
+  };
 
-  xhr.addEventListener('load', () => {
+  function handleResponse(xhr) {
     if (uploadId !== currentUploadId) {
       return;
     }
@@ -355,18 +378,64 @@ document.getElementById('upload-form').addEventListener('submit', (e) => {
     } else {
       showStatus('error', xhr.responseText || 'Upload failed.');
     }
-  });
+  }
 
-  xhr.addEventListener('error', () => {
+  let xhr;
+  try {
+    xhr = await attemptUpload(buildFormData(key, urlVal), onProgress);
+  } catch {
     if (uploadId !== currentUploadId) {
       return;
     }
-    submitBtn.disabled = false;
-    setProgress(0, false);
-    showStatus('error', 'Could not reach the server. Is it running?');
-  });
 
-  xhr.send(formData);
+    if (!fileAtSubmit) {
+      // URL-only: no content URI involved, don't retry.
+      submitBtn.disabled = false;
+      setProgress(0, false);
+      showStatus('error', 'Could not reach the server. Is it running?');
+      return;
+    }
+
+    // File upload failed at network level — pre-read into memory and retry once.
+    // On Android, cloud storage files (e.g. Dropbox) stream from a content provider
+    // that can fail mid-upload; buffering first avoids that streaming failure.
+    showStatus('info', 'Retrying\u2026');
+    setProgress(0, true);
+
+    let retryFile;
+    try {
+      const buffer = await fileAtSubmit.arrayBuffer();
+      retryFile = new File([buffer], fileAtSubmit.name, { type: fileAtSubmit.type });
+    } catch {
+      if (uploadId !== currentUploadId) {
+        return;
+      }
+      submitBtn.disabled = false;
+      setProgress(0, false);
+      showStatus(
+        'error',
+        'Upload failed. Could not read the file \u2014 try downloading it to your device first.'
+      );
+      return;
+    }
+
+    try {
+      xhr = await attemptUpload(buildFormData(key, urlVal, retryFile), onProgress);
+    } catch {
+      if (uploadId !== currentUploadId) {
+        return;
+      }
+      submitBtn.disabled = false;
+      setProgress(0, false);
+      showStatus(
+        'error',
+        'Upload failed. Try downloading the file to your device before uploading.'
+      );
+      return;
+    }
+  }
+
+  handleResponse(xhr);
 });
 
 /** Checks if a file was shared via the Web Share Target API and pre-populates the drop zone. */

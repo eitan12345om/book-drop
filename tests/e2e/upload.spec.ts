@@ -136,3 +136,28 @@ test('update metadata option is enabled for EPUB files', async ({ page }) => {
   });
   await expect(page.locator('#fetchmetadata')).toBeEnabled();
 });
+
+test('re-enables submit button and shows actionable hint after a network-level upload failure', async ({
+  page,
+}) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Kobo/4.0 Test' },
+  });
+  const key = (await apiRes.json()).key as string;
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill(key);
+  await page.locator('#file-input').setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hello ebook'),
+  });
+
+  // Abort the upload at the network level to trigger the XHR error handler.
+  await page.route('/upload', (route) => route.abort());
+  await page.locator('#submit-btn').click();
+
+  // Allow extra time: the handler retries once (arrayBuffer + second XHR) before giving up
+  await expect(page.locator('#status-msg')).toHaveClass(/status-error/, { timeout: 10_000 });
+  await expect(page.locator('#submit-btn')).toBeEnabled();
+});
