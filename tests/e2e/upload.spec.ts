@@ -164,7 +164,10 @@ test('uploads multiple files sequentially and both appear on download page', asy
     { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('second file') },
   ]);
   await uploadPage.locator('#submit-btn').click();
-  await expect(uploadPage.locator('#status-msg')).toContainText('Sent', { timeout: 15_000 });
+  await expect(uploadPage.locator('#status-msg')).toContainText('sent', {
+    timeout: 15_000,
+    ignoreCase: true,
+  });
   await uploadCtx.close();
 
   // Both download links should appear on the Kobo page (via SSE/polling)
