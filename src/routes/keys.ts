@@ -57,7 +57,7 @@ export function makeKeysRouter(
     const key = generateUniqueKey(keys);
     if (!key) {
       logger.warn('Key rejected: could not generate unique key');
-      res.status(503).send('error');
+      res.status(503).send('Server busy');
       return;
     }
 

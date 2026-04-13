@@ -16,6 +16,7 @@ import {
   FILE_DELETE_DELAY_MS,
 } from '../src/config.js';
 import { addDiskUsage, subtractDiskUsage, getDiskUsage } from '../src/keyStore.js';
+import { buildSuccessMessage } from '../src/routes/upload.js';
 import type { KeyInfo } from '../src/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -748,6 +749,78 @@ describe('malformed URLs', () => {
     const { app } = createApp();
     const res = await request(app).get('/%2f%c0').set('User-Agent', 'TestBrowser/1.0');
     assert.strictEqual(res.status, 400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('POST /generate — 503 body', () => {
+  it('returns "Server busy" body when MAX_ACTIVE_KEYS is reached', async () => {
+    const { app, keys } = createApp();
+    const fakeInfo: KeyInfo = {
+      created: new Date(),
+      ip: '1.2.3.4',
+      agent: 'test',
+      files: [],
+      urls: [],
+      timer: null,
+      pendingUploads: 0,
+      pendingFilenames: [],
+      alive: new Date(),
+    };
+    for (let i = 0; i < MAX_ACTIVE_KEYS; i++) {
+      keys.set(String(i).padStart(4, 'A').substring(0, 4) + i, fakeInfo);
+    }
+    const res = await request(app).post('/generate').set('User-Agent', 'TestBrowser');
+    assert.strictEqual(res.status, 503);
+    assert.strictEqual(res.text, 'Server busy');
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('buildSuccessMessage', () => {
+  it('returns basic success message without optional fields', () => {
+    const msg = buildSuccessMessage('your device', null, 'book.epub', null);
+    assert.ok(msg.includes('Sent to your device'));
+    assert.ok(msg.includes('Filename: book.epub'));
+    assert.ok(!msg.includes('Metadata lookup failed'));
+  });
+
+  it('includes conversion tool when provided', () => {
+    const msg = buildSuccessMessage('Kindle', 'KindleGen', 'book.mobi', null);
+    assert.ok(msg.includes('converted with KindleGen'));
+  });
+
+  it('includes URL when provided', () => {
+    const msg = buildSuccessMessage('your device', null, 'book.epub', 'https://example.com');
+    assert.ok(msg.includes('URL added: https://example.com'));
+  });
+
+  it('appends metadata failure note when metadataFailed is true', () => {
+    const msg = buildSuccessMessage('your device', null, 'book.epub', null, true);
+    assert.ok(msg.includes('Metadata lookup failed'));
+    assert.ok(msg.includes('original metadata kept'));
+  });
+
+  it('does not append metadata failure note when metadataFailed is false', () => {
+    const msg = buildSuccessMessage('your device', null, 'book.epub', null, false);
+    assert.ok(!msg.includes('Metadata lookup failed'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('POST /upload — metadata failure feedback', () => {
+  it('includes metadata failure note in response when fetchmetadata is set and EPUB parsing fails', async () => {
+    const { app, key } = await generateKey();
+    // A buffer that declares itself as EPUB but is not a valid ZIP — causes readEpubMetadata to throw
+    const fakeEpub = Buffer.from('not a real epub file');
+    const res = await request(app)
+      .post('/upload')
+      .field('key', key)
+      .field('fetchmetadata', '1')
+      .attach('file', fakeEpub, { filename: 'book.epub', contentType: 'application/epub+zip' });
+    assert.strictEqual(res.status, 200);
+    assert.match(res.text, /Sent to/i);
+    assert.match(res.text, /Metadata lookup failed/i);
   });
 });
 

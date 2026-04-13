@@ -144,11 +144,12 @@ function deviceLabel(agent: string): string {
   return agent.includes('Kobo') ? 'Kobo' : agent.includes('Kindle') ? 'Kindle' : 'your device';
 }
 
-function buildSuccessMessage(
+export function buildSuccessMessage(
   device: string,
   conversionTool: string | null,
   filename: string,
-  submittedUrl: string | null
+  submittedUrl: string | null,
+  metadataFailed?: boolean
 ): string {
   const parts = [
     conversionTool ? `Sent to ${device} (converted with ${conversionTool})` : `Sent to ${device}`,
@@ -156,6 +157,9 @@ function buildSuccessMessage(
   ];
   if (submittedUrl) {
     parts.push(`URL added: ${submittedUrl}`);
+  }
+  if (metadataFailed) {
+    parts.push('(Metadata lookup failed — original metadata kept.)');
   }
   return parts.join('\n');
 }
@@ -364,6 +368,7 @@ export function makeUploadRouter(
           }
 
           let metadataDiff: MetadataDiff | undefined;
+          let metadataFailed = false;
           if (req.body?.fetchmetadata && mimetype === TYPE_EPUB) {
             try {
               logger.info({ key }, 'Fetching metadata from Google Books');
@@ -371,6 +376,7 @@ export function makeUploadRouter(
               logger.info({ key, changes: Object.keys(metadataDiff).length }, 'Metadata updated');
             } catch (metaErr) {
               logger.warn({ err: metaErr, key }, 'Metadata fetch skipped');
+              metadataFailed = true;
             }
           }
 
@@ -391,7 +397,13 @@ export function makeUploadRouter(
           notifySSE(key, info);
 
           res.send(
-            buildSuccessMessage(deviceLabel(info.agent), conversionTool, finalName, submittedUrl)
+            buildSuccessMessage(
+              deviceLabel(info.agent),
+              conversionTool,
+              finalName,
+              submittedUrl,
+              metadataFailed
+            )
           );
         } finally {
           info.pendingUploads--;
