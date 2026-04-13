@@ -176,15 +176,20 @@ html.ereader {
     display: none;
   }
 
-  // Remove shadows (e-ink can't render depth)
+  // Remove shadows (e-ink can't render depth); darken border for e-ink visibility
   .card {
     box-shadow: none;
+    @include m.theme-prop(border-color, 'border', t.$ereader);
+  }
+
+  // Muted text is too light on e-ink — use near-black for readability
+  .instructions p {
+    @include m.theme-prop(color, 'text-muted', t.$ereader);
   }
 
   // Links: use black as fallback for browsers without CSS variable support
   a {
-    color: map.get(t.$ereader, 'accent');
-    color: var(--accent);
+    @include m.theme-prop(color, 'accent', t.$ereader);
   }
 
   // Touch navigation doesn't need focus rings — suppress them on e-ink

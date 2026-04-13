@@ -57,7 +57,7 @@
 
 // Apply a CSS property with a plain fallback (old browsers) and var() override (modern browsers).
 // Old browsers that don't understand var() drop that declaration and keep the fallback line.
-@mixin theme-prop($property, $token-name) {
-  #{$property}: map.get(t.$light, $token-name);
+@mixin theme-prop($property, $token-name, $map: t.$light) {
+  #{$property}: map.get($map, $token-name);
   #{$property}: var(--#{$token-name});
 }
