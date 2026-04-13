@@ -25,6 +25,15 @@ async function main(): Promise<void> {
   });
 }
 
+process.on('unhandledRejection', (reason: unknown) => {
+  logger.error({ err: reason }, 'Unhandled promise rejection');
+});
+
+process.on('uncaughtException', (err: Error) => {
+  logger.error({ err }, 'Uncaught exception');
+  process.exit(1);
+});
+
 main().catch((err) => {
   logger.error({ err }, 'Fatal startup error');
   process.exit(1);

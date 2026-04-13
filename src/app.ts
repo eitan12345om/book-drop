@@ -105,14 +105,23 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
     void serveHtml(VIEWS_DIR, page, nonceMap.get(req) ?? '', res, next, extras);
   });
 
-  // Catch URIError from malformed percent-encoded URLs (e.g. invalid UTF-8 sequences)
+  // 404 handler — no route matched
+  app.use((_req: express.Request, res: express.Response) => {
+    res.status(404).json({ error: 'Not found.' });
+  });
+
+  // Catch-all error handler — URIError from malformed percent-encoded URLs,
+  // or any other error forwarded via next(err)
   app.use(
-    (err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    (err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
       if (err instanceof URIError) {
-        res.status(400).send('Bad Request');
+        res.status(400).json({ error: 'Bad request.' });
         return;
       }
-      next(err);
+      logger.error({ err }, 'Unhandled error');
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Internal server error.' });
+      }
     }
   );
 
