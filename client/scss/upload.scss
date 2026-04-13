@@ -142,6 +142,10 @@
   opacity: 0.8;
 }
 
+.zone-clear-btn {
+  margin-top: 0.65rem;
+}
+
 // ─── Options ──────────────────────────────────────────────────────────────────
 
 // Fallback for browsers without grid (e.g. old Kobo): items stack as blocks with margin
@@ -240,6 +244,36 @@
 
 // ─── Submit button ────────────────────────────────────────────────────────────
 
+.btn-secondary {
+  display: inline-block;
+  padding: 0.35rem 0.9rem;
+  @include m.theme-prop(background, 'surface');
+  border: 1px solid m.token('text-muted');
+  border: 1px solid var(--text-muted);
+  border-radius: t.$radius-sm;
+  @include m.theme-prop(color, 'text');
+  font-size: 0.825rem;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  line-height: 1;
+  transition: background 0.12s;
+}
+
+.btn-secondary:hover {
+  @include m.theme-prop(background, 'bg');
+}
+
+.btn-secondary:active {
+  @include m.theme-prop(background, 'border');
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid m.token('accent');
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .btn-primary {
   display: block;
   width: 100%;
@@ -253,9 +287,7 @@
   font-family: inherit;
   cursor: pointer;
   touch-action: manipulation;
-  transition:
-    background 0.12s,
-    transform 0.08s;
+  transition: background 0.12s;
   line-height: 1;
 }
 
@@ -264,7 +296,7 @@
 }
 
 .btn-primary:active:not(:disabled) {
-  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .btn-primary:disabled {
@@ -294,7 +326,6 @@
   border: 1px solid m.token('success-border');
   border: 1px solid var(--success-border);
   @include m.theme-prop(color, 'success-text');
-  cursor: pointer;
 }
 
 .status-error {
@@ -302,7 +333,6 @@
   border: 1px solid m.token('error-border');
   border: 1px solid var(--error-border);
   @include m.theme-prop(color, 'error-text');
-  cursor: pointer;
 }
 
 .status-info {

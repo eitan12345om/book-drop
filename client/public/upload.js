@@ -20,12 +20,14 @@ const zoneEmpty = document.getElementById('zone-empty');
 const zoneSelected = document.getElementById('zone-selected');
 const zoneFileName = document.getElementById('zone-file-name');
 const zoneFileSize = document.getElementById('zone-file-size');
+const zoneClearBtn = document.getElementById('zone-clear-btn');
 const submitBtn = document.getElementById('submit-btn');
 const urlInput = document.getElementById('urlinput');
 const statusMsg = document.getElementById('status-msg');
 const progressWrap = document.getElementById('progress-wrap');
 const progressFill = document.getElementById('progress-fill');
 const pageUrlLink = document.getElementById('page-url');
+const optionsNote = document.getElementById('options-note');
 
 const receiveUrl = window.location.origin + '/receive';
 pageUrlLink.href = receiveUrl;
@@ -133,8 +135,45 @@ function buildOptionsGrid() {
   });
 }
 
-/** Enables or disables options that restrict to certain file extensions based on the selected file. */
+/**
+ * Enables or disables options based on the selected file.
+ * When file is null (no selection or multiple files selected), all extension-restricted
+ * options are disabled — multiple files may have mixed types and the server ignores
+ * inapplicable conversions, but disabling avoids confusing silent no-ops.
+ */
 function updateOptionAvailability(file) {
+  if (!file) {
+    // No file or multiple files selected — disable all extension-restricted options
+    OPTIONS.forEach(({ id, enabledExtensions }) => {
+      if (!enabledExtensions) {
+        return;
+      }
+      const input = document.getElementById(id);
+      if (!input) {
+        return;
+      }
+      input.disabled = true;
+      input.checked = false;
+      const label = input.closest('label');
+      if (label) {
+        label.classList.add('option-disabled');
+      }
+    });
+    if (optionsNote) {
+      optionsNote.textContent =
+        selectedFiles.length > 1
+          ? 'Conversion options are unavailable when multiple files are selected.'
+          : '';
+      optionsNote.classList.toggle('hidden', selectedFiles.length <= 1);
+    }
+    return;
+  }
+
+  if (optionsNote) {
+    optionsNote.textContent = '';
+    optionsNote.classList.add('hidden');
+  }
+
   OPTIONS.forEach(({ id, enabledExtensions }) => {
     if (!enabledExtensions) {
       return;
@@ -143,8 +182,8 @@ function updateOptionAvailability(file) {
     if (!input) {
       return;
     }
-    const ext = file ? '.' + file.name.split('.').pop().toLowerCase() : null;
-    const enabled = ext === null || enabledExtensions.includes(ext);
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    const enabled = enabledExtensions.includes(ext);
     const wasDisabled = input.disabled;
     input.disabled = !enabled;
     if (!enabled) {
@@ -174,7 +213,7 @@ function wireMutualExclusion() {
   });
 }
 
-let selectedFile = null;
+let selectedFiles = [];
 let currentUploadId = 0;
 
 /** Returns a human-readable file size string. */
@@ -184,29 +223,39 @@ function formatSize(bytes) {
     : `${Math.ceil(bytes / 1024)} KB`;
 }
 
-/** Enables the submit button when a file is selected or a URL is entered. */
+/** Enables the submit button when one or more files are selected or a URL is entered. */
 function updateSubmitState() {
-  submitBtn.disabled = !selectedFile && !urlInput.value.trim();
+  submitBtn.disabled = selectedFiles.length === 0 && !urlInput.value.trim();
 }
 
-/** Updates UI to reflect the currently selected file, or clears it if file is null. */
-function setFile(file) {
-  selectedFile = file;
+/** Updates UI to reflect the currently selected files, or clears if empty. */
+function setFiles(files) {
+  selectedFiles = files.slice();
   updateSubmitState();
-  if (file) {
-    zoneEmpty.classList.add('hidden');
-    zoneSelected.classList.remove('hidden');
-    zoneFileName.textContent = file.name;
-    zoneFileSize.textContent = formatSize(file.size);
-    dropZone.classList.add('has-file');
-    dropZone.setAttribute('aria-label', `Selected: ${file.name}`);
-  } else {
+  if (files.length === 0) {
     zoneEmpty.classList.remove('hidden');
     zoneSelected.classList.add('hidden');
     dropZone.classList.remove('has-file');
-    dropZone.setAttribute('aria-label', 'Choose or drop an ebook file');
+    dropZone.setAttribute('aria-label', 'Choose or drop ebook files');
+    fileInput.value = '';
+  } else if (files.length === 1) {
+    zoneEmpty.classList.add('hidden');
+    zoneSelected.classList.remove('hidden');
+    zoneFileName.textContent = files[0].name;
+    zoneFileSize.textContent = formatSize(files[0].size);
+    dropZone.classList.add('has-file');
+    dropZone.setAttribute('aria-label', `Selected: ${files[0].name}`);
+  } else {
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+    zoneEmpty.classList.add('hidden');
+    zoneSelected.classList.remove('hidden');
+    zoneFileName.textContent = `${files.length} files selected`;
+    zoneFileSize.textContent = formatSize(totalSize);
+    dropZone.classList.add('has-file');
+    dropZone.setAttribute('aria-label', `${files.length} files selected`);
   }
-  updateOptionAvailability(file);
+  // Pass single file for per-type options; null disables extension-restricted options for mixed
+  updateOptionAvailability(files.length === 1 ? files[0] : null);
 }
 
 /** Returns true if the file's extension is in ACCEPTED_EXTENSIONS, showing an error otherwise. */
@@ -222,18 +271,28 @@ function validateFile(file) {
   return true;
 }
 
-/** Validates and stages the first file from a FileList. */
+/** Validates all files from a FileList and stages them, or shows an error and stops. */
 function handleFiles(files) {
-  const f = files && files[0];
-  if (!f) {
-    setFile(null);
+  if (!files || files.length === 0) {
+    setFiles([]);
     return;
   }
-  if (validateFile(f)) {
-    setFile(f);
-    hideStatus();
+  const valid = [];
+  for (let i = 0; i < files.length; i++) {
+    if (!validateFile(files[i])) {
+      return; // validateFile already showed the error
+    }
+    valid.push(files[i]);
   }
+  setFiles(valid);
+  hideStatus();
 }
+
+zoneClearBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setFiles([]);
+  hideStatus();
+});
 
 dropZone.addEventListener('click', () => fileInput.click());
 dropZone.addEventListener('keydown', (e) => {
@@ -270,12 +329,6 @@ function hideStatus() {
   statusMsg.classList.add('hidden');
 }
 
-statusMsg.addEventListener('click', () => {
-  if (!statusMsg.classList.contains('status-info')) {
-    hideStatus();
-  }
-});
-
 /** Updates the progress bar visibility and fill percentage. */
 function setProgress(value, visible) {
   progressWrap.classList.toggle('hidden', !visible);
@@ -304,11 +357,10 @@ function attemptUpload(formData, onProgress) {
 }
 
 /**
- * Builds FormData for an upload. Pass fileOverride to substitute a pre-read
- * File (used on retry); omit to use the current selectedFile.
+ * Builds FormData for a single file upload.
+ * Pass file=null for URL-only posts.
  */
-function buildFormData(key, urlVal, fileOverride) {
-  const file = fileOverride !== undefined ? fileOverride : selectedFile;
+function buildFormData(key, urlVal, file) {
   const formData = new FormData();
   formData.set('key', key);
   if (file) {
@@ -325,6 +377,31 @@ function buildFormData(key, urlVal, fileOverride) {
   return formData;
 }
 
+/**
+ * Uploads a single file with one retry on network failure.
+ * On Android, cloud-storage files can fail mid-stream; buffering first avoids that.
+ * Throws with message 'read' if the file can't be read into memory.
+ */
+async function uploadOneFile(key, urlVal, file, onProgress) {
+  let xhr;
+  try {
+    xhr = await attemptUpload(buildFormData(key, urlVal, file), onProgress);
+  } catch {
+    // Network failure — pre-read into memory and retry once
+    onProgress(0);
+    showStatus('info', 'Retrying\u2026');
+    let retryFile;
+    try {
+      const buffer = await file.arrayBuffer();
+      retryFile = new File([buffer], file.name, { type: file.type });
+    } catch {
+      throw new Error('read');
+    }
+    xhr = await attemptUpload(buildFormData(key, urlVal, retryFile), onProgress);
+  }
+  return xhr;
+}
+
 document.getElementById('upload-form').addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -335,7 +412,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   }
 
   const urlVal = urlInput.value.trim();
-  if (!selectedFile && !urlVal) {
+  if (selectedFiles.length === 0 && !urlVal) {
     showStatus('error', 'Please choose a file or enter a URL.');
     return;
   }
@@ -354,17 +431,55 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
 
   const uploadId = ++currentUploadId;
   submitBtn.disabled = true;
-  setProgress(0, true);
-  showStatus('info', 'Uploading\u2026');
 
-  const fileAtSubmit = selectedFile; // capture before any async gaps
+  const filesToUpload = selectedFiles.slice(); // capture before any async gaps
+  const successMessages = [];
 
-  const onProgress = (pct) => {
-    setProgress(pct, true);
-    showStatus('info', pct < 100 ? `Uploading\u2026 ${pct}%` : 'Processing\u2026 please wait');
-  };
+  // If a URL and files are both present, post the URL first as its own request
+  // so it has an independent success/error response before file uploads begin.
+  if (urlVal && filesToUpload.length > 0) {
+    setProgress(0, true);
+    showStatus('info', 'Staging URL\u2026');
+    let urlXhr;
+    try {
+      urlXhr = await attemptUpload(buildFormData(key, urlVal, null), () => {});
+    } catch {
+      if (uploadId !== currentUploadId) {
+        return;
+      }
+      submitBtn.disabled = false;
+      setProgress(0, false);
+      showStatus('error', 'Could not reach the server. Is it running?');
+      return;
+    }
+    if (uploadId !== currentUploadId) {
+      return;
+    }
+    if (urlXhr.status < 200 || urlXhr.status >= 300) {
+      submitBtn.disabled = false;
+      setProgress(0, false);
+      showStatus('error', urlXhr.responseText || 'Failed to stage URL.');
+      return;
+    }
+    successMessages.push(urlXhr.responseText);
+  }
 
-  function handleResponse(xhr) {
+  // URL-only (no files)
+  if (filesToUpload.length === 0) {
+    setProgress(0, true);
+    showStatus('info', 'Uploading\u2026');
+    let xhr;
+    try {
+      xhr = await attemptUpload(buildFormData(key, urlVal, null), () => {});
+    } catch {
+      if (uploadId !== currentUploadId) {
+        return;
+      }
+      submitBtn.disabled = false;
+      setProgress(0, false);
+      showStatus('error', 'Could not reach the server. Is it running?');
+      return;
+    }
     if (uploadId !== currentUploadId) {
       return;
     }
@@ -372,70 +487,85 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     setProgress(0, false);
     if (xhr.status >= 200 && xhr.status < 300) {
       showStatus('success', xhr.responseText);
-      setFile(null);
       urlInput.value = '';
       updateSubmitState();
     } else {
       showStatus('error', xhr.responseText || 'Upload failed.');
     }
+    return;
   }
 
-  let xhr;
-  try {
-    xhr = await attemptUpload(buildFormData(key, urlVal), onProgress);
-  } catch {
+  // Sequential file uploads — one POST per file, no URL (already sent above or not present)
+  const total = filesToUpload.length;
+  for (let i = 0; i < total; i++) {
     if (uploadId !== currentUploadId) {
       return;
     }
 
-    if (!fileAtSubmit) {
-      // URL-only: no content URI involved, don't retry.
-      submitBtn.disabled = false;
-      setProgress(0, false);
-      showStatus('error', 'Could not reach the server. Is it running?');
-      return;
-    }
+    const fileLabel = total > 1 ? ` (${i + 1} of ${total})` : '';
 
-    // File upload failed at network level — pre-read into memory and retry once.
-    // On Android, cloud storage files (e.g. Dropbox) stream from a content provider
-    // that can fail mid-upload; buffering first avoids that streaming failure.
-    showStatus('info', 'Retrying\u2026');
+    const onProgress = (pct) => {
+      setProgress(pct, true);
+      showStatus(
+        'info',
+        pct < 100
+          ? `Uploading${fileLabel}\u2026 ${pct}%`
+          : `Processing${fileLabel}\u2026 please wait`
+      );
+    };
+
     setProgress(0, true);
+    showStatus('info', `Uploading${fileLabel}\u2026`);
 
-    let retryFile;
+    // URL was already sent above; don't send it again with individual file posts
+    let xhr;
     try {
-      const buffer = await fileAtSubmit.arrayBuffer();
-      retryFile = new File([buffer], fileAtSubmit.name, { type: fileAtSubmit.type });
-    } catch {
+      xhr = await uploadOneFile(key, '', filesToUpload[i], onProgress);
+    } catch (err) {
       if (uploadId !== currentUploadId) {
         return;
       }
       submitBtn.disabled = false;
       setProgress(0, false);
-      showStatus(
-        'error',
-        'Upload failed. Could not read the file \u2014 try downloading it to your device first.'
-      );
+      if (err.message === 'read') {
+        showStatus(
+          'error',
+          `Could not read \u201c${filesToUpload[i].name}\u201d \u2014 try downloading it to your device first.`
+        );
+      } else {
+        showStatus(
+          'error',
+          `Upload failed for \u201c${filesToUpload[i].name}\u201d. Try downloading the file to your device before uploading.`
+        );
+      }
       return;
     }
 
-    try {
-      xhr = await attemptUpload(buildFormData(key, urlVal, retryFile), onProgress);
-    } catch {
-      if (uploadId !== currentUploadId) {
-        return;
-      }
-      submitBtn.disabled = false;
-      setProgress(0, false);
-      showStatus(
-        'error',
-        'Upload failed. Try downloading the file to your device before uploading.'
-      );
+    if (uploadId !== currentUploadId) {
       return;
     }
+
+    if (xhr.status < 200 || xhr.status >= 300) {
+      submitBtn.disabled = false;
+      setProgress(0, false);
+      const prefix =
+        i > 0 ? `${i} of ${total} files sent - ` : total > 1 ? `0 of ${total} files sent - ` : '';
+      showStatus('error', prefix + (xhr.responseText || 'Upload failed.'));
+      return;
+    }
+
+    successMessages.push(xhr.responseText);
   }
 
-  handleResponse(xhr);
+  if (uploadId !== currentUploadId) {
+    return;
+  }
+  submitBtn.disabled = false;
+  setProgress(0, false);
+  showStatus('success', successMessages.join('\n'));
+  setFiles([]);
+  urlInput.value = '';
+  updateSubmitState();
 });
 
 /** Checks if a file was shared via the Web Share Target API and pre-populates the drop zone. */
@@ -454,7 +584,7 @@ async function checkPendingShare() {
     type: response.headers.get('Content-Type') || 'application/octet-stream',
   });
   if (validateFile(file)) {
-    setFile(file);
+    setFiles([file]);
   }
 }
 

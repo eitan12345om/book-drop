@@ -5,8 +5,6 @@ import compression from 'compression';
 import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import rateLimit from 'express-rate-limit';
-import { RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX } from './config.js';
 import { logger } from './logger.js';
 import type { KeyInfo } from './types.js';
 import { isEreaderAgent } from './utils.js';
@@ -89,7 +87,7 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
 
   // Routes
   app.get('/health', (_req, res) => res.send('ok'));
-  app.use(makeKeysRouter(keys, sseClients));
+  app.use(makeKeysRouter(keys, sseClients, notifySSE));
   app.use(makeUploadRouter(keys, notifySSE));
 
   app.post('/share', (_req, res) => res.redirect('/'));

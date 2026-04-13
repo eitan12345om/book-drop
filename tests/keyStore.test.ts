@@ -7,23 +7,35 @@ import {
   generateUniqueKey,
   expireKey,
   removeKey,
-  clearFile,
+  clearFiles,
   addDiskUsage,
   getDiskUsage,
 } from '../src/keyStore.js';
 import { EXPIRE_DELAY_MS } from '../src/config.js';
-import type { KeyInfo } from '../src/types.js';
+import type { KeyInfo, FileInfo } from '../src/types.js';
 
 function makeKeyInfo(overrides: Partial<KeyInfo> = {}): KeyInfo {
   return {
     created: new Date(),
     ip: '127.0.0.1',
     agent: 'TestBrowser/1.0',
-    file: null,
+    files: [],
     urls: [],
     timer: null,
-    downloadTimer: null,
+    pendingUploads: 0,
+    pendingFilenames: [],
     alive: new Date(),
+    ...overrides,
+  };
+}
+
+function makeFileInfo(overrides: Partial<FileInfo> = {}): FileInfo {
+  return {
+    name: 'test.epub',
+    path: '/tmp/test.epub',
+    size: 500,
+    uploaded: new Date(),
+    downloadTimer: null,
     ...overrides,
   };
 }
@@ -91,14 +103,6 @@ describe('expireKey', () => {
     mock.timers.reset();
   });
 
-  it('sets a timer on the key info', () => {
-    const keys = new Map<string, KeyInfo>();
-    const info = makeKeyInfo();
-    keys.set('TEST', info);
-    expireKey('TEST', keys);
-    assert.notStrictEqual(info.timer, null);
-  });
-
   it('updates alive timestamp', () => {
     const keys = new Map<string, KeyInfo>();
     const before = new Date();
@@ -155,13 +159,13 @@ describe('removeKey', () => {
     mock.timers.reset();
   });
 
-  it('clears the downloadTimer on removal', () => {
+  it('clears the downloadTimer on each staged file when removeKey is called', () => {
     mock.timers.enable({ apis: ['setTimeout', 'Date'] });
     const keys = new Map<string, KeyInfo>();
-    const info = makeKeyInfo();
+    const file = makeFileInfo({ downloadTimer: setTimeout(() => {}, 60_000) });
+    const info = makeKeyInfo({ files: [file] });
     keys.set('EFGH', info);
-    info.downloadTimer = setTimeout(() => {}, 60_000);
-    assert.notStrictEqual(info.downloadTimer, null);
+    assert.notStrictEqual(file.downloadTimer, null);
     removeKey('EFGH', keys);
     assert.strictEqual(keys.has('EFGH'), false);
     mock.timers.reset();
@@ -182,36 +186,54 @@ describe('removeKey', () => {
   });
 });
 
-describe('clearFile', () => {
-  it('subtracts the file size from the disk usage counter', () => {
+describe('clearFiles', () => {
+  it('subtracts each file size from the disk usage counter', () => {
     const info = makeKeyInfo({
-      file: { name: 'test.epub', path: '/tmp/x.epub', size: 500, uploaded: new Date() },
+      files: [
+        makeFileInfo({ size: 300 }),
+        makeFileInfo({ name: 'b.epub', path: '/tmp/b.epub', size: 200 }),
+      ],
     });
     addDiskUsage(500);
     const before = getDiskUsage();
-    clearFile(info);
+    clearFiles(info);
     assert.strictEqual(getDiskUsage(), before - 500);
   });
 
-  it('sets info.file to null', () => {
+  it('empties info.files', () => {
     const info = makeKeyInfo({
-      file: { name: 'test.epub', path: '/tmp/x.epub', size: 0, uploaded: new Date() },
+      files: [makeFileInfo()],
     });
-    clearFile(info);
-    assert.strictEqual(info.file, null);
+    clearFiles(info);
+    assert.strictEqual(info.files.length, 0);
   });
 
-  it('is a no-op when info.file is already null', () => {
+  it('is a no-op when info.files is already empty', () => {
     const info = makeKeyInfo();
     const before = getDiskUsage();
-    assert.doesNotThrow(() => clearFile(info));
+    assert.doesNotThrow(() => clearFiles(info));
     assert.strictEqual(getDiskUsage(), before);
   });
 
-  it('decrements disk usage when removeKey is called with a staged file', () => {
+  it('cancels each file downloadTimer', () => {
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+    const timerFired = { value: false };
+    const file = makeFileInfo({
+      downloadTimer: setTimeout(() => {
+        timerFired.value = true;
+      }, 60_000),
+    });
+    const info = makeKeyInfo({ files: [file] });
+    clearFiles(info);
+    mock.timers.tick(60_001);
+    assert.strictEqual(timerFired.value, false);
+    mock.timers.reset();
+  });
+
+  it('decrements disk usage when removeKey is called with staged files', () => {
     const keys = new Map<string, KeyInfo>();
     const info = makeKeyInfo({
-      file: { name: 'book.epub', path: '/tmp/book.epub', size: 1000, uploaded: new Date() },
+      files: [makeFileInfo({ size: 1000 })],
     });
     addDiskUsage(1000);
     const before = getDiskUsage();

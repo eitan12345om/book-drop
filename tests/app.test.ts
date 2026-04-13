@@ -1,4 +1,4 @@
-import { describe, it, before, after } from 'node:test';
+import { describe, it, before, after, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import http from 'node:http';
@@ -7,8 +7,15 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createApp } from '../src/app.js';
-import { MAX_ACTIVE_KEYS, MAX_KEYS_PER_IP, MAX_DISK_BYTES } from '../src/config.js';
-import { addDiskUsage, subtractDiskUsage } from '../src/keyStore.js';
+import {
+  MAX_ACTIVE_KEYS,
+  MAX_KEYS_PER_IP,
+  MAX_DISK_BYTES,
+  MAX_FILES_PER_KEY,
+  MAX_URLS_PER_KEY,
+  FILE_DELETE_DELAY_MS,
+} from '../src/config.js';
+import { addDiskUsage, subtractDiskUsage, getDiskUsage } from '../src/keyStore.js';
 import type { KeyInfo } from '../src/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -101,12 +108,12 @@ describe('GET /status/:key', () => {
     assert.ok('error' in res.body);
   });
 
-  it('returns empty file/urls for a freshly generated key', async () => {
+  it('returns empty files/urls for a freshly generated key', async () => {
     const agent = 'TestBrowser/1.0';
     const { app, key } = await generateKey(agent);
     const res = await request(app).get(`/status/${key}`).set('User-Agent', agent);
     assert.strictEqual(res.status, 200);
-    assert.strictEqual(res.body.file, null);
+    assert.deepStrictEqual(res.body.files, []);
     assert.deepStrictEqual(res.body.urls, []);
   });
 
@@ -120,11 +127,20 @@ describe('GET /status/:key', () => {
     const agent = 'TestBrowser/1.0';
     const { app, keys, key } = await generateKey(agent);
     const info = keys.get(key)!;
-    info.file = { name: 'book.epub', path: '/tmp/book.epub', size: 0, uploaded: new Date() };
+    info.files = [
+      {
+        name: 'book.epub',
+        path: '/tmp/book.epub',
+        size: 0,
+        uploaded: new Date(),
+        downloadTimer: null,
+      },
+    ];
 
     const res = await request(app).get(`/status/${key}`).set('User-Agent', agent);
     assert.strictEqual(res.status, 200);
-    assert.deepStrictEqual(res.body.file, { name: 'book.epub' });
+    assert.strictEqual(res.body.files.length, 1);
+    assert.strictEqual(res.body.files[0].name, 'book.epub');
   });
 });
 
@@ -136,18 +152,99 @@ describe('DELETE /file/:key', () => {
     assert.strictEqual(res.status, 400);
   });
 
-  it('clears the file and returns ok', async () => {
+  it('clears all files and returns ok', async () => {
     const agent = 'TestBrowser/1.0';
     const { app, keys, key } = await generateKey(agent);
     const info = keys.get(key)!;
-    info.file = { name: 'test.epub', path: '/tmp/nonexistent.epub', size: 0, uploaded: new Date() };
+    info.files = [
+      {
+        name: 'test.epub',
+        path: '/tmp/nonexistent.epub',
+        size: 0,
+        uploaded: new Date(),
+        downloadTimer: null,
+      },
+    ];
 
     const del = await request(app).delete(`/file/${key}`);
     assert.strictEqual(del.status, 200);
     assert.strictEqual(del.text, 'ok');
 
     const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
-    assert.strictEqual(status.body.file, null);
+    assert.deepStrictEqual(status.body.files, []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('DELETE /file/:key/:filename', () => {
+  it('returns 404 for an unknown key', async () => {
+    const { app } = createApp();
+    const res = await request(app).delete('/file/ZZZZ/book.epub');
+    assert.strictEqual(res.status, 404);
+  });
+
+  it('returns 404 when the filename does not match any staged file', async () => {
+    const { app, keys, key } = await generateKey();
+    keys.get(key)!.files = [
+      {
+        name: 'real.epub',
+        path: '/tmp/nonexistent.epub',
+        size: 0,
+        uploaded: new Date(),
+        downloadTimer: null,
+      },
+    ];
+    const res = await request(app).delete(`/file/${key}/other.epub`);
+    assert.strictEqual(res.status, 404);
+  });
+
+  it('removes only the named file and leaves others intact', async () => {
+    const agent = 'TestBrowser/1.0';
+    const { app, keys, key } = await generateKey(agent);
+    const info = keys.get(key)!;
+    info.files = [
+      {
+        name: 'first.epub',
+        path: '/tmp/nonexistent1.epub',
+        size: 0,
+        uploaded: new Date(),
+        downloadTimer: null,
+      },
+      {
+        name: 'second.epub',
+        path: '/tmp/nonexistent2.epub',
+        size: 0,
+        uploaded: new Date(),
+        downloadTimer: null,
+      },
+    ];
+
+    const del = await request(app).delete(`/file/${key}/first.epub`);
+    assert.strictEqual(del.status, 200);
+
+    const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
+    assert.strictEqual(status.body.files.length, 1);
+    assert.strictEqual(status.body.files[0].name, 'second.epub');
+  });
+
+  it('URL-decodes the filename parameter', async () => {
+    const agent = 'TestBrowser/1.0';
+    const { app, keys, key } = await generateKey(agent);
+    keys.get(key)!.files = [
+      {
+        name: 'my book.epub',
+        path: '/tmp/nonexistent.epub',
+        size: 0,
+        uploaded: new Date(),
+        downloadTimer: null,
+      },
+    ];
+
+    const del = await request(app).delete(`/file/${key}/my%20book.epub`);
+    assert.strictEqual(del.status, 200);
+
+    const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
+    assert.deepStrictEqual(status.body.files, []);
   });
 });
 
@@ -195,8 +292,8 @@ describe('POST /upload', () => {
         contentType: 'text/plain',
       });
     const info = keys.get(key)!;
-    assert.notStrictEqual(info.file, null);
-    assert.strictEqual(info.file!.name, 'mybook.txt');
+    assert.strictEqual(info.files.length, 1);
+    assert.strictEqual(info.files[0].name, 'mybook.txt');
   });
 
   it('adds a URL when url field is provided', async () => {
@@ -224,6 +321,127 @@ describe('POST /upload', () => {
       .field('url', 'javascript:alert(1)');
     assert.strictEqual(res.status, 400);
     assert.match(res.text, /Invalid URL/i);
+  });
+
+  it('returns 400 when MAX_FILES_PER_KEY is reached', async () => {
+    const { app, keys, key } = await generateKey();
+    const info = keys.get(key)!;
+    for (let i = 0; i < MAX_FILES_PER_KEY; i++) {
+      info.files.push({
+        name: `book${i}.txt`,
+        path: `/tmp/book${i}.txt`,
+        size: 10,
+        uploaded: new Date(),
+        downloadTimer: null,
+      });
+    }
+    const res = await request(app)
+      .post('/upload')
+      .field('key', key)
+      .attach('file', Buffer.from('one more'), {
+        filename: 'extra.txt',
+        contentType: 'text/plain',
+      });
+    assert.strictEqual(res.status, 400);
+    assert.match(res.text, /File limit/i);
+  });
+
+  it('returns 400 when pendingUploads already fills the slot (TOCTOU guard)', async () => {
+    const { app, keys, key } = await generateKey();
+    const info = keys.get(key)!;
+    // Simulate MAX_FILES_PER_KEY in-flight uploads with no committed files
+    info.pendingUploads = MAX_FILES_PER_KEY;
+    const res = await request(app)
+      .post('/upload')
+      .field('key', key)
+      .attach('file', Buffer.from('one more'), {
+        filename: 'extra.txt',
+        contentType: 'text/plain',
+      });
+    assert.strictEqual(res.status, 400);
+    assert.match(res.text, /File limit/i);
+  });
+
+  it('accumulates disk usage across multiple files for the same key', async () => {
+    const { app, keys, key } = await generateKey();
+    const diskBefore = getDiskUsage();
+
+    await request(app)
+      .post('/upload')
+      .field('key', key)
+      .attach('file', Buffer.from('first book content'), {
+        filename: 'first.txt',
+        contentType: 'text/plain',
+      });
+    const afterFirst = getDiskUsage();
+    assert.ok(afterFirst > diskBefore, 'disk usage should increase after first upload');
+
+    await request(app)
+      .post('/upload')
+      .field('key', key)
+      .attach('file', Buffer.from('second book content'), {
+        filename: 'second.txt',
+        contentType: 'text/plain',
+      });
+    const afterSecond = getDiskUsage();
+    assert.ok(afterSecond > afterFirst, 'disk usage should increase again after second upload');
+    assert.strictEqual(keys.get(key)!.files.length, 2);
+  });
+
+  it('deduplicates display names when the same filename is uploaded twice', async () => {
+    const { app, keys, key } = await generateKey();
+
+    await request(app).post('/upload').field('key', key).attach('file', Buffer.from('first copy'), {
+      filename: 'book.txt',
+      contentType: 'text/plain',
+    });
+
+    await request(app)
+      .post('/upload')
+      .field('key', key)
+      .attach('file', Buffer.from('second copy'), {
+        filename: 'book.txt',
+        contentType: 'text/plain',
+      });
+
+    const info = keys.get(key)!;
+    assert.strictEqual(info.files.length, 2);
+    assert.strictEqual(info.files[0].name, 'book.txt');
+    assert.strictEqual(info.files[1].name, 'book (2).txt');
+  });
+
+  it('deduplicates display names when the same filename is uploaded three times', async () => {
+    const { app, keys, key } = await generateKey();
+
+    for (let i = 0; i < 3; i++) {
+      await request(app)
+        .post('/upload')
+        .field('key', key)
+        .attach('file', Buffer.from(`copy ${i}`), {
+          filename: 'book.txt',
+          contentType: 'text/plain',
+        });
+    }
+
+    const info = keys.get(key)!;
+    assert.strictEqual(info.files.length, 3);
+    assert.strictEqual(info.files[0].name, 'book.txt');
+    assert.strictEqual(info.files[1].name, 'book (2).txt');
+    assert.strictEqual(info.files[2].name, 'book (3).txt');
+  });
+
+  it('returns 400 when MAX_URLS_PER_KEY is reached', async () => {
+    const { app, keys, key } = await generateKey();
+    const info = keys.get(key)!;
+    for (let i = 0; i < MAX_URLS_PER_KEY; i++) {
+      info.urls.push(`https://example.com/${i}`);
+    }
+    const res = await request(app)
+      .post('/upload')
+      .field('key', key)
+      .field('url', 'https://example.com/overflow');
+    assert.strictEqual(res.status, 400);
+    assert.match(res.text, /URL limit/i);
   });
 });
 
@@ -318,10 +536,11 @@ describe('POST /generate — capacity', () => {
       created: new Date(),
       ip: '1.2.3.4',
       agent: 'test',
-      file: null,
+      files: [],
       urls: [],
       timer: null,
-      downloadTimer: null,
+      pendingUploads: 0,
+      pendingFilenames: [],
       alive: new Date(),
     };
     for (let i = 0; i < MAX_ACTIVE_KEYS; i++) {
@@ -339,7 +558,9 @@ describe('GET /:filename', () => {
     const { app, keys, key } = await generateKey(agent);
     const tmpFile = path.join('uploads', `test-serve-${Date.now()}.txt`);
     await fs.writeFile(tmpFile, 'ebook content here');
-    keys.get(key)!.file = { name: 'mybook.txt', path: tmpFile, size: 0, uploaded: new Date() };
+    keys.get(key)!.files = [
+      { name: 'mybook.txt', path: tmpFile, size: 0, uploaded: new Date(), downloadTimer: null },
+    ];
 
     const res = await request(app).get(`/mybook.txt?key=${key}`).set('User-Agent', agent);
     assert.strictEqual(res.status, 200);
@@ -348,15 +569,18 @@ describe('GET /:filename', () => {
     await fs.rm(tmpFile, { force: true });
   });
 
-  it('falls through (404) when the filename does not match the staged file', async () => {
+  it('falls through (404) when the filename does not match any staged file', async () => {
     const agent = 'TestBrowser/1.0';
     const { app, keys, key } = await generateKey(agent);
-    keys.get(key)!.file = {
-      name: 'real.txt',
-      path: '/tmp/nonexistent.txt',
-      size: 0,
-      uploaded: new Date(),
-    };
+    keys.get(key)!.files = [
+      {
+        name: 'real.txt',
+        path: '/tmp/nonexistent.txt',
+        size: 0,
+        uploaded: new Date(),
+        downloadTimer: null,
+      },
+    ];
 
     const res = await request(app).get(`/wrong.txt?key=${key}`).set('User-Agent', agent);
     assert.strictEqual(res.status, 404);
@@ -372,6 +596,64 @@ describe('GET /:filename', () => {
     const { app } = createApp({ staticDir: STATIC_DIR });
     const res = await request(app).get('/somefile.epub?key=!!');
     assert.strictEqual(res.status, 404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('GET /:filename — download timer', () => {
+  afterEach(() => {
+    mock.timers.reset();
+  });
+
+  it('sets downloadTimer on the FileInfo after a successful download', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const agent = 'TestBrowser/1.0';
+    const { app, keys, key } = await generateKey(agent);
+    const tmpFile = path.join('uploads', `test-timer-${Date.now()}.txt`);
+    await fs.writeFile(tmpFile, 'timer test content');
+    const fileEntry = {
+      name: 'timer.txt',
+      path: tmpFile,
+      size: 18,
+      uploaded: new Date(),
+      downloadTimer: null,
+    };
+    keys.get(key)!.files = [fileEntry];
+
+    const res = await request(app).get(`/timer.txt?key=${key}`).set('User-Agent', agent);
+    assert.strictEqual(res.status, 200);
+    assert.notStrictEqual(
+      fileEntry.downloadTimer,
+      null,
+      'downloadTimer should be set after serving'
+    );
+
+    await fs.rm(tmpFile, { force: true });
+  });
+
+  it('removes the file from info.files after FILE_DELETE_DELAY_MS', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const agent = 'TestBrowser/1.0';
+    const { app, keys, key } = await generateKey(agent);
+    const tmpFile = path.join('uploads', `test-autorm-${Date.now()}.txt`);
+    await fs.writeFile(tmpFile, 'timer test content');
+    keys.get(key)!.files = [
+      {
+        name: 'autoremove.txt',
+        path: tmpFile,
+        size: 18,
+        uploaded: new Date(),
+        downloadTimer: null,
+      },
+    ];
+
+    await request(app).get(`/autoremove.txt?key=${key}`).set('User-Agent', agent);
+    assert.strictEqual(keys.get(key)!.files.length, 1, 'file should still be staged before delay');
+
+    mock.timers.tick(FILE_DELETE_DELAY_MS + 1);
+    assert.strictEqual(keys.get(key)!.files.length, 0, 'file should be removed after delay');
+
+    await fs.rm(tmpFile, { force: true });
   });
 });
 
@@ -461,7 +743,6 @@ describe('GET /device/:key', () => {
 });
 
 // ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 describe('malformed URLs', () => {
   it('returns 400 for invalid UTF-8 percent-encoding without stack trace', async () => {
     const { app } = createApp();
@@ -529,7 +810,7 @@ describe('GET /events/:key', () => {
                 try {
                   const line = buf.split('\n').find((l) => l.startsWith('data:'))!;
                   const payload = JSON.parse(line.replace(/^data:\s*/, ''));
-                  assert.ok('file' in payload && 'urls' in payload);
+                  assert.ok('files' in payload && 'urls' in payload);
                   resolve();
                 } catch (e) {
                   reject(e);

@@ -4,13 +4,26 @@ import express from 'express';
 import multer from 'multer';
 import sanitize from 'sanitize-filename';
 import { fileTypeFromFile } from 'file-type';
-import { expireKey, clearFile, addDiskUsage, getDiskUsage } from '../keyStore.js';
+import {
+  expireKey,
+  addDiskUsage,
+  getEffectiveDiskUsage,
+  reservePendingDisk,
+  releasePendingDisk,
+} from '../keyStore.js';
 import {
   convertWithKindlegen,
   convertWithKepubify,
   convertWithPdfCropMargins,
 } from '../converter.js';
-import { MAX_FILE_SIZE, MAX_DISK_BYTES, UPLOAD_DIR, UPLOAD_RATE_LIMIT_MAX } from '../config.js';
+import {
+  MAX_FILE_SIZE,
+  MAX_DISK_BYTES,
+  MAX_FILES_PER_KEY,
+  MAX_URLS_PER_KEY,
+  UPLOAD_DIR,
+  UPLOAD_RATE_LIMIT_MAX,
+} from '../config.js';
 import { logger } from '../logger.js';
 import type { KeyInfo, MetadataDiff } from '../types.js';
 import {
@@ -58,6 +71,37 @@ export function sanitiseFilename(
     filename = filename.replace(/[^.\w\-"'()]/g, '_');
   }
   return filename;
+}
+
+/** Predicts the display filename after conversion without running it (pure function). */
+function predictConvertedFilename(
+  sanitised: string,
+  mimetype: string,
+  agent: string,
+  options: { kindlegen: boolean; kepubify: boolean; pdfcropmargins: boolean }
+): string {
+  if (mimetype === TYPE_EPUB && agent.includes('Kindle') && options.kindlegen) {
+    return sanitised.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.mobi');
+  }
+  if (mimetype === TYPE_EPUB && agent.includes('Kobo') && options.kepubify) {
+    return sanitised.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.kepub.epub');
+  }
+  return sanitised;
+}
+
+/** Returns name unchanged, or appends (2), (3), … until unique among existingNames. */
+function uniqueFilename(name: string, existingNames: string[]): string {
+  if (!existingNames.includes(name)) {
+    return name;
+  }
+  const ext = path.extname(name);
+  const base = name.slice(0, name.length - ext.length);
+  let n = 2;
+  let candidate: string;
+  do {
+    candidate = `${base} (${n++})${ext}`;
+  } while (existingNames.includes(candidate));
+  return candidate;
 }
 
 async function runConversion(
@@ -207,6 +251,13 @@ export function makeUploadRouter(
           }
           return;
         }
+        if (info.urls.length >= MAX_URLS_PER_KEY) {
+          res.status(400).send('URL limit reached');
+          if (req.file) {
+            deleteFile(req.file.path);
+          }
+          return;
+        }
         if (!info.urls.includes(rawUrl)) {
           info.urls.push(rawUrl);
           submittedUrl = rawUrl;
@@ -238,86 +289,115 @@ export function makeUploadRouter(
           return;
         }
 
-        const filename = sanitiseFilename(req.file.originalname, {
+        // Check file count limit (combines committed + in-flight slots)
+        if (info.files.length + info.pendingUploads >= MAX_FILES_PER_KEY) {
+          res
+            .status(400)
+            .send(`File limit reached - this session supports up to ${MAX_FILES_PER_KEY} files`);
+          deleteFile(req.file.path);
+          return;
+        }
+
+        const conversionOptions = {
+          kindlegen: !!req.body?.kindlegen,
+          kepubify: !!req.body?.kepubify,
+          pdfcropmargins: !!req.body?.pdfcropmargins,
+        };
+
+        const sanitised = sanitiseFilename(req.file.originalname, {
           transliterate: !!req.body?.transliteration,
           isKindle: info.agent.includes('Kindle'),
         });
 
-        let convertedPath: string;
-        let conversionTool: string | null;
-        let finalFilename: string;
+        const predicted = predictConvertedFilename(
+          sanitised,
+          mimetype,
+          info.agent,
+          conversionOptions
+        );
+        const finalName = uniqueFilename(predicted, [
+          ...info.files.map((f) => f.name),
+          ...info.pendingFilenames,
+        ]);
+
+        // Reserve slot, filename, and disk pessimistically before any await
+        info.pendingUploads++;
+        info.pendingFilenames.push(finalName);
+        reservePendingDisk(req.file.size);
+
         try {
-          ({
-            convertedPath,
-            conversionTool,
-            filename: finalFilename,
-          } = await runConversion(
-            req.file.path,
-            filename,
-            mimetype,
-            info.agent,
-            {
-              kindlegen: !!req.body?.kindlegen,
-              kepubify: !!req.body?.kepubify,
-              pdfcropmargins: !!req.body?.pdfcropmargins,
-            },
-            key
-          ));
-        } catch (convErr) {
-          logger.error({ err: convErr, key, tool: conversionTool! }, 'Conversion failed');
-          res.status(500).send(`Conversion failed: ${(convErr as Error).message}`);
-          return;
-        }
-
-        const { size: convertedSize } = await fs.promises.stat(convertedPath);
-        if (convertedSize > MAX_FILE_SIZE) {
-          deleteFile(convertedPath);
-          logger.warn({ key, convertedSize }, 'Upload rejected: converted file too large');
-          res.status(413).send('Converted file too large');
-          return;
-        }
-
-        const projectedUsage = getDiskUsage() + convertedSize - (info.file?.size ?? 0);
-        if (projectedUsage > MAX_DISK_BYTES) {
-          deleteFile(convertedPath);
-          logger.warn(
-            { key, convertedSize, diskUsage: getDiskUsage() },
-            'Upload rejected: disk limit reached'
-          );
-          res.status(507).send('Insufficient storage');
-          return;
-        }
-
-        let metadataDiff: MetadataDiff | undefined;
-        if (req.body?.fetchmetadata && mimetype === TYPE_EPUB) {
+          let convertedPath: string;
+          let conversionTool: string | null;
           try {
-            logger.info({ key }, 'Fetching metadata from Google Books');
-            metadataDiff = await updateEpubMetadata(convertedPath);
-            logger.info({ key, changes: Object.keys(metadataDiff).length }, 'Metadata updated');
-          } catch (metaErr) {
-            logger.warn({ err: metaErr, key }, 'Metadata fetch skipped');
+            ({ convertedPath, conversionTool } = await runConversion(
+              req.file.path,
+              sanitised,
+              mimetype,
+              info.agent,
+              conversionOptions,
+              key
+            ));
+          } catch (convErr) {
+            logger.error({ err: convErr, key }, 'Conversion failed');
+            deleteFile(req.file.path);
+            res.status(500).send(`Conversion failed: ${(convErr as Error).message}`);
+            return;
           }
+
+          const { size: convertedSize } = await fs.promises.stat(convertedPath);
+          if (convertedSize > MAX_FILE_SIZE) {
+            deleteFile(convertedPath);
+            logger.warn({ key, convertedSize }, 'Upload rejected: converted file too large');
+            res.status(413).send('Converted file too large');
+            return;
+          }
+
+          // Disk check: subtract our own reservation, add actual converted size
+          if (getEffectiveDiskUsage() - req.file.size + convertedSize > MAX_DISK_BYTES) {
+            deleteFile(convertedPath);
+            logger.warn(
+              { key, convertedSize, diskUsage: getEffectiveDiskUsage() },
+              'Upload rejected: disk limit reached'
+            );
+            res.status(507).send('Insufficient storage');
+            return;
+          }
+
+          let metadataDiff: MetadataDiff | undefined;
+          if (req.body?.fetchmetadata && mimetype === TYPE_EPUB) {
+            try {
+              logger.info({ key }, 'Fetching metadata from Google Books');
+              metadataDiff = await updateEpubMetadata(convertedPath);
+              logger.info({ key, changes: Object.keys(metadataDiff).length }, 'Metadata updated');
+            } catch (metaErr) {
+              logger.warn({ err: metaErr, key }, 'Metadata fetch skipped');
+            }
+          }
+
+          addDiskUsage(convertedSize);
+          info.files.push({
+            name: finalName,
+            path: convertedPath,
+            size: convertedSize,
+            uploaded: new Date(),
+            metadataDiff,
+            downloadTimer: null,
+          });
+          expireKey(key, keys);
+          logger.info(
+            { key, filename: finalName, size: convertedSize, ip: clientIp(req) },
+            'File staged'
+          );
+          notifySSE(key, info);
+
+          res.send(
+            buildSuccessMessage(deviceLabel(info.agent), conversionTool, finalName, submittedUrl)
+          );
+        } finally {
+          info.pendingUploads--;
+          info.pendingFilenames = info.pendingFilenames.filter((n) => n !== finalName);
+          releasePendingDisk(req.file.size);
         }
-
-        clearFile(info);
-        addDiskUsage(convertedSize);
-        info.file = {
-          name: finalFilename,
-          path: convertedPath,
-          size: convertedSize,
-          uploaded: new Date(),
-          metadataDiff,
-        };
-        expireKey(key, keys);
-        logger.info(
-          { key, filename: finalFilename, size: convertedSize, ip: clientIp(req) },
-          'File staged'
-        );
-        notifySSE(key, info);
-
-        res.send(
-          buildSuccessMessage(deviceLabel(info.agent), conversionTool, finalFilename, submittedUrl)
-        );
         return;
       }
 

@@ -41,11 +41,16 @@
   cursor: pointer;
   touch-action: manipulation;
   @include m.webkit(flex-shrink, 0);
+  transition: background 0.12s;
 }
 
 .btn-icon:hover {
   @include m.theme-prop(border-color, 'accent');
   @include m.theme-prop(color, 'accent');
+}
+
+.btn-icon:active:not(:disabled) {
+  @include m.theme-prop(background, 'bg');
 }
 
 .btn-icon:disabled {
@@ -118,6 +123,7 @@
   @include m.flex-gap-col(0.5rem);
 }
 
+// Standalone item (URL links — no delete button)
 .download-item {
   @include m.flex;
   @include m.webkit(align-items, center);
@@ -146,12 +152,80 @@
   height: 1.1rem;
 }
 
+// ─── File entry (download link + delete button) ───────────────────────────────
+
+.download-entry {
+  border: 1px solid m.token('border');
+  border: 1px solid var(--border);
+  border-radius: t.$radius-sm;
+  overflow: hidden;
+}
+
+.download-row {
+  @include m.flex;
+  @include m.webkit(align-items, stretch);
+}
+
+// Override standalone .download-item styles when inside .download-entry
+.download-entry .download-item {
+  @include m.webkit(flex, 1 1 0%);
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.download-entry .download-item:hover {
+  border-color: transparent;
+}
+
+.btn-delete {
+  display: block;
+  display: -webkit-flex;
+  display: flex;
+  @include m.webkit(align-items, center);
+  @include m.webkit(justify-content, center);
+  @include m.webkit(flex-shrink, 0);
+  width: 2.75rem;
+  border: none;
+  border-left: 1px solid m.token('border');
+  border-left: 1px solid var(--border);
+  background: transparent;
+  @include m.theme-prop(color, 'text-muted');
+  cursor: pointer;
+  touch-action: manipulation;
+  padding: 0;
+  transition: background 0.12s;
+}
+
+.btn-delete:hover {
+  @include m.theme-prop(background, 'error-bg');
+  @include m.theme-prop(color, 'error-text');
+  @include m.theme-prop(border-color, 'error-border');
+}
+
+.btn-delete:active:not(:disabled) {
+  @include m.theme-prop(background, 'error-border');
+  @include m.theme-prop(color, 'error-text');
+}
+
+.btn-delete:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-delete svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+
 // ─── Metadata diff ────────────────────────────────────────────────────────────
 
 .metadata-diff {
   padding: 0.6rem 1rem 0.75rem;
   border-top: 1px solid m.token('border');
   border-top: 1px solid var(--border);
+  @include m.theme-prop(background, 'bg');
   @include m.flex(column);
   @include m.flex-gap-col(0.35rem);
 }

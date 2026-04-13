@@ -5,6 +5,8 @@ import { logger } from './logger.js';
 import { EXPIRE_DELAY_MS } from './config.js';
 
 let diskUsageBytes = 0;
+let pendingDiskBytes = 0;
+
 export function addDiskUsage(bytes: number): void {
   diskUsageBytes += bytes;
 }
@@ -14,18 +16,33 @@ export function subtractDiskUsage(bytes: number): void {
 export function getDiskUsage(): number {
   return diskUsageBytes;
 }
+export function reservePendingDisk(bytes: number): void {
+  pendingDiskBytes += bytes;
+}
+export function releasePendingDisk(bytes: number): void {
+  pendingDiskBytes = Math.max(0, pendingDiskBytes - bytes);
+}
+export function getEffectiveDiskUsage(): number {
+  return diskUsageBytes + pendingDiskBytes;
+}
 
-/** Subtracts the file's size from the disk counter, unlinks it, and nulls info.file. */
-export function clearFile(info: KeyInfo): void {
-  if (info.file) {
-    subtractDiskUsage(info.file.size);
-    fs.unlink(info.file.path, (err) => {
+/** Cancels all download timers, unlinks all staged files, subtracts their sizes, and empties info.files. */
+export function clearFiles(info: KeyInfo): void {
+  if (info.files.length > 1) {
+    logger.warn({ count: info.files.length }, 'Clearing multiple staged files');
+  }
+  for (const file of info.files) {
+    if (file.downloadTimer) {
+      clearTimeout(file.downloadTimer);
+    }
+    subtractDiskUsage(file.size);
+    fs.unlink(file.path, (err) => {
       if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
         logger.error({ err }, 'Error deleting file');
       }
     });
-    info.file = null;
   }
+  info.files = [];
 }
 
 export const KEY_CHARS = '23456789ACDEFGHJKLMNPRSTUVWXYZ';
@@ -52,7 +69,7 @@ export function generateUniqueKey(keys: Map<string, KeyInfo>): string | null {
   return key;
 }
 
-/** Removes a key from the map, cancels its timers, and deletes its staged file. */
+/** Removes a key from the map, cancels its timers, and deletes its staged files. */
 export function removeKey(key: string, keys: Map<string, KeyInfo>): void {
   const info = keys.get(key);
   if (!info) {
@@ -62,10 +79,7 @@ export function removeKey(key: string, keys: Map<string, KeyInfo>): void {
   if (info.timer) {
     clearTimeout(info.timer);
   }
-  if (info.downloadTimer) {
-    clearTimeout(info.downloadTimer);
-  }
-  clearFile(info);
+  clearFiles(info);
   keys.delete(key);
   logger.info({ key }, 'Key removed');
 }

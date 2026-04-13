@@ -21,11 +21,11 @@ self.addEventListener('fetch', (event) => {
               'Content-Type': file.type || 'application/octet-stream',
               'X-File-Name': encodeURIComponent(file.name),
             },
-          }),
+          })
         );
       }
 
       return Response.redirect('/', 303);
-    })(),
+    })()
   );
 });

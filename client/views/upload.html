@@ -126,17 +126,17 @@
         </div>
 
         <div class="card">
-          <h2 class="card-title">Ebook file</h2>
+          <h2 class="card-title">Ebook files</h2>
           <div
             id="drop-zone"
             class="zone"
             role="button"
             tabindex="0"
-            aria-label="Choose or drop an ebook file"
+            aria-label="Choose or drop ebook files"
           >
             <div id="zone-empty">
               <div class="zone-icon" aria-hidden="true">📚</div>
-              <p class="zone-label"><strong>Choose file</strong> or drag &amp; drop</p>
+              <p class="zone-label"><strong>Choose files</strong> or drag &amp; drop</p>
               <p class="zone-formats">EPUB · MOBI · PDF · TXT · CBZ · CBR</p>
             </div>
             <div id="zone-selected" class="hidden" aria-live="polite">
@@ -144,6 +144,14 @@
                 <span class="zone-file-name" id="zone-file-name"></span>
                 <span class="zone-file-size" id="zone-file-size"></span>
               </p>
+              <button
+                id="zone-clear-btn"
+                class="btn-secondary zone-clear-btn"
+                aria-label="Clear selection"
+                type="button"
+              >
+                Clear
+              </button>
             </div>
           </div>
         </div>
@@ -154,6 +162,7 @@
           class="hidden"
           aria-hidden="true"
           tabindex="-1"
+          multiple
         />
 
         <div class="card">
@@ -179,6 +188,7 @@
             role="group"
             aria-label="Conversion options"
           ></div>
+          <p id="options-note" class="hint hidden"></p>
         </div>
 
         <button type="submit" id="submit-btn" class="btn-primary" disabled>Upload and send</button>
@@ -208,8 +218,8 @@
         <p>
           Open this service on your Kobo, Kindle, or Tolino — it will show a 4-character key and a
           QR code. Scan the QR code with your phone to open this page with the key pre-filled, or
-          type the key manually. Pick a file and press <em>Upload and send</em>. A download link
-          appears on your e-reader within seconds.
+          type the key manually. Pick one or more files and press <em>Upload and send</em>. Download
+          links appear on your e-reader within seconds.
         </p>
         <p>
           Files are stored temporarily on the server and deleted automatically a few minutes after

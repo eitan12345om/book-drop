@@ -70,6 +70,7 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
     );
     return outPath;
   } catch (err) {
+    await deleteFile(outPath);
     const msg = sanitizeOutput(
       (err as Error).message,
       [basename(inputPath), 'infile.epub'],
@@ -93,6 +94,7 @@ export async function convertWithKepubify(inputPath: string): Promise<string> {
     );
     return outPath;
   } catch (err) {
+    await deleteFile(outPath);
     const msg = sanitizeOutput(
       (err as Error).message,
       [basename(inputPath), 'infile.epub'],
@@ -117,6 +119,7 @@ export async function convertWithPdfCropMargins(inputPath: string): Promise<stri
     );
     return outPath;
   } catch (err) {
+    await deleteFile(outPath);
     const msg = sanitizeOutput(
       (err as Error).message,
       [basename(inputPath), 'infile.pdf'],

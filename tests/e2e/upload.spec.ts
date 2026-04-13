@@ -137,6 +137,57 @@ test('update metadata option is enabled for EPUB files', async ({ page }) => {
   await expect(page.locator('#fetchmetadata')).toBeEnabled();
 });
 
+test('uploads multiple files sequentially and both appear on download page', async ({
+  browser,
+}) => {
+  const koboUA = 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36';
+
+  // Open Kobo download page first so it generates its own key
+  const koboCtx = await browser.newContext({
+    userAgent: koboUA,
+    baseURL: 'http://localhost:3001',
+  });
+  const koboPage = await koboCtx.newPage();
+  await koboPage.goto('/');
+  await expect(koboPage.locator('#key-display')).not.toHaveText('\u2013\u2013\u2013\u2013', {
+    timeout: 5_000,
+  });
+  const key = (await koboPage.locator('#key-display').textContent())?.trim() as string;
+
+  // Upload two files to that key from the upload page
+  const uploadCtx = await browser.newContext({ baseURL: 'http://localhost:3001' });
+  const uploadPage = await uploadCtx.newPage();
+  await uploadPage.goto('/');
+  await uploadPage.locator('#keyinput').fill(key);
+  await uploadPage.locator('#file-input').setInputFiles([
+    { name: 'first.txt', mimeType: 'text/plain', buffer: Buffer.from('first file') },
+    { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('second file') },
+  ]);
+  await uploadPage.locator('#submit-btn').click();
+  await expect(uploadPage.locator('#status-msg')).toContainText('Sent', { timeout: 15_000 });
+  await uploadCtx.close();
+
+  // Both download links should appear on the Kobo page (via SSE/polling)
+  await expect(koboPage.locator('#download-list a')).toHaveCount(2, { timeout: 10_000 });
+  const names = await koboPage
+    .locator('#download-list a')
+    .evaluateAll((links) => (links as HTMLAnchorElement[]).map((a) => a.textContent?.trim() ?? ''));
+  expect(names).toContain('first.txt');
+  expect(names).toContain('second.txt');
+  await koboCtx.close();
+});
+
+test('disables conversion options when multiple files are selected', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'first.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 1') },
+    { name: 'second.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 2') },
+  ]);
+  await expect(page.locator('#kepubify')).toBeDisabled();
+  await expect(page.locator('#kindlegen')).toBeDisabled();
+  await expect(page.locator('#options-note')).toBeVisible();
+});
+
 test('re-enables submit button and shows actionable hint after a network-level upload failure', async ({
   page,
 }) => {

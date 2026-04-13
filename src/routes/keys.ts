@@ -1,7 +1,14 @@
 import path from 'path';
+import fs from 'fs';
 import express from 'express';
 import QRCode from 'qrcode';
-import { generateUniqueKey, expireKey, removeKey, clearFile } from '../keyStore.js';
+import {
+  generateUniqueKey,
+  expireKey,
+  removeKey,
+  clearFiles,
+  subtractDiskUsage,
+} from '../keyStore.js';
 import {
   MAX_EXPIRE_MS,
   MAX_ACTIVE_KEYS,
@@ -20,7 +27,8 @@ import { makeRequireKey, makeRequireMatchingAgent, makeLimiter } from '../middle
 
 export function makeKeysRouter(
   keys: Map<string, KeyInfo>,
-  sseClients: Map<string, express.Response>
+  sseClients: Map<string, express.Response>,
+  notifySSE: (key: string, info: KeyInfo) => void
 ): express.Router {
   const router = express.Router();
   const requireKey = makeRequireKey(keys);
@@ -57,10 +65,11 @@ export function makeKeysRouter(
       created: new Date(),
       ip,
       agent,
-      file: null,
+      files: [],
       urls: [],
       timer: null,
-      downloadTimer: null,
+      pendingUploads: 0,
+      pendingFilenames: [],
       alive: new Date(),
     };
     info.onRemove = () => {
@@ -108,7 +117,7 @@ export function makeKeysRouter(
     expireKey(key, keys);
     res.json({
       alive: info.alive,
-      file: info.file ? { name: info.file.name, metadataDiff: info.file.metadataDiff } : null,
+      files: info.files.map((f) => ({ name: f.name, metadataDiff: f.metadataDiff })),
       urls: info.urls,
     });
   });
@@ -150,7 +159,7 @@ export function makeKeysRouter(
 
     const snapshot = {
       alive: info.alive,
-      file: info.file ? { name: info.file.name } : null,
+      files: info.files.map((f) => ({ name: f.name, metadataDiff: f.metadataDiff })),
       urls: info.urls,
     };
     res.write(`data: ${JSON.stringify(snapshot)}\n\n`);
@@ -170,6 +179,45 @@ export function makeKeysRouter(
     });
   });
 
+  router.delete('/file/:key/:filename', deleteLimiter, (req, res) => {
+    const key = (req.params.key as string).toUpperCase();
+    if (!isValidKey(key)) {
+      res.status(400).send('Invalid key format');
+      return;
+    }
+    const info = keys.get(key);
+    if (!info) {
+      res.status(404).send('Unknown key');
+      return;
+    }
+    let filename: string;
+    try {
+      filename = decodeURIComponent(req.params.filename as string);
+    } catch {
+      res.status(400).send('Bad filename');
+      return;
+    }
+    const idx = info.files.findIndex((f) => f.name === filename);
+    if (idx === -1) {
+      res.status(404).send('File not found');
+      return;
+    }
+    const fileEntry = info.files[idx];
+    if (fileEntry.downloadTimer) {
+      clearTimeout(fileEntry.downloadTimer);
+    }
+    subtractDiskUsage(fileEntry.size);
+    fs.unlink(fileEntry.path, (err) => {
+      if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        logger.error({ err }, 'Error deleting file');
+      }
+    });
+    info.files.splice(idx, 1);
+    logger.info({ key, filename }, 'File deleted by user');
+    notifySSE(key, info);
+    res.send('ok');
+  });
+
   router.delete('/file/:key', deleteLimiter, (req, res) => {
     const key = (req.params.key as string).toUpperCase();
     if (!isValidKey(key)) {
@@ -181,7 +229,8 @@ export function makeKeysRouter(
       res.status(400).send(`Unknown key: ${key}`);
       return;
     }
-    clearFile(info);
+    clearFiles(info);
+    notifySSE(key, info);
     res.send('ok');
   });
 
@@ -193,21 +242,30 @@ export function makeKeysRouter(
 
     const filename = decodeURIComponent(req.params.filename as string);
     const info = keys.get(key);
-    if (!info?.file || info.file.name !== filename) {
+    if (!info) {
+      return next();
+    }
+    const fileEntry = info.files.find((f) => f.name === filename);
+    if (!fileEntry) {
       return next();
     }
 
     expireKey(key, keys);
-    logger.info({ filePath: info.file.path, filename }, 'Serving file');
+    logger.info({ filePath: fileEntry.path, filename }, 'Serving file');
 
-    const absPath = path.resolve(info.file.path);
+    const absPath = path.resolve(fileEntry.path);
     res.on('finish', () => {
-      if (res.statusCode >= 200 && res.statusCode < 300 && info.file && !info.downloadTimer) {
-        info.downloadTimer = setTimeout(() => {
-          if (info.file) {
-            logger.info({ key, filename }, 'File deleted after download delay');
-            clearFile(info);
-          }
+      if (res.statusCode >= 200 && res.statusCode < 300 && !fileEntry.downloadTimer) {
+        fileEntry.downloadTimer = setTimeout(() => {
+          logger.info({ key, filename }, 'File deleted after download delay');
+          subtractDiskUsage(fileEntry.size);
+          fs.unlink(fileEntry.path, (err) => {
+            if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+              logger.error({ err }, 'Error deleting file after download');
+            }
+          });
+          info.files = info.files.filter((f) => f !== fileEntry);
+          notifySSE(key, info);
         }, FILE_DELETE_DELAY_MS).unref();
       }
     });

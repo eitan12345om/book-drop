@@ -173,7 +173,7 @@ export async function fetchGoogleBooksMetadata(
   }
   if (typeof v.description === 'string' && v.description) {
     const d = v.description;
-    result.description = d.length > 300 ? d.slice(0, 297) + '…' : d;
+    result.description = d.length > 300 ? `${d.slice(0, 297)}…` : d;
   }
   if (Array.isArray(v.categories) && v.categories.length > 0) {
     result.subject = String(v.categories[0]);

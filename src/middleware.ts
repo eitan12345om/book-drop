@@ -59,7 +59,7 @@ export function makeNotifySSE(sseClients: Map<string, express.Response>) {
     }
     const payload = {
       alive: info.alive,
-      file: info.file ? { name: info.file.name, metadataDiff: info.file.metadataDiff } : null,
+      files: info.files.map((f) => ({ name: f.name, metadataDiff: f.metadataDiff })),
       urls: info.urls,
     };
     sse.write(`data: ${JSON.stringify(payload)}\n\n`);
