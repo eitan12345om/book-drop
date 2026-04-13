@@ -324,7 +324,7 @@
 
 // ─── Responsive: stack key card vertically on small screens ───────────────────
 
-@media (max-width: 600px) {
+@include m.breakpoint('md') {
   .key-card-inner {
     @include m.webkit(flex-direction, column);
     @include m.webkit(align-items, stretch);
