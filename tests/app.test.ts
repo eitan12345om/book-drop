@@ -694,6 +694,64 @@ describe('POST /upload — unsupported file type', () => {
 });
 
 // ---------------------------------------------------------------------------
+describe('POST /upload — temp file cleanup on rejection', () => {
+  // Empty files are written to disk by multer (0-byte write), then rejected post-write.
+  // Verifies the deleteFile call keeps the uploads dir clean after a validation failure.
+  it('removes the temp file when an empty file is rejected', async () => {
+    const { app, key } = await generateKey();
+    const filesBefore = await fs.readdir('uploads');
+
+    const res = await request(app)
+      .post('/upload')
+      .field('key', key)
+      .attach('file', Buffer.alloc(0), { filename: 'empty.txt', contentType: 'text/plain' });
+
+    // Give the async deleteFile callback a tick to complete
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const filesAfter = await fs.readdir('uploads');
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(
+      filesAfter.length,
+      filesBefore.length,
+      'no temp files should remain after an empty-file rejection'
+    );
+  });
+
+  // Verifies that a file written to disk during a successful upload passes through cleanly,
+  // and that the upload dir count matches after a sequence of accept + reject.
+  it('does not accumulate temp files across a mix of accepted and rejected uploads', async () => {
+    const { app, key } = await generateKey();
+    const filesBefore = await fs.readdir('uploads');
+
+    // Accepted upload — file is kept (counted in info.files, not in uploads as orphan)
+    await request(app)
+      .post('/upload')
+      .field('key', key)
+      .attach('file', Buffer.from('good content'), {
+        filename: 'good.txt',
+        contentType: 'text/plain',
+      });
+
+    // Rejected upload (empty file) — temp file must be deleted
+    await request(app)
+      .post('/upload')
+      .field('key', key)
+      .attach('file', Buffer.alloc(0), { filename: 'empty.txt', contentType: 'text/plain' });
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const filesAfter = await fs.readdir('uploads');
+    // Only the accepted file should remain (filesBefore + 1)
+    assert.strictEqual(
+      filesAfter.length,
+      filesBefore.length + 1,
+      'only the accepted file should be in uploads — rejected upload must not leave an orphan'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('GET /device/:key', () => {
   it('returns 400 for an invalid key format', async () => {
     const { app } = createApp();

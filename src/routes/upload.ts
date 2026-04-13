@@ -213,6 +213,11 @@ export function makeUploadRouter(
   router.post('/upload', uploadLimiter, (req, res) => {
     upload.single('file')(req, res, async (err) => {
       if (err) {
+        // LIMIT_FILE_SIZE leaves a partial file on disk; clean it up before responding.
+        // fileFilter errors set req.file to undefined (no disk write), so this is a no-op there.
+        if (req.file) {
+          deleteFile(req.file.path);
+        }
         logger.warn({ err: (err as Error).message }, 'Upload rejected');
         res.status(400).send((err as Error).message);
         return;
