@@ -89,13 +89,15 @@
 }
 
 .dot-active {
-  background: #22c55e;
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+  @include m.theme-prop(background, 'dot-active');
+  box-shadow: 0 0 0 3px m.token('dot-active-glow');
+  box-shadow: 0 0 0 3px var(--dot-active-glow);
 }
 
 .dot-waiting {
-  background: #f59e0b;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+  @include m.theme-prop(background, 'dot-waiting');
+  box-shadow: 0 0 0 3px m.token('dot-waiting-glow');
+  box-shadow: 0 0 0 3px var(--dot-waiting-glow);
   -webkit-animation: pulse 2s infinite;
   animation: pulse 2s infinite;
 }
