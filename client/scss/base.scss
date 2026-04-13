@@ -55,9 +55,7 @@ a:hover {
 }
 
 a:focus-visible {
-  outline: 2px solid m.token('accent');
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  @include m.focus-ring;
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -145,9 +143,7 @@ a:focus-visible {
 }
 
 .btn-theme:focus-visible {
-  outline: 2px solid m.token('accent');
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  @include m.focus-ring;
 }
 
 .btn-theme svg {

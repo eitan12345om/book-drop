@@ -61,3 +61,26 @@
   #{$property}: map.get($map, $token-name);
   #{$property}: var(--#{$token-name});
 }
+
+// ─── Focus helpers ────────────────────────────────────────────────────────────
+
+// Standard 2px accent outline for :focus-visible rules.
+@mixin focus-ring {
+  outline: 2px solid token('accent');
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+// Accent-coloured glow for input :focus rules (box-shadow only).
+@mixin focus-glow {
+  box-shadow: 0 0 0 4px token('accent-glow');
+  box-shadow: 0 0 0 4px var(--accent-glow);
+}
+
+// ─── Responsive breakpoints ───────────────────────────────────────────────────
+
+@mixin breakpoint($name) {
+  @media (max-width: map.get(t.$breakpoints, $name)) {
+    @content;
+  }
+}
