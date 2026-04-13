@@ -7,13 +7,13 @@
 
 .field-label {
   display: block;
-  font-size: 0.875rem;
+  font-size: t.$font-base;
   font-weight: 500;
   margin-bottom: 0.4rem;
 }
 
 .hint {
-  font-size: 0.78rem;
+  font-size: t.$font-sm;
   @include m.theme-prop(color, 'text-muted');
   margin: 0.3rem 0 0;
 }
@@ -55,7 +55,7 @@
   border-radius: t.$radius-sm;
   @include m.theme-prop(background, 'bg');
   @include m.theme-prop(color, 'text');
-  font-size: 1rem;
+  font-size: t.$font-lg;
   font-family: inherit;
   transition:
     border-color 0.12s,
@@ -116,7 +116,7 @@
 }
 
 .zone-formats {
-  font-size: 0.775rem;
+  font-size: t.$font-sm;
   @include m.theme-prop(color, 'text-muted');
   margin: 0.3rem 0 0;
 }
@@ -135,7 +135,7 @@
 }
 
 .zone-file-size {
-  font-size: 0.8rem;
+  font-size: t.$font-sm;
   @include m.theme-prop(color, 'success-text');
   opacity: 0.8;
 }
@@ -216,12 +216,12 @@
 }
 
 .option-label {
-  font-size: 0.875rem;
+  font-size: t.$font-base;
   font-weight: 500;
 }
 
 .option-tag {
-  font-size: 0.68rem;
+  font-size: t.$font-xs;
   font-weight: 500;
   letter-spacing: 0.02em;
   @include m.theme-prop(color, 'text-muted');
@@ -234,7 +234,7 @@
 
 .option-desc {
   display: block;
-  font-size: 0.775rem;
+  font-size: t.$font-sm;
   @include m.theme-prop(color, 'text-muted');
   margin-top: 0.1rem;
   line-height: 1.4;
@@ -250,7 +250,7 @@
   border: 1px solid var(--text-muted);
   border-radius: t.$radius-sm;
   @include m.theme-prop(color, 'text');
-  font-size: 0.825rem;
+  font-size: t.$font-sm;
   font-family: inherit;
   cursor: pointer;
   touch-action: manipulation;
@@ -278,7 +278,7 @@
   color: #fff;
   border: none;
   border-radius: t.$radius;
-  font-size: 1rem;
+  font-size: t.$font-lg;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
@@ -309,7 +309,7 @@
 .status-msg {
   padding: 0.85rem 1rem;
   border-radius: t.$radius-sm;
-  font-size: 0.875rem;
+  font-size: t.$font-base;
   margin-top: 0.85rem;
   line-height: 1.5;
   white-space: pre-wrap;

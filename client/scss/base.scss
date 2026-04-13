@@ -75,7 +75,7 @@ a:focus-visible {
 }
 
 .page-header h1 {
-  font-size: 1.6rem;
+  font-size: t.$font-xl;
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0 0 0.3rem;
@@ -106,7 +106,7 @@ a:focus-visible {
 }
 
 .card-title {
-  font-size: 0.72rem;
+  font-size: t.$font-xs;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -226,7 +226,7 @@ html.ereader {
 }
 
 .instructions p {
-  font-size: 0.85rem;
+  font-size: t.$font-base;
   @include m.theme-prop(color, 'text-muted');
   line-height: 1.65;
   margin: 0 0 0.6rem;
@@ -243,7 +243,7 @@ html.ereader {
   @include m.flex-gap-col(0.25rem);
   text-align: center;
   @include m.theme-prop(color, 'text-muted');
-  font-size: 0.8rem;
+  font-size: t.$font-sm;
   margin-top: 2rem;
   padding-top: 1.25rem;
   border-top: 1px solid m.token('border');
