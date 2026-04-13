@@ -444,6 +444,23 @@ describe('POST /upload', () => {
     assert.strictEqual(res.status, 400);
     assert.match(res.text, /URL limit/i);
   });
+
+  it('returns 500 with a generic message when conversion fails', async () => {
+    // Relies on kepubify not being installed in the test environment.
+    // An EPUB uploaded with kepubify=true to a Kobo user agent triggers kepubify conversion.
+    const { app, key } = await generateKey('Kobo/1.0 Test');
+    const res = await request(app)
+      .post('/upload')
+      .set('User-Agent', 'Kobo/1.0 Test')
+      .field('key', key)
+      .field('kepubify', 'true')
+      .attach('file', Buffer.from('PK\x03\x04'), {
+        filename: 'book.epub',
+        contentType: 'application/epub+zip',
+      });
+    assert.strictEqual(res.status, 500);
+    assert.strictEqual(res.text, 'Conversion failed');
+  });
 });
 
 // ---------------------------------------------------------------------------
