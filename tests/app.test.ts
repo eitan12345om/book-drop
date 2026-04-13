@@ -867,9 +867,23 @@ describe('buildSuccessMessage', () => {
 
 // ---------------------------------------------------------------------------
 describe('POST /upload — metadata failure feedback', () => {
+  let originalFetch: typeof global.fetch;
+
+  before(() => {
+    originalFetch = global.fetch;
+    // Guard: any real network call during this suite is a test bug, not expected behavior.
+    global.fetch = async () => {
+      throw new Error('Unexpected network call — fetch must not be reached in this test');
+    };
+  });
+
+  after(() => {
+    global.fetch = originalFetch;
+  });
+
   it('includes metadata failure note in response when fetchmetadata is set and EPUB parsing fails', async () => {
     const { app, key } = await generateKey();
-    // A buffer that declares itself as EPUB but is not a valid ZIP — causes readEpubMetadata to throw
+    // Not a valid ZIP — JSZip throws immediately, so fetchGoogleBooksMetadata is never called.
     const fakeEpub = Buffer.from('not a real epub file');
     const res = await request(app)
       .post('/upload')
