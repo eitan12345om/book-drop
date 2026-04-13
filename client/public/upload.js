@@ -292,10 +292,14 @@ zoneClearBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   setFiles([]);
   hideStatus();
+  dropZone.focus();
 });
 
 dropZone.addEventListener('click', () => fileInput.click());
 dropZone.addEventListener('keydown', (e) => {
+  if (e.target !== dropZone) {
+    return;
+  }
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
     fileInput.click();
