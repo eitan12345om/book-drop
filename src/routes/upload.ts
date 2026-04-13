@@ -219,7 +219,11 @@ export function makeUploadRouter(
           deleteFile(req.file.path);
         }
         logger.warn({ err: (err as Error).message }, 'Upload rejected');
-        res.status(400).send((err as Error).message);
+        if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+          res.status(413).send(err.message);
+        } else {
+          res.status(400).send((err as Error).message);
+        }
         return;
       }
 
