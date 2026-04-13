@@ -200,20 +200,6 @@ html.ereader {
     -webkit-animation: none !important;
     animation: none !important;
   }
-
-  // Solid fallback for e-ink: translucent rgba() doesn't render predictably
-  .zone:hover,
-  .zone.dragging {
-    background: #eeeeee;
-  }
-
-  .option-item:has(input:checked) {
-    background: #eeeeee;
-  }
-
-  .download-item:hover {
-    background: #eeeeee;
-  }
 }
 
 // ─── Reduced motion ───────────────────────────────────────────────────────────

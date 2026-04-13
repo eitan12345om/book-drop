@@ -42,7 +42,7 @@
 .key-input:focus {
   outline: none;
   @include m.theme-prop(border-color, 'accent');
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  @include m.focus-glow;
 }
 
 // ─── URL input ────────────────────────────────────────────────────────────────
@@ -65,7 +65,7 @@
 .url-input:focus {
   outline: none;
   @include m.theme-prop(border-color, 'accent');
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  @include m.focus-glow;
 }
 
 // ─── Drop zone ────────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@
 .zone:hover,
 .zone.dragging {
   @include m.theme-prop(border-color, 'accent');
-  background: rgba(37, 99, 235, 0.04);
+  @include m.theme-prop(background, 'accent-subtle');
 }
 
 .zone.has-file {
@@ -186,7 +186,7 @@
 
 .option-item:has(input:checked) {
   @include m.theme-prop(border-color, 'accent');
-  background: rgba(37, 99, 235, 0.04);
+  @include m.theme-prop(background, 'accent-subtle');
 }
 
 .option-item:has(input:disabled),
