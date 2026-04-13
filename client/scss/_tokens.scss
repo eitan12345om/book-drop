@@ -7,6 +7,12 @@ $light: (
   'text-muted': #6f6862,
   'accent': #2563eb,
   'accent-hover': #1d4ed8,
+  'accent-subtle': rgba(37, 99, 235, 0.04),
+  'accent-glow': rgba(37, 99, 235, 0.12),
+  'dot-active': #22c55e,
+  'dot-active-glow': rgba(34, 197, 94, 0.2),
+  'dot-waiting': #f59e0b,
+  'dot-waiting-glow': rgba(245, 158, 11, 0.2),
   'success-bg': #f0fdf4,
   'success-border': #86efac,
   'success-text': #166534,
@@ -24,6 +30,12 @@ $dark: (
   'text-muted': #a8a29e,
   'accent': #3b82f6,
   'accent-hover': #60a5fa,
+  'accent-subtle': rgba(59, 130, 246, 0.04),
+  'accent-glow': rgba(59, 130, 246, 0.12),
+  'dot-active': #22c55e,
+  'dot-active-glow': rgba(34, 197, 94, 0.2),
+  'dot-waiting': #f59e0b,
+  'dot-waiting-glow': rgba(245, 158, 11, 0.2),
   'success-bg': #052e16,
   'success-border': #166534,
   'success-text': #86efac,
@@ -36,8 +48,14 @@ $dark: (
 $ereader: (
   'accent': #000000,
   'accent-hover': #333333,
+  'accent-subtle': #eeeeee,
+  'accent-glow': transparent,
   'border': #999999,
   'text-muted': #333333,
+  'dot-active': #000000,
+  'dot-active-glow': transparent,
+  'dot-waiting': #888888,
+  'dot-waiting-glow': transparent,
 );
 
 // Static tokens — same across all themes, no CSS variable needed
@@ -48,3 +66,17 @@ $shadow:
   0 1px 3px rgba(0, 0, 0, 0.07),
   0 1px 2px rgba(0, 0, 0, 0.04);
 $font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+
+// Font scale
+$font-xs: 0.72rem; // card titles, tags, badges
+$font-sm: 0.8rem; // hints, captions, secondary text
+$font-base: 0.875rem; // body text, field labels, buttons
+$font-lg: 1rem; // primary inputs, zone labels
+$font-xl: 1.6rem; // page heading (h1)
+
+// Responsive breakpoints
+$breakpoints: (
+  'sm': 480px,
+  // options grid: 2-col → 1-col
+  'md': 600px, // key card: horizontal → vertical stack
+);
