@@ -360,26 +360,3 @@
   border-radius: 2px;
   transition: width 0.2s ease;
 }
-
-// ─── Footer ───────────────────────────────────────────────────────────────────
-
-.page-footer {
-  @include m.flex(column);
-  @include m.flex-gap-col(0.25rem);
-  text-align: center;
-  @include m.theme-prop(color, 'text-muted');
-  font-size: 0.78rem;
-  margin-top: 2rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid m.token('border');
-  border-top: 1px solid var(--border);
-  line-height: 1.8;
-}
-
-.page-footer a {
-  @include m.theme-prop(color, 'text-muted');
-}
-
-.page-footer a:hover {
-  @include m.theme-prop(color, 'text');
-}

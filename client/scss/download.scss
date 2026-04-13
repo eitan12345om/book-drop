@@ -349,14 +349,3 @@
     @include m.webkit(justify-content, center);
   }
 }
-
-// ─── Footer ───────────────────────────────────────────────────────────────────
-
-.footer {
-  margin-top: 2rem;
-  @include m.flex(column);
-  @include m.flex-gap-col(0.25rem);
-  font-size: 0.8rem;
-  @include m.theme-prop(color, 'text-muted');
-  text-align: center;
-}
