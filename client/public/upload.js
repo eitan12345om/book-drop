@@ -341,6 +341,58 @@ function setProgress(value, visible) {
  * Resolves with the XHR on load (caller checks xhr.status).
  * Rejects on network-level error.
  */
+/**
+ * Turns the raw array of per-request server responses into a single human-friendly string.
+ *
+ * Single file:  "Sent to Kobo\nbook.epub"  (strips redundant "Filename: " label)
+ * Multi-file:   "3 files sent to Kobo\n• book1.epub\n• book2.epub (converted with Kepubify)"
+ * URL messages  ("URL added: …") are appended as-is after the file summary.
+ */
+function formatSuccessMessages(messages) {
+  const fileMessages = [];
+  const urlMessages = [];
+  for (let i = 0; i < messages.length; i++) {
+    if (/^Sent to /m.test(messages[i])) {
+      fileMessages.push(messages[i]);
+    } else {
+      urlMessages.push(messages[i]);
+    }
+  }
+
+  const lines = [];
+
+  if (fileMessages.length === 1) {
+    // Single file: keep the "Sent to …" header and prefix the filename with a bullet.
+    lines.push(fileMessages[0].replace(/^Filename: /m, '\u2022 '));
+  } else if (fileMessages.length > 1) {
+    // Multiple files: one summary header, then a bulleted filename list.
+    const deviceMatch = fileMessages[0].match(/^Sent to ([^(\n]+?)(?:\s*\(|$)/m);
+    const device = deviceMatch ? deviceMatch[1].trim() : 'your device';
+    lines.push(fileMessages.length + ' files sent to ' + device);
+    for (let j = 0; j < fileMessages.length; j++) {
+      const filenameMatch = fileMessages[j].match(/^Filename: (.+)$/m);
+      if (!filenameMatch) {
+        continue;
+      }
+      let entry = '\u2022 ' + filenameMatch[1];
+      const convMatch = fileMessages[j].match(/converted with ([^)]+)\)/);
+      if (convMatch) {
+        entry += ' \u2014 converted with ' + convMatch[1];
+      }
+      if (/Metadata lookup failed/.test(fileMessages[j])) {
+        entry += ' \u2014 metadata unchanged';
+      }
+      lines.push(entry);
+    }
+  }
+
+  for (let k = 0; k < urlMessages.length; k++) {
+    lines.push(urlMessages[k]);
+  }
+
+  return lines.join('\n');
+}
+
 function attemptUpload(formData, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -562,7 +614,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   }
   submitBtn.disabled = false;
   setProgress(0, false);
-  showStatus('success', successMessages.join('\n'));
+  showStatus('success', formatSuccessMessages(successMessages));
   setFiles([]);
   urlInput.value = '';
   updateSubmitState();
