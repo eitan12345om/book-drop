@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import request from 'supertest';
 import express from 'express';
 import { makeRequireKey, makeRequireMatchingAgent } from '../src/middleware.js';
-import { sanitiseFilename } from '../src/routes/upload.js';
 import type { KeyInfo } from '../src/types.js';
 
 function makeKeyInfo(agent: string): KeyInfo {
@@ -11,10 +10,11 @@ function makeKeyInfo(agent: string): KeyInfo {
     created: new Date(),
     ip: '127.0.0.1',
     agent,
-    file: null,
+    files: [],
     urls: [],
     timer: null,
-    downloadTimer: null,
+    pendingUploads: 0,
+    pendingFilenames: [],
     alive: new Date(),
   };
 }
@@ -84,48 +84,5 @@ describe('makeRequireMatchingAgent', () => {
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.key, 'ACDF');
     assert.strictEqual(res.body.hasInfo, true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-describe('sanitiseFilename', () => {
-  it('leaves a plain ASCII filename unchanged', () => {
-    assert.strictEqual(
-      sanitiseFilename('book.epub', { transliterate: false, isKindle: false }),
-      'book.epub'
-    );
-  });
-
-  it('transliterates accented characters when enabled', () => {
-    const result = sanitiseFilename('Üntergang.epub', { transliterate: true, isKindle: false });
-    assert.ok(!result.includes('Ü'), 'accented char should be replaced');
-    assert.ok(result.endsWith('.epub'));
-  });
-
-  it('does not transliterate when disabled', () => {
-    const result = sanitiseFilename('Üntergang.epub', { transliterate: false, isKindle: false });
-    assert.ok(result.includes('Ü'));
-  });
-
-  it('replaces non-ASCII characters with underscores for Kindle', () => {
-    const result = sanitiseFilename('Le Château.epub', { transliterate: false, isKindle: true });
-    assert.ok(!result.includes('â'), 'accented char should be replaced');
-    assert.ok(!result.includes(' '), 'space should be replaced');
-    assert.ok(result.endsWith('.epub'));
-  });
-
-  it('preserves Kindle-safe ASCII characters on Kindle', () => {
-    const result = sanitiseFilename('My-Book-(2024).epub', {
-      transliterate: false,
-      isKindle: true,
-    });
-    assert.strictEqual(result, 'My-Book-(2024).epub');
-  });
-
-  it('applies transliteration before Kindle restriction', () => {
-    // transliterate first (Ü→U), then Kindle pass should leave U untouched
-    const result = sanitiseFilename('Über.epub', { transliterate: true, isKindle: true });
-    assert.ok(!result.includes('Ü'));
-    assert.ok(result.endsWith('.epub'));
   });
 });

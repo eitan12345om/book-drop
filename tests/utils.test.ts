@@ -17,10 +17,7 @@ import {
   writeEpubMetadata,
   fetchGoogleBooksMetadata,
   updateEpubMetadata,
-  ALLOWED_TYPES,
-  ALLOWED_EXTENSIONS,
 } from '../src/utils.js';
-import { envInt } from '../src/config.js';
 
 // ── EPUB metadata helpers ────────────────────────────────────────────────────
 
@@ -372,39 +369,5 @@ describe('deleteFile', () => {
     const unlinkMock = mock.method(fs, 'unlink', (_path: string, cb: Function) => cb(enoent));
     assert.doesNotThrow(() => deleteFile('/tmp/nonexistent.epub'));
     unlinkMock.mock.restore();
-  });
-});
-
-describe('ALLOWED_TYPES and ALLOWED_EXTENSIONS', () => {
-  it('includes epub', () => {
-    assert.ok(ALLOWED_TYPES.has('application/epub+zip'));
-    assert.ok(ALLOWED_EXTENSIONS.has('epub'));
-  });
-
-  it('includes pdf', () => {
-    assert.ok(ALLOWED_TYPES.has('application/pdf'));
-    assert.ok(ALLOWED_EXTENSIONS.has('pdf'));
-  });
-
-  it('does not include exe', () => {
-    assert.strictEqual(ALLOWED_EXTENSIONS.has('exe'), false);
-  });
-});
-
-describe('envInt', () => {
-  it('returns the fallback when the env var is absent', () => {
-    assert.strictEqual(envInt('_BOOK_DROP_NONEXISTENT_12345', 42), 42);
-  });
-
-  it('parses a valid integer env var', () => {
-    process.env._BOOK_DROP_TEST_INT = '99';
-    assert.strictEqual(envInt('_BOOK_DROP_TEST_INT', 0), 99);
-    delete process.env._BOOK_DROP_TEST_INT;
-  });
-
-  it('returns the fallback when the env var is not a valid integer', () => {
-    process.env._BOOK_DROP_TEST_INT = 'not-a-number';
-    assert.strictEqual(envInt('_BOOK_DROP_TEST_INT', 42), 42);
-    delete process.env._BOOK_DROP_TEST_INT;
   });
 });

@@ -13,6 +13,7 @@
     "prefer-template": "warn",
     "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
     "curly": "error",
+    "no-shadow": "error",
     "react/jsx-no-target-blank": "error",
     "react/no-danger": "warn"
   },
@@ -25,7 +26,6 @@
   "overrides": [
     {
       "files": ["tests/**/*.ts"],
-      "plugins": ["vitest"],
       "rules": {
         "no-console": "off"
       }
