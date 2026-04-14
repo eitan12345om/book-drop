@@ -8,6 +8,7 @@ import {
   removeKey,
   clearFiles,
   subtractDiskUsage,
+  addDiskUsage,
 } from '../keyStore.js';
 import {
   MAX_EXPIRE_MS,
@@ -270,6 +271,7 @@ export function makeKeysRouter(
           fs.unlink(fileEntry.path, (err) => {
             if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
               logger.error({ err }, 'Error deleting file after download');
+              addDiskUsage(fileEntry.size); // rollback: file is still on disk
             }
           });
           info.files = info.files.filter((f) => f !== fileEntry);

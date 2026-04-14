@@ -39,6 +39,7 @@ export function clearFiles(info: KeyInfo): void {
     fs.unlink(file.path, (err) => {
       if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
         logger.error({ err }, 'Error deleting file');
+        addDiskUsage(file.size); // rollback: file is still on disk
       }
     });
   }
