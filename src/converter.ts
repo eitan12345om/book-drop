@@ -23,19 +23,28 @@ function spawnProcess(
   isSuccess: (code: number | null) => boolean = (code) => code === 0,
   timeoutMs = 55_000
 ): Promise<string> {
+  const MAX_OUTPUT_BYTES = 100 * 1024;
   return new Promise((resolve, reject) => {
     let output = '';
+    let outputBytes = 0;
+    let truncated = false;
     const proc = spawn(cmd, args, { cwd });
     const timer = setTimeout(() => {
       proc.kill();
       reject(new Error(`${cmd} timed out after ${timeoutMs} ms`));
     }, timeoutMs);
-    proc.stdout.on('data', (d: Buffer) => {
-      output += d.toString();
-    });
-    proc.stderr.on('data', (d: Buffer) => {
-      output += d.toString();
-    });
+    const appendOutput = (d: Buffer): void => {
+      if (!truncated) {
+        output += d.toString();
+        outputBytes += d.length;
+        if (outputBytes > MAX_OUTPUT_BYTES) {
+          truncated = true;
+          output += '\n[output truncated]';
+        }
+      }
+    };
+    proc.stdout.on('data', appendOutput);
+    proc.stderr.on('data', appendOutput);
     proc.once('error', (err) => {
       clearTimeout(timer);
       reject(new Error(`${cmd} spawn error: ${err.message}`));
