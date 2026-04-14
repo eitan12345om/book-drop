@@ -27,3 +27,5 @@ export const MAX_DISK_BYTES = envInt('MAX_DISK_BYTES', 1 * 1024 * 1024 * 1024);
 export const MAX_FILES_PER_KEY = envInt('MAX_FILES_PER_KEY', 5);
 export const MAX_URLS_PER_KEY = envInt('MAX_URLS_PER_KEY', 20);
 export const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY ?? '';
+export const SSE_MAX_DURATION_MS = envInt('SSE_MAX_DURATION_MS', 30 * 60_000);
+export const SSE_HEARTBEAT_MS = envInt('SSE_HEARTBEAT_MS', 25_000);

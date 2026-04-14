@@ -19,6 +19,8 @@ import {
   DELETE_RATE_LIMIT_MAX,
   EVENTS_RATE_LIMIT_MAX,
   DOWNLOAD_RATE_LIMIT_MAX,
+  SSE_MAX_DURATION_MS,
+  SSE_HEARTBEAT_MS,
 } from '../config.js';
 import { logger } from '../logger.js';
 import type { KeyInfo } from '../types.js';
@@ -171,10 +173,16 @@ export function makeKeysRouter(
       res.end();
       sseClients.delete(key);
       logger.info({ key }, 'SSE connection reached max duration');
-    }, 30 * 60_000).unref();
+    }, SSE_MAX_DURATION_MS).unref();
+
+    const heartbeat = setInterval(() => {
+      res.write(': heartbeat\n\n');
+      (res as unknown as { flush?: () => void }).flush?.();
+    }, SSE_HEARTBEAT_MS).unref();
 
     req.on('close', () => {
       clearTimeout(maxDurationTimer);
+      clearInterval(heartbeat);
       sseClients.delete(key);
     });
   });
