@@ -182,6 +182,7 @@ function renderDownloads(files, urls) {
             'DELETE',
             '/file/' + encodeURIComponent(currentKey) + '/' + encodeURIComponent(fileName)
           );
+          xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
           xhr.onreadystatechange = function () {
             if (xhr.readyState !== 4) {
               return;
@@ -316,6 +317,7 @@ function requestKey() {
     'POST',
     abandonKey ? '/generate?abandon=' + encodeURIComponent(abandonKey) : '/generate'
   );
+  xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
   xhr.onreadystatechange = function () {
     if (xhr.readyState !== 4) {
       return;

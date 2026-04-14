@@ -37,7 +37,7 @@ import {
   ALLOWED_TYPES,
   ALLOWED_EXTENSIONS,
 } from '../utils.js';
-import { makeLimiter } from '../middleware.js';
+import { makeLimiter, requireXhr } from '../middleware.js';
 
 async function detectMimetype(
   filePath: string,
@@ -204,7 +204,7 @@ export function makeUploadRouter(
     fileFilter,
   });
 
-  router.post('/upload', uploadLimiter, (req, res) => {
+  router.post('/upload', requireXhr, uploadLimiter, (req, res) => {
     upload.single('file')(req, res, async (err) => {
       if (err) {
         // LIMIT_FILE_SIZE leaves a partial file on disk; clean it up before responding.

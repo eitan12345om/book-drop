@@ -45,7 +45,10 @@ after(async () => {
 
 async function generateKey(agent = 'Mozilla/5.0 TestBrowser') {
   const { app, keys } = createApp();
-  const res = await request(app).post('/generate').set('User-Agent', agent);
+  const res = await request(app)
+    .post('/generate')
+    .set('User-Agent', agent)
+    .set('X-Requested-With', 'XMLHttpRequest');
   return { app, keys, key: res.body.key as string, status: res.status };
 }
 
@@ -53,7 +56,10 @@ async function generateKey(agent = 'Mozilla/5.0 TestBrowser') {
 describe('POST /generate', () => {
   it('returns 200 with a 4-character key', async () => {
     const { app } = createApp();
-    const res = await request(app).post('/generate').set('User-Agent', 'TestBrowser/1.0');
+    const res = await request(app)
+      .post('/generate')
+      .set('User-Agent', 'TestBrowser/1.0')
+      .set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(res.status, 200);
     assert.match(res.body.key, /^[2-9A-Z]{4}$/);
   });
@@ -75,7 +81,10 @@ describe('POST /generate', () => {
   it('removes the old key when a valid abandon key is provided', async () => {
     const { app, key: oldKey, keys } = await generateKey('TestBrowser/1.0');
     assert.ok(keys.has(oldKey));
-    await request(app).post(`/generate?abandon=${oldKey}`).set('User-Agent', 'TestBrowser/1.0');
+    await request(app)
+      .post(`/generate?abandon=${oldKey}`)
+      .set('User-Agent', 'TestBrowser/1.0')
+      .set('X-Requested-With', 'XMLHttpRequest');
     assert.ok(!keys.has(oldKey), 'old key should be removed from the store');
   });
 
@@ -83,7 +92,8 @@ describe('POST /generate', () => {
     const { app } = createApp();
     const res = await request(app)
       .post('/generate?abandon=ZZZZ')
-      .set('User-Agent', 'TestBrowser/1.0');
+      .set('User-Agent', 'TestBrowser/1.0')
+      .set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(res.status, 200);
     assert.match(res.body.key, /^[2-9A-Z]{4}$/);
   });
@@ -91,8 +101,14 @@ describe('POST /generate', () => {
   it('generates unique keys on successive calls', async () => {
     const { app, keys } = createApp();
     const agent = 'TestBrowser/1.0';
-    const r1 = await request(app).post('/generate').set('User-Agent', agent);
-    const r2 = await request(app).post('/generate').set('User-Agent', agent);
+    const r1 = await request(app)
+      .post('/generate')
+      .set('User-Agent', agent)
+      .set('X-Requested-With', 'XMLHttpRequest');
+    const r2 = await request(app)
+      .post('/generate')
+      .set('User-Agent', agent)
+      .set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(r1.body.key.length, 4);
     assert.strictEqual(r2.body.key.length, 4);
     assert.ok(keys.has(r1.body.key));
@@ -118,10 +134,10 @@ describe('GET /status/:key', () => {
     assert.deepStrictEqual(res.body.urls, []);
   });
 
-  it('returns 403 when user-agent does not match', async () => {
+  it('returns 404 when user-agent does not match', async () => {
     const { app, key } = await generateKey('BrowserA/1.0');
     const res = await request(app).get(`/status/${key}`).set('User-Agent', 'BrowserB/2.0');
-    assert.strictEqual(res.status, 403);
+    assert.strictEqual(res.status, 404);
   });
 
   it('reflects file info after it has been set', async () => {
@@ -149,7 +165,7 @@ describe('GET /status/:key', () => {
 describe('DELETE /file/:key', () => {
   it('returns 400 for an unknown key', async () => {
     const { app } = createApp();
-    const res = await request(app).delete('/file/ZZZZ');
+    const res = await request(app).delete('/file/ZZZZ').set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(res.status, 400);
   });
 
@@ -167,7 +183,7 @@ describe('DELETE /file/:key', () => {
       },
     ];
 
-    const del = await request(app).delete(`/file/${key}`);
+    const del = await request(app).delete(`/file/${key}`).set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(del.status, 200);
     assert.strictEqual(del.text, 'ok');
 
@@ -180,7 +196,9 @@ describe('DELETE /file/:key', () => {
 describe('DELETE /file/:key/:filename', () => {
   it('returns 404 for an unknown key', async () => {
     const { app } = createApp();
-    const res = await request(app).delete('/file/ZZZZ/book.epub');
+    const res = await request(app)
+      .delete('/file/ZZZZ/book.epub')
+      .set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(res.status, 404);
   });
 
@@ -195,7 +213,9 @@ describe('DELETE /file/:key/:filename', () => {
         downloadTimer: null,
       },
     ];
-    const res = await request(app).delete(`/file/${key}/other.epub`);
+    const res = await request(app)
+      .delete(`/file/${key}/other.epub`)
+      .set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(res.status, 404);
   });
 
@@ -220,7 +240,9 @@ describe('DELETE /file/:key/:filename', () => {
       },
     ];
 
-    const del = await request(app).delete(`/file/${key}/first.epub`);
+    const del = await request(app)
+      .delete(`/file/${key}/first.epub`)
+      .set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(del.status, 200);
 
     const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
@@ -241,7 +263,9 @@ describe('DELETE /file/:key/:filename', () => {
       },
     ];
 
-    const del = await request(app).delete(`/file/${key}/my%20book.epub`);
+    const del = await request(app)
+      .delete(`/file/${key}/my%20book.epub`)
+      .set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(del.status, 200);
 
     const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
@@ -255,6 +279,7 @@ describe('POST /upload', () => {
     const { app } = createApp();
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', 'ZZZZ')
       .attach('file', Buffer.from('hello'), { filename: 'test.txt', contentType: 'text/plain' });
     assert.strictEqual(res.status, 400);
@@ -264,6 +289,7 @@ describe('POST /upload', () => {
     const { app, key } = await generateKey();
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.alloc(0), { filename: 'empty.txt', contentType: 'text/plain' });
     assert.strictEqual(res.status, 400);
@@ -274,6 +300,7 @@ describe('POST /upload', () => {
     const { app, key } = await generateKey();
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.from('This is a test ebook.'), {
         filename: 'test.txt',
@@ -287,6 +314,7 @@ describe('POST /upload', () => {
     const { app, keys, key } = await generateKey();
     await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.from('ebook content'), {
         filename: 'mybook.txt',
@@ -301,6 +329,7 @@ describe('POST /upload', () => {
     const { app, keys, key } = await generateKey();
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .field('url', 'https://example.com/article');
     assert.strictEqual(res.status, 200);
@@ -309,7 +338,10 @@ describe('POST /upload', () => {
 
   it('returns 400 when neither file nor url is provided', async () => {
     const { app, key } = await generateKey();
-    const res = await request(app).post('/upload').field('key', key);
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key);
     assert.strictEqual(res.status, 400);
     assert.match(res.text, /No file or URL/i);
   });
@@ -318,6 +350,7 @@ describe('POST /upload', () => {
     const { app, key } = await generateKey();
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .field('url', 'javascript:alert(1)');
     assert.strictEqual(res.status, 400);
@@ -338,6 +371,7 @@ describe('POST /upload', () => {
     }
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.from('one more'), {
         filename: 'extra.txt',
@@ -354,6 +388,7 @@ describe('POST /upload', () => {
     info.pendingUploads = MAX_FILES_PER_KEY;
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.from('one more'), {
         filename: 'extra.txt',
@@ -369,6 +404,7 @@ describe('POST /upload', () => {
 
     await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.from('first book content'), {
         filename: 'first.txt',
@@ -379,6 +415,7 @@ describe('POST /upload', () => {
 
     await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.from('second book content'), {
         filename: 'second.txt',
@@ -392,13 +429,18 @@ describe('POST /upload', () => {
   it('deduplicates display names when the same filename is uploaded twice', async () => {
     const { app, keys, key } = await generateKey();
 
-    await request(app).post('/upload').field('key', key).attach('file', Buffer.from('first copy'), {
-      filename: 'book.txt',
-      contentType: 'text/plain',
-    });
+    await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', Buffer.from('first copy'), {
+        filename: 'book.txt',
+        contentType: 'text/plain',
+      });
 
     await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.from('second copy'), {
         filename: 'book.txt',
@@ -417,6 +459,7 @@ describe('POST /upload', () => {
     for (let i = 0; i < 3; i++) {
       await request(app)
         .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
         .field('key', key)
         .attach('file', Buffer.from(`copy ${i}`), {
           filename: 'book.txt',
@@ -439,6 +482,7 @@ describe('POST /upload', () => {
     }
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .field('url', 'https://example.com/overflow');
     assert.strictEqual(res.status, 400);
@@ -451,6 +495,7 @@ describe('POST /upload', () => {
     const { app, key } = await generateKey('Kobo/1.0 Test');
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .set('User-Agent', 'Kobo/1.0 Test')
       .field('key', key)
       .field('kepubify', 'true')
@@ -538,10 +583,16 @@ describe('POST /generate — per-IP limit', () => {
     const { app } = createApp();
     const agent = 'TestBrowser/1.0';
     for (let i = 0; i < MAX_KEYS_PER_IP; i++) {
-      const res = await request(app).post('/generate').set('User-Agent', agent);
+      const res = await request(app)
+        .post('/generate')
+        .set('User-Agent', agent)
+        .set('X-Requested-With', 'XMLHttpRequest');
       assert.strictEqual(res.status, 200);
     }
-    const res = await request(app).post('/generate').set('User-Agent', agent);
+    const res = await request(app)
+      .post('/generate')
+      .set('User-Agent', agent)
+      .set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(res.status, 429);
   });
 });
@@ -564,7 +615,10 @@ describe('POST /generate — capacity', () => {
     for (let i = 0; i < MAX_ACTIVE_KEYS; i++) {
       keys.set(String(i).padStart(4, 'A').substring(0, 4) + i, fakeInfo);
     }
-    const res = await request(app).post('/generate').set('User-Agent', 'TestBrowser');
+    const res = await request(app)
+      .post('/generate')
+      .set('User-Agent', 'TestBrowser')
+      .set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(res.status, 503);
   });
 });
@@ -683,6 +737,7 @@ describe('POST /upload — disk limit', () => {
     try {
       const res = await request(app)
         .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
         .field('key', key)
         .attach('file', Buffer.from('This is a test ebook.'), {
           filename: 'test.txt',
@@ -701,6 +756,7 @@ describe('POST /upload — unsupported file type', () => {
     const { app, key } = await generateKey();
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.from('some content'), {
         filename: 'virus.exe',
@@ -720,6 +776,7 @@ describe('POST /upload — temp file cleanup on rejection', () => {
 
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.alloc(0), { filename: 'empty.txt', contentType: 'text/plain' });
 
@@ -744,6 +801,7 @@ describe('POST /upload — temp file cleanup on rejection', () => {
     // Accepted upload — file is kept (counted in info.files, not in uploads as orphan)
     await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.from('good content'), {
         filename: 'good.txt',
@@ -753,6 +811,7 @@ describe('POST /upload — temp file cleanup on rejection', () => {
     // Rejected upload (empty file) — temp file must be deleted
     await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .attach('file', Buffer.alloc(0), { filename: 'empty.txt', contentType: 'text/plain' });
 
@@ -770,16 +829,18 @@ describe('POST /upload — temp file cleanup on rejection', () => {
 
 // ---------------------------------------------------------------------------
 describe('GET /device/:key', () => {
-  it('returns 400 for an invalid key format', async () => {
+  it('returns unknown for an invalid key format', async () => {
     const { app } = createApp();
     const res = await request(app).get('/device/!!');
-    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.device, 'unknown');
   });
 
-  it('returns 404 for an unknown key', async () => {
+  it('returns unknown for a nonexistent key', async () => {
     const { app } = createApp();
     const res = await request(app).get('/device/ZZZZ');
-    assert.strictEqual(res.status, 404);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.device, 'unknown');
   });
 
   it('returns Kobo for a key registered by a Kobo device', async () => {
@@ -845,7 +906,10 @@ describe('POST /generate — 503 body', () => {
     for (let i = 0; i < MAX_ACTIVE_KEYS; i++) {
       keys.set(String(i).padStart(4, 'A').substring(0, 4) + i, fakeInfo);
     }
-    const res = await request(app).post('/generate').set('User-Agent', 'TestBrowser');
+    const res = await request(app)
+      .post('/generate')
+      .set('User-Agent', 'TestBrowser')
+      .set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(res.status, 503);
     assert.strictEqual(res.text, 'Server busy');
   });
@@ -904,12 +968,61 @@ describe('POST /upload — metadata failure feedback', () => {
     const fakeEpub = Buffer.from('not a real epub file');
     const res = await request(app)
       .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key)
       .field('fetchmetadata', '1')
       .attach('file', fakeEpub, { filename: 'book.epub', contentType: 'application/epub+zip' });
     assert.strictEqual(res.status, 200);
     assert.match(res.text, /Sent to/i);
     assert.match(res.text, /Metadata lookup failed/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('CSRF — X-Requested-With header required on mutations', () => {
+  it('POST /generate returns 403 without X-Requested-With header', async () => {
+    const { app } = createApp();
+    const res = await request(app).post('/generate').set('User-Agent', 'TestBrowser/1.0');
+    assert.strictEqual(res.status, 403);
+  });
+
+  it('POST /upload returns 403 without X-Requested-With header', async () => {
+    const { app } = createApp();
+    const setupRes = await request(app)
+      .post('/generate')
+      .set('User-Agent', 'TestBrowser/1.0')
+      .set('X-Requested-With', 'XMLHttpRequest');
+    const key = setupRes.body.key as string;
+
+    const res = await request(app)
+      .post('/upload')
+      .field('key', key)
+      .attach('file', Buffer.from('test'), { filename: 'test.txt', contentType: 'text/plain' });
+    assert.strictEqual(res.status, 403);
+  });
+
+  it('DELETE /file/:key returns 403 without X-Requested-With header', async () => {
+    const { app } = createApp();
+    const setupRes = await request(app)
+      .post('/generate')
+      .set('User-Agent', 'TestBrowser/1.0')
+      .set('X-Requested-With', 'XMLHttpRequest');
+    const key = setupRes.body.key as string;
+
+    const res = await request(app).delete(`/file/${key}`);
+    assert.strictEqual(res.status, 403);
+  });
+
+  it('DELETE /file/:key/:filename returns 403 without X-Requested-With header', async () => {
+    const { app } = createApp();
+    const setupRes = await request(app)
+      .post('/generate')
+      .set('User-Agent', 'TestBrowser/1.0')
+      .set('X-Requested-With', 'XMLHttpRequest');
+    const key = setupRes.body.key as string;
+
+    const res = await request(app).delete(`/file/${key}/book.epub`);
+    assert.strictEqual(res.status, 403);
   });
 });
 
@@ -922,7 +1035,10 @@ describe('GET /events/:key', () => {
 
   before(async () => {
     ({ app, keys } = createApp());
-    const res = await request(app).post('/generate').set('User-Agent', agent);
+    const res = await request(app)
+      .post('/generate')
+      .set('User-Agent', agent)
+      .set('X-Requested-With', 'XMLHttpRequest');
     key = res.body.key;
   });
 
@@ -936,9 +1052,9 @@ describe('GET /events/:key', () => {
     assert.strictEqual(res.status, 404);
   });
 
-  it('returns 403 for wrong user-agent', async () => {
+  it('returns 404 for wrong user-agent', async () => {
     const res = await request(app).get(`/events/${key}`).set('User-Agent', 'Mozilla/5.0');
-    assert.strictEqual(res.status, 403);
+    assert.strictEqual(res.status, 404);
   });
 
   it('opens SSE stream with correct headers and sends initial state', async () => {

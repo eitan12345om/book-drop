@@ -49,6 +49,15 @@ export async function serveHtml(
   }
 }
 
+/** Rejects requests that lack the X-Requested-With: XMLHttpRequest header (CSRF protection). */
+export const requireXhr: express.RequestHandler = (req, res, next) => {
+  if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {
+    res.status(403).json({ error: 'Forbidden.' });
+    return;
+  }
+  next();
+};
+
 /** Returns a function that pushes the current key state as an SSE event to the connected client. */
 export function makeNotifySSE(sseClients: Map<string, express.Response>) {
   return function notifySSE(key: string, info: KeyInfo): void {
@@ -109,7 +118,7 @@ export function makeRequireMatchingAgent(keys: Map<string, KeyInfo>): express.Re
     const ua = req.headers['user-agent'] ?? '';
     if (info.agent !== ua) {
       logger.warn({ key, expected: info.agent, got: ua }, 'UA mismatch');
-      res.status(403).json({ error: 'Forbidden.' });
+      res.status(404).json({ error: 'Unknown key.' });
       return;
     }
     res.locals.key = key;

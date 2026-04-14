@@ -26,7 +26,12 @@ import {
 import { logger } from '../logger.js';
 import type { KeyInfo } from '../types.js';
 import { isValidKey, clientIp } from '../utils.js';
-import { makeRequireKey, makeRequireMatchingAgent, makeLimiter } from '../middleware.js';
+import {
+  makeRequireKey,
+  makeRequireMatchingAgent,
+  makeLimiter,
+  requireXhr,
+} from '../middleware.js';
 
 export function makeKeysRouter(
   keys: Map<string, KeyInfo>,
@@ -43,7 +48,7 @@ export function makeKeysRouter(
   const eventsLimiter = makeLimiter(EVENTS_RATE_LIMIT_MAX);
   const downloadLimiter = makeLimiter(DOWNLOAD_RATE_LIMIT_MAX);
 
-  router.post('/generate', generateLimiter, async (req, res) => {
+  router.post('/generate', requireXhr, generateLimiter, async (req, res) => {
     if (keys.size >= MAX_ACTIVE_KEYS) {
       logger.warn({ activeKeys: keys.size }, 'Key rejected: server busy');
       res.status(503).send('Server busy');
@@ -125,8 +130,13 @@ export function makeKeysRouter(
     });
   });
 
-  router.get('/device/:key', generateLimiter, requireKey, (_req, res) => {
-    const info: KeyInfo = res.locals.keyInfo;
+  router.get('/device/:key', generateLimiter, (req, res) => {
+    const key = (req.params.key as string | undefined)?.toUpperCase() ?? '';
+    const info = isValidKey(key) ? keys.get(key) : undefined;
+    if (!info) {
+      res.json({ device: 'unknown' });
+      return;
+    }
     const agent = info.agent.toLowerCase();
     const device = agent.includes('kobo')
       ? 'Kobo'
@@ -188,7 +198,7 @@ export function makeKeysRouter(
     });
   });
 
-  router.delete('/file/:key/:filename', deleteLimiter, (req, res) => {
+  router.delete('/file/:key/:filename', requireXhr, deleteLimiter, (req, res) => {
     const key = (req.params.key as string).toUpperCase();
     if (!isValidKey(key)) {
       res.status(400).send('Invalid key format');
@@ -227,7 +237,7 @@ export function makeKeysRouter(
     res.send('ok');
   });
 
-  router.delete('/file/:key', deleteLimiter, (req, res) => {
+  router.delete('/file/:key', requireXhr, deleteLimiter, (req, res) => {
     const key = (req.params.key as string).toUpperCase();
     if (!isValidKey(key)) {
       res.status(400).send('Invalid key format');

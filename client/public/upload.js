@@ -401,6 +401,7 @@ function attemptUpload(formData, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/upload', true);
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
     xhr.upload.addEventListener('progress', (ev) => {
       if (ev.lengthComputable) {
         onProgress(Math.round((ev.loaded / ev.total) * 100));

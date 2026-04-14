@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import express from 'express';
-import { makeRequireKey, makeRequireMatchingAgent } from '../src/middleware.js';
+import { makeRequireKey, makeRequireMatchingAgent, requireXhr } from '../src/middleware.js';
 import type { KeyInfo } from '../src/types.js';
 
 function makeKeyInfo(agent: string): KeyInfo {
@@ -68,12 +68,12 @@ describe('makeRequireMatchingAgent', () => {
     assert.ok('error' in res.body);
   });
 
-  it('returns 403 when user-agent does not match', async () => {
+  it('returns 404 when user-agent does not match', async () => {
     const keys = new Map<string, KeyInfo>();
     keys.set('ACDF', makeKeyInfo('AgentA/1.0'));
     const app = makeApp(makeRequireMatchingAgent(keys));
     const res = await request(app).get('/ACDF').set('User-Agent', 'AgentB/1.0');
-    assert.strictEqual(res.status, 403);
+    assert.strictEqual(res.status, 404);
   });
 
   it('calls next and populates res.locals when key and user-agent match', async () => {
@@ -84,5 +84,30 @@ describe('makeRequireMatchingAgent', () => {
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.key, 'ACDF');
     assert.strictEqual(res.body.hasInfo, true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('requireXhr', () => {
+  function makeXhrApp() {
+    const app = express();
+    app.post('/test', requireXhr, (_req, res) => res.json({ ok: true }));
+    return app;
+  }
+
+  it('returns 403 when X-Requested-With header is absent', async () => {
+    const res = await request(makeXhrApp()).post('/test');
+    assert.strictEqual(res.status, 403);
+  });
+
+  it('returns 403 when X-Requested-With has wrong value', async () => {
+    const res = await request(makeXhrApp()).post('/test').set('X-Requested-With', 'form');
+    assert.strictEqual(res.status, 403);
+  });
+
+  it('calls next when X-Requested-With is XMLHttpRequest', async () => {
+    const res = await request(makeXhrApp()).post('/test').set('X-Requested-With', 'XMLHttpRequest');
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(res.body, { ok: true });
   });
 });
