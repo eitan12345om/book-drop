@@ -443,7 +443,6 @@ async function uploadOneFile(key, urlVal, file, onProgress) {
   try {
     xhr = await attemptUpload(buildFormData(key, urlVal, file), onProgress);
   } catch {
-    // Network failure — pre-read into memory and retry once
     onProgress(0);
     showStatus('info', 'Retrying\u2026');
     let retryFile;
@@ -491,8 +490,6 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   const filesToUpload = selectedFiles.slice(); // capture before any async gaps
   const successMessages = [];
 
-  // If a URL and files are both present, post the URL first as its own request
-  // so it has an independent success/error response before file uploads begin.
   if (urlVal && filesToUpload.length > 0) {
     setProgress(0, true);
     showStatus('info', 'Staging URL\u2026');
@@ -520,7 +517,6 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     successMessages.push(urlXhr.responseText);
   }
 
-  // URL-only (no files)
   if (filesToUpload.length === 0) {
     setProgress(0, true);
     showStatus('info', 'Uploading\u2026');
@@ -551,7 +547,6 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     return;
   }
 
-  // Sequential file uploads — one POST per file, no URL (already sent above or not present)
   const total = filesToUpload.length;
   for (let i = 0; i < total; i++) {
     if (uploadId !== currentUploadId) {
@@ -573,7 +568,6 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     setProgress(0, true);
     showStatus('info', `Uploading${fileLabel}\u2026`);
 
-    // URL was already sent above; don't send it again with individual file posts
     let xhr;
     try {
       xhr = await uploadOneFile(key, '', filesToUpload[i], onProgress);

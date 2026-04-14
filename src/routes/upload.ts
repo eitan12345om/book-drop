@@ -39,9 +39,6 @@ import {
 } from '../utils.js';
 import { makeLimiter } from '../middleware.js';
 
-// ---------------------------------------------------------------------------
-// Helpers
-
 async function detectMimetype(
   filePath: string,
   declared: string
@@ -51,7 +48,6 @@ async function detectMimetype(
   if (mimetype === 'application/octet-stream' && detected) {
     mimetype = detected.mime;
   }
-  // Normalise non-standard epub MIME type sent by some clients
   if (mimetype === 'application/epub') {
     mimetype = TYPE_EPUB;
   }
@@ -164,8 +160,6 @@ export function buildSuccessMessage(
   return parts.join('\n');
 }
 
-// ---------------------------------------------------------------------------
-
 export function makeUploadRouter(
   keys: Map<string, KeyInfo>,
   notifySSE: (key: string, info: KeyInfo) => void
@@ -246,7 +240,6 @@ export function makeUploadRouter(
       const info = keys.get(key)!;
       expireKey(key, keys);
 
-      // Stage URL if provided
       let submittedUrl: string | null = null;
       const rawUrl = ((req.body?.url as string) ?? '').trim();
       if (rawUrl) {
@@ -302,7 +295,6 @@ export function makeUploadRouter(
           return;
         }
 
-        // Check file count limit (combines committed + in-flight slots)
         if (info.files.length + info.pendingUploads >= MAX_FILES_PER_KEY) {
           res
             .status(400)
@@ -365,7 +357,6 @@ export function makeUploadRouter(
             return;
           }
 
-          // Disk check: subtract our own reservation, add actual converted size
           if (getEffectiveDiskUsage() - req.file.size + convertedSize > MAX_DISK_BYTES) {
             deleteFile(convertedPath);
             logger.warn(

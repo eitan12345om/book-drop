@@ -66,8 +66,6 @@ export function deleteFile(filePath: string): void {
   });
 }
 
-// ── EPUB metadata ────────────────────────────────────────────────────────────
-
 const DC_FIELDS = ['title', 'creator', 'publisher', 'date', 'description', 'subject'] as const;
 
 /** Extracts the text content of a single Dublin Core element from an OPF string. */
@@ -198,8 +196,6 @@ export async function updateEpubMetadata(filePath: string): Promise<MetadataDiff
   }
   return diff;
 }
-
-// ── Filename utilities ────────────────────────────────────────────────────────
 
 /** Transliterates non-ASCII characters in the filename stem while preserving the extension. */
 export function doTransliterate(filename: string): string {
