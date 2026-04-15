@@ -331,3 +331,79 @@ test('updates file queue status during upload', async ({ browser }) => {
   await koboCtx.close();
   await uploadCtx.close();
 });
+
+test('history is hidden on first visit with no uploads', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#history')).toBeHidden();
+});
+
+test('shows recently sent file after successful upload', async ({ page }) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Kobo/4.0 Test', 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  const key = (await apiRes.json()).key as string;
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill(key);
+  await page.locator('#file-input').setInputFiles({
+    name: 'my-book.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hello ebook'),
+  });
+  await page.locator('#submit-btn').click();
+  await expect(page.locator('#status-msg')).toContainText('Sent to', { timeout: 10_000 });
+
+  await expect(page.locator('#history')).toBeVisible();
+  await expect(page.locator('#history-list li').nth(0)).toContainText('my-book.txt');
+  await expect(page.locator('#history-list .history-time').nth(0)).toContainText('just now');
+});
+
+test('history is capped at 5 entries', async ({ page }) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Kobo/4.0 Test', 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  const key = (await apiRes.json()).key as string;
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill(key);
+
+  // Seed 6 uploads via sessionStorage directly, then render
+  await page.evaluate(() => {
+    const entries = Array.from({ length: 6 }, (_, i) => ({
+      name: `book${i + 1}.epub`,
+      sentAt: Date.now() - i * 1000,
+    }));
+    sessionStorage.setItem('bookdrop-sent', JSON.stringify(entries));
+  });
+  await page.reload();
+
+  await expect(page.locator('#history-list li')).toHaveCount(5);
+});
+
+test('history clears between browser sessions', async ({ browser }) => {
+  const ctx1 = await browser.newContext({ baseURL: 'http://localhost:3001' });
+  const page1 = await ctx1.newPage();
+
+  const apiRes = await page1.request.post('/generate', {
+    headers: { 'User-Agent': 'Kobo/4.0 Test', 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  const key = (await apiRes.json()).key as string;
+
+  await page1.goto('/');
+  await page1.locator('#keyinput').fill(key);
+  await page1.locator('#file-input').setInputFiles({
+    name: 'session-book.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('test'),
+  });
+  await page1.locator('#submit-btn').click();
+  await expect(page1.locator('#history')).toBeVisible({ timeout: 10_000 });
+  await ctx1.close();
+
+  // New browser context = new sessionStorage
+  const ctx2 = await browser.newContext({ baseURL: 'http://localhost:3001' });
+  const page2 = await ctx2.newPage();
+  await page2.goto('/');
+  await expect(page2.locator('#history')).toBeHidden();
+  await ctx2.close();
+});

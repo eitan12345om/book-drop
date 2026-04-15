@@ -23,6 +23,8 @@ const zoneFileSize = document.getElementById('zone-file-size');
 const zoneClearBtn = document.getElementById('zone-clear-btn');
 const fileQueue = document.getElementById('file-queue');
 const submitBtn = document.getElementById('submit-btn');
+const historySection = document.getElementById('history');
+const historyList = document.getElementById('history-list');
 const urlInput = document.getElementById('urlinput');
 const statusMsg = document.getElementById('status-msg');
 const progressWrap = document.getElementById('progress-wrap');
@@ -308,6 +310,78 @@ function lockFileQueue() {
 /** Shows remove buttons in the queue (after upload fails). */
 function unlockFileQueue() {
   fileQueue.querySelectorAll('.fq-remove').forEach((btn) => btn.classList.remove('hidden'));
+}
+
+const HISTORY_KEY = 'bookdrop-sent';
+const HISTORY_MAX = 5;
+const HISTORY_TTL_MS = 60 * 60 * 1000;
+
+/** Adds filenames from successful upload response texts to session history. */
+function addToHistory(responseTexts) {
+  const existing = readHistory();
+  const now = Date.now();
+  const newEntries = responseTexts
+    .map((text) => {
+      const match = text.match(/^Filename: (.+)$/m);
+      return match ? { name: match[1].trim(), sentAt: now } : null;
+    })
+    .filter(Boolean);
+  if (newEntries.length === 0) {
+    return;
+  }
+  const merged = [...newEntries, ...existing].slice(0, HISTORY_MAX);
+  try {
+    sessionStorage.setItem(HISTORY_KEY, JSON.stringify(merged));
+  } catch {}
+}
+
+function readHistory() {
+  try {
+    const raw = sessionStorage.getItem(HISTORY_KEY);
+    if (!raw) {
+      return [];
+    }
+    const entries = JSON.parse(raw);
+    const cutoff = Date.now() - HISTORY_TTL_MS;
+    return entries.filter((e) => e.sentAt > cutoff).slice(0, HISTORY_MAX);
+  } catch {
+    return [];
+  }
+}
+
+/** Returns a short relative time string like "2 min ago" or "just now". */
+function relativeTime(sentAt) {
+  const mins = Math.floor((Date.now() - sentAt) / 60_000);
+  if (mins < 1) {
+    return 'just now';
+  }
+  if (mins < 60) {
+    return `${mins} min ago`;
+  }
+  const hrs = Math.floor(mins / 60);
+  return `${hrs} hr ago`;
+}
+
+/** Renders the recently-sent history section. */
+function renderHistory() {
+  const entries = readHistory();
+  if (entries.length === 0) {
+    historySection.classList.add('hidden');
+    return;
+  }
+  historyList.innerHTML = '';
+  entries.forEach((entry) => {
+    const li = document.createElement('li');
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'history-name';
+    nameSpan.textContent = entry.name;
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'history-time';
+    timeSpan.textContent = relativeTime(entry.sentAt);
+    li.append(nameSpan, timeSpan);
+    historyList.appendChild(li);
+  });
+  historySection.classList.remove('hidden');
 }
 
 /** Returns true if the file's extension is in ACCEPTED_EXTENSIONS, showing an error otherwise. */
@@ -690,6 +764,8 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   submitBtn.disabled = false;
   setProgress(0, false);
   showStatus('success', formatSuccessMessages(successMessages));
+  addToHistory(successMessages);
+  renderHistory();
   setFiles([]);
   urlInput.value = '';
   updateSubmitState();
@@ -756,6 +832,7 @@ document.getElementById('keyinput').addEventListener('input', function (e) {
 buildOptionsGrid();
 wireMutualExclusion();
 checkPendingShare();
+renderHistory();
 
 // Pre-fill key from ?key= URL parameter (e.g. when arriving via QR code scan)
 (function () {

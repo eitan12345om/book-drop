@@ -461,3 +461,46 @@
   border-radius: 2px;
   transition: width 0.2s ease;
 }
+
+// ─── Recently sent history ────────────────────────────────────────────────────
+
+#history {
+  margin-top: 1.5rem;
+}
+
+.history-title {
+  font-size: t.$font-base;
+  font-weight: 600;
+  @include m.theme-prop(color, 'text-muted');
+  margin-bottom: 0.5rem;
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+
+  li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: t.$font-base;
+  }
+}
+
+.history-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-time {
+  font-size: 0.8rem;
+  @include m.theme-prop(color, 'text-muted');
+  white-space: nowrap;
+}
