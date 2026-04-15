@@ -24,7 +24,7 @@ test('upload form submit button is disabled without a key', async ({ page }) => 
 
 test('upload a text file and see success message', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
-    headers: { 'User-Agent': 'Kobo/4.0 Test' },
+    headers: { 'User-Agent': 'Kobo/4.0 Test', 'X-Requested-With': 'XMLHttpRequest' },
   });
   const key = (await apiRes.json()).key as string;
 
@@ -42,7 +42,10 @@ test('upload a text file and see success message', async ({ page }) => {
 
 test('autoselects kindlegen when key belongs to a Kindle device', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
-    headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0' },
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0',
+      'X-Requested-With': 'XMLHttpRequest',
+    },
   });
   const key = (await apiRes.json()).key as string;
 
@@ -55,7 +58,10 @@ test('autoselects kindlegen when key belongs to a Kindle device', async ({ page 
 
 test('autoselects kepubify when key belongs to a Kobo device', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36' },
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36',
+      'X-Requested-With': 'XMLHttpRequest',
+    },
   });
   const key = (await apiRes.json()).key as string;
 
@@ -71,7 +77,10 @@ test('autoselects kepubify when key belongs to a Kobo device', async ({ page }) 
 
 test('clears format converters when key belongs to a Tolino device', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 4.4; Tolino)' },
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 4.4; Tolino)',
+      'X-Requested-With': 'XMLHttpRequest',
+    },
   });
   const key = (await apiRes.json()).key as string;
 
@@ -84,7 +93,7 @@ test('clears format converters when key belongs to a Tolino device', async ({ pa
 
 test('key input is preserved after a successful upload', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
-    headers: { 'User-Agent': 'Kobo/4.0 Test' },
+    headers: { 'User-Agent': 'Kobo/4.0 Test', 'X-Requested-With': 'XMLHttpRequest' },
   });
   const key = (await apiRes.json()).key as string;
 
@@ -103,7 +112,10 @@ test('key input is preserved after a successful upload', async ({ page }) => {
 
 test('pre-fills key from URL parameter and auto-selects device', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36' },
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36',
+      'X-Requested-With': 'XMLHttpRequest',
+    },
   });
   const key = (await apiRes.json()).key as string;
 
@@ -191,11 +203,41 @@ test('disables conversion options when multiple files are selected', async ({ pa
   await expect(page.locator('#options-note')).toBeVisible();
 });
 
+test('shows animated processing state while server processes upload', async ({ page }) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Kobo/4.0 Test', 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  const key = (await apiRes.json()).key as string;
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill(key);
+  await page.locator('#file-input').setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hello ebook'),
+  });
+
+  // Delay the server response so we can observe the intermediate processing state.
+  // route.fulfill() owns the full response, giving a window between upload completion
+  // and response delivery where is-processing should be visible.
+  await page.route('/upload', async (route) => {
+    await new Promise((r) => setTimeout(r, 2_000));
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/plain',
+      body: 'Sent to Kobo\nFilename: test.txt',
+    });
+  });
+  await page.locator('#submit-btn').click();
+
+  await expect(page.locator('#status-msg')).toHaveClass(/is-processing/, { timeout: 5_000 });
+});
+
 test('re-enables submit button and shows actionable hint after a network-level upload failure', async ({
   page,
 }) => {
   const apiRes = await page.request.post('/generate', {
-    headers: { 'User-Agent': 'Kobo/4.0 Test' },
+    headers: { 'User-Agent': 'Kobo/4.0 Test', 'X-Requested-With': 'XMLHttpRequest' },
   });
   const key = (await apiRes.json()).key as string;
 

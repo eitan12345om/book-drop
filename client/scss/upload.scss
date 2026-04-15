@@ -306,6 +306,21 @@
 
 // ─── Status message ───────────────────────────────────────────────────────────
 
+@keyframes ellipsis {
+  0% {
+    content: '';
+  }
+  33% {
+    content: '.';
+  }
+  66% {
+    content: '..';
+  }
+  100% {
+    content: '...';
+  }
+}
+
 .status-msg {
   padding: 0.85rem 1rem;
   border-radius: t.$radius-sm;
@@ -334,6 +349,11 @@
   border: 1px solid m.token('border');
   border: 1px solid var(--border);
   @include m.theme-prop(color, 'text-muted');
+}
+
+.is-processing::after {
+  content: '';
+  animation: ellipsis 1.2s step-end infinite;
 }
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────

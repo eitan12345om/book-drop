@@ -558,16 +558,17 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
 
     const onProgress = (pct) => {
       setProgress(pct, true);
-      showStatus(
-        'info',
-        pct < 100
-          ? `Uploading${fileLabel}\u2026 ${pct}%`
-          : `Processing${fileLabel}\u2026 please wait`
-      );
+      if (pct < 100) {
+        statusMsg.textContent = `Uploading${fileLabel}\u2026 ${pct}%`;
+      } else {
+        statusMsg.textContent = `Processing${fileLabel} please wait`;
+      }
     };
 
     setProgress(0, true);
-    showStatus('info', `Uploading${fileLabel}\u2026`);
+    statusMsg.textContent = `Uploading${fileLabel}\u2026`;
+    statusMsg.className = 'status-msg status-info is-processing';
+    statusMsg.classList.remove('hidden');
 
     let xhr;
     try {
