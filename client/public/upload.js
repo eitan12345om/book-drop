@@ -21,6 +21,7 @@ const zoneSelected = document.getElementById('zone-selected');
 const zoneFileName = document.getElementById('zone-file-name');
 const zoneFileSize = document.getElementById('zone-file-size');
 const zoneClearBtn = document.getElementById('zone-clear-btn');
+const fileQueue = document.getElementById('file-queue');
 const submitBtn = document.getElementById('submit-btn');
 const urlInput = document.getElementById('urlinput');
 const statusMsg = document.getElementById('status-msg');
@@ -238,6 +239,8 @@ function setFiles(files) {
     dropZone.classList.remove('has-file');
     dropZone.setAttribute('aria-label', 'Choose or drop ebook files');
     fileInput.value = '';
+    fileQueue.innerHTML = '';
+    fileQueue.classList.add('hidden');
   } else if (files.length === 1) {
     zoneEmpty.classList.add('hidden');
     zoneSelected.classList.remove('hidden');
@@ -245,6 +248,8 @@ function setFiles(files) {
     zoneFileSize.textContent = formatSize(files[0].size);
     dropZone.classList.add('has-file');
     dropZone.setAttribute('aria-label', `Selected: ${files[0].name}`);
+    fileQueue.innerHTML = '';
+    fileQueue.classList.add('hidden');
   } else {
     const totalSize = files.reduce((sum, f) => sum + f.size, 0);
     zoneEmpty.classList.add('hidden');
@@ -253,9 +258,56 @@ function setFiles(files) {
     zoneFileSize.textContent = formatSize(totalSize);
     dropZone.classList.add('has-file');
     dropZone.setAttribute('aria-label', `${files.length} files selected`);
+    fileQueue.innerHTML = '';
+    files.forEach((f, idx) => {
+      const li = document.createElement('li');
+      li.dataset.index = idx;
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'fq-name';
+      nameSpan.textContent = f.name;
+      const sizeSpan = document.createElement('span');
+      sizeSpan.className = 'fq-size';
+      sizeSpan.textContent = formatSize(f.size);
+      const statusSpan = document.createElement('span');
+      statusSpan.className = 'fq-status';
+      statusSpan.id = `fq-status-${idx}`;
+      statusSpan.textContent = 'queued';
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'fq-remove';
+      removeBtn.setAttribute('aria-label', `Remove ${f.name}`);
+      removeBtn.textContent = '\u00d7';
+      removeBtn.addEventListener('click', () => {
+        const newFiles = selectedFiles.filter((_, i) => i !== idx);
+        setFiles(newFiles);
+      });
+      li.append(nameSpan, sizeSpan, statusSpan, removeBtn);
+      fileQueue.appendChild(li);
+    });
+    fileQueue.classList.remove('hidden');
   }
   // Pass single file for per-type options; null disables extension-restricted options for mixed
   updateOptionAvailability(files.length === 1 ? files[0] : null);
+}
+
+/** Updates the status badge for file at index in the queue list. */
+function setFileQueueStatus(index, text, modifier) {
+  const el = document.getElementById(`fq-status-${index}`);
+  if (!el) {
+    return;
+  }
+  el.textContent = text;
+  el.className = 'fq-status' + (modifier ? ` fq-${modifier}` : '');
+}
+
+/** Hides remove buttons in the queue (during upload). */
+function lockFileQueue() {
+  fileQueue.querySelectorAll('.fq-remove').forEach((btn) => btn.classList.add('hidden'));
+}
+
+/** Shows remove buttons in the queue (after upload fails). */
+function unlockFileQueue() {
+  fileQueue.querySelectorAll('.fq-remove').forEach((btn) => btn.classList.remove('hidden'));
 }
 
 /** Returns true if the file's extension is in ACCEPTED_EXTENSIONS, showing an error otherwise. */
@@ -549,6 +601,9 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   }
 
   const total = filesToUpload.length;
+  if (total > 1) {
+    lockFileQueue();
+  }
   for (let i = 0; i < total; i++) {
     if (uploadId !== currentUploadId) {
       return;
@@ -560,8 +615,14 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       setProgress(pct, true);
       if (pct < 100) {
         statusMsg.textContent = `Uploading${fileLabel}\u2026 ${pct}%`;
+        if (total > 1) {
+          setFileQueueStatus(i, `${pct}%`, 'uploading');
+        }
       } else {
         statusMsg.textContent = `Processing${fileLabel} please wait`;
+        if (total > 1) {
+          setFileQueueStatus(i, 'processing', 'uploading');
+        }
       }
     };
 
@@ -569,6 +630,9 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     statusMsg.textContent = `Uploading${fileLabel}\u2026`;
     statusMsg.className = 'status-msg status-info is-processing';
     statusMsg.classList.remove('hidden');
+    if (total > 1) {
+      setFileQueueStatus(i, 'uploading\u2026', 'uploading');
+    }
 
     let xhr;
     try {
@@ -576,6 +640,10 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     } catch (err) {
       if (uploadId !== currentUploadId) {
         return;
+      }
+      if (total > 1) {
+        setFileQueueStatus(i, '\u2717 error', 'error');
+        unlockFileQueue();
       }
       submitBtn.disabled = false;
       setProgress(0, false);
@@ -598,6 +666,10 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     }
 
     if (xhr.status < 200 || xhr.status >= 300) {
+      if (total > 1) {
+        setFileQueueStatus(i, '\u2717 error', 'error');
+        unlockFileQueue();
+      }
       submitBtn.disabled = false;
       setProgress(0, false);
       const prefix =
@@ -606,6 +678,9 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       return;
     }
 
+    if (total > 1) {
+      setFileQueueStatus(i, '\u2713 done', 'done');
+    }
     successMessages.push(xhr.responseText);
   }
 

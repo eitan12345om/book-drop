@@ -356,6 +356,93 @@
   animation: ellipsis 1.2s step-end infinite;
 }
 
+// ─── File queue ───────────────────────────────────────────────────────────────
+
+.file-queue {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: t.$radius-sm;
+    @include m.theme-prop(background, 'surface');
+    border: 1px solid m.token('border');
+    border: 1px solid var(--border);
+  }
+}
+
+.fq-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: t.$font-base;
+}
+
+.fq-size {
+  font-size: 0.8rem;
+  @include m.theme-prop(color, 'text-muted');
+  white-space: nowrap;
+}
+
+.fq-status {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  @include m.theme-prop(background, 'border');
+  @include m.theme-prop(color, 'text-muted');
+
+  &.fq-uploading {
+    @include m.theme-prop(background, 'surface');
+    border: 1px solid m.token('border');
+    border: 1px solid var(--border);
+    @include m.theme-prop(color, 'text');
+  }
+
+  &.fq-done {
+    background: m.token('success-bg');
+    background: var(--success-bg);
+    color: m.token('success-text');
+    color: var(--success-text);
+  }
+
+  &.fq-error {
+    background: m.token('error-bg');
+    background: var(--error-bg);
+    color: m.token('error-text');
+    color: var(--error-text);
+  }
+}
+
+.fq-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.1rem 0.3rem;
+  font-size: 1rem;
+  line-height: 1;
+  @include m.theme-prop(color, 'text-muted');
+  border-radius: t.$radius-sm;
+
+  &:hover {
+    @include m.theme-prop(color, 'text');
+    @include m.theme-prop(background, 'border');
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
+}
+
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 
 .progress-wrap {

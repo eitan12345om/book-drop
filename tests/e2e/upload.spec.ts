@@ -257,3 +257,77 @@ test('re-enables submit button and shows actionable hint after a network-level u
   await expect(page.locator('#status-msg')).toHaveClass(/status-error/, { timeout: 10_000 });
   await expect(page.locator('#submit-btn')).toBeEnabled();
 });
+
+test('shows per-file queue list when multiple files are selected', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'first.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 1') },
+    { name: 'second.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 2') },
+    { name: 'third.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') },
+  ]);
+
+  await expect(page.locator('#file-queue')).toBeVisible();
+  await expect(page.locator('#file-queue li')).toHaveCount(3);
+  await expect(page.locator('#file-queue li').nth(0)).toContainText('first.epub');
+  await expect(page.locator('#file-queue li').nth(1)).toContainText('second.epub');
+  await expect(page.locator('#file-queue li').nth(2)).toContainText('third.txt');
+  await expect(page.locator('#file-queue .fq-status').nth(0)).toHaveText('queued');
+});
+
+test('queue list is hidden when a single file is selected', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles({
+    name: 'solo.epub',
+    mimeType: 'application/epub+zip',
+    buffer: Buffer.from('fake epub'),
+  });
+
+  await expect(page.locator('#file-queue')).toBeHidden();
+});
+
+test('remove button in queue removes file from selection', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'first.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 1') },
+    { name: 'second.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 2') },
+  ]);
+
+  await expect(page.locator('#file-queue li')).toHaveCount(2);
+  await page.locator('#file-queue li').nth(0).locator('.fq-remove').click();
+
+  // After removing first file, single file remains — queue hides, zone shows filename
+  await expect(page.locator('#file-queue')).toBeHidden();
+  await expect(page.locator('#zone-file-name')).toHaveText('second.epub');
+});
+
+test('updates file queue status during upload', async ({ browser }) => {
+  const koboUA = 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36';
+  const koboCtx = await browser.newContext({ userAgent: koboUA, baseURL: 'http://localhost:3001' });
+  const koboPage = await koboCtx.newPage();
+  await koboPage.goto('/');
+  await expect(koboPage.locator('#key-display')).not.toHaveText('\u2013\u2013\u2013\u2013', {
+    timeout: 5_000,
+  });
+  const key = (await koboPage.locator('#key-display').textContent())?.trim() as string;
+
+  const uploadCtx = await browser.newContext({ baseURL: 'http://localhost:3001' });
+  const uploadPage = await uploadCtx.newPage();
+  await uploadPage.goto('/');
+  await uploadPage.locator('#keyinput').fill(key);
+  await uploadPage.locator('#file-input').setInputFiles([
+    { name: 'alpha.txt', mimeType: 'text/plain', buffer: Buffer.from('alpha') },
+    { name: 'beta.txt', mimeType: 'text/plain', buffer: Buffer.from('beta') },
+  ]);
+
+  await uploadPage.locator('#submit-btn').click();
+  await expect(uploadPage.locator('#status-msg')).toContainText('sent', {
+    timeout: 15_000,
+    ignoreCase: true,
+  });
+
+  // After all uploads complete the queue is cleared (setFiles([]) hides it)
+  await expect(uploadPage.locator('#file-queue')).toBeHidden();
+
+  await koboCtx.close();
+  await uploadCtx.close();
+});
