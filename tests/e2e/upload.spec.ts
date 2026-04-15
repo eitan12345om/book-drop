@@ -325,8 +325,9 @@ test('updates file queue status during upload', async ({ browser }) => {
     ignoreCase: true,
   });
 
-  // After all uploads complete the queue is cleared (setFiles([]) hides it)
-  await expect(uploadPage.locator('#file-queue')).toBeHidden();
+  // After all uploads complete the queue stays visible showing ✓ done rows
+  await expect(uploadPage.locator('#file-queue')).toBeVisible();
+  await expect(uploadPage.locator('#file-queue .fq-status.fq-done')).toHaveCount(2);
 
   await koboCtx.close();
   await uploadCtx.close();

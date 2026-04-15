@@ -30,7 +30,7 @@ test.describe('Upload page (desktop)', () => {
   test('heading hierarchy: one h1 and h2 for each card section', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page.locator('h2')).toHaveCount(6); // Device key, Ebook file, URL, Conversion options, How it works, Recently sent
+    await expect(page.locator('h2')).toHaveCount(5); // Device key, Ebook file, URL, Conversion options, How it works
   });
 });
 

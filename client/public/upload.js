@@ -312,6 +312,21 @@ function unlockFileQueue() {
   fileQueue.querySelectorAll('.fq-remove').forEach((btn) => btn.classList.remove('hidden'));
 }
 
+/**
+ * Resets the form for a new upload without clearing the file queue.
+ * Used after a successful multi-file upload so completed rows stay visible.
+ */
+function resetFormAfterUpload() {
+  selectedFiles = [];
+  updateSubmitState();
+  zoneEmpty.classList.remove('hidden');
+  zoneSelected.classList.add('hidden');
+  dropZone.classList.remove('has-file');
+  dropZone.setAttribute('aria-label', 'Choose or drop ebook files');
+  fileInput.value = '';
+  updateOptionAvailability(null);
+}
+
 const HISTORY_KEY = 'bookdrop-sent';
 const HISTORY_MAX = 5;
 const HISTORY_TTL_MS = 60 * 60 * 1000;
@@ -763,10 +778,20 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   }
   submitBtn.disabled = false;
   setProgress(0, false);
-  showStatus('success', formatSuccessMessages(successMessages));
   addToHistory(successMessages);
   renderHistory();
-  setFiles([]);
+  if (total > 1) {
+    // Queue rows already show ✓ done — just show a brief summary, keep queue visible.
+    const deviceMatch = successMessages
+      .find((m) => /^Sent to /m.test(m))
+      ?.match(/^Sent to ([^(\n]+?)(?:\s*\(|$)/m);
+    const device = deviceMatch ? deviceMatch[1].trim() : 'your device';
+    showStatus('success', `${total} files sent to ${device}`);
+    resetFormAfterUpload();
+  } else {
+    showStatus('success', formatSuccessMessages(successMessages));
+    setFiles([]);
+  }
   urlInput.value = '';
   updateSubmitState();
 });
