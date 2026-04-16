@@ -25,6 +25,7 @@ const fileQueue = document.getElementById('file-queue');
 const submitBtn = document.getElementById('submit-btn');
 const historySection = document.getElementById('history');
 const historyList = document.getElementById('history-list');
+const toastContainer = document.getElementById('toast-container');
 const urlInput = document.getElementById('urlinput');
 const statusMsg = document.getElementById('status-msg');
 const progressWrap = document.getElementById('progress-wrap');
@@ -459,6 +460,17 @@ dropZone.addEventListener('drop', (e) => {
 fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 urlInput.addEventListener('input', updateSubmitState);
 
+/** Shows a self-dismissing toast notification for 3 seconds. */
+function showToast(message) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.addEventListener('animationend', () => toast.remove(), { once: true });
+  }, 2700);
+}
+
 /** Displays a status message of the given type ('info', 'success', or 'error'). */
 function showStatus(type, message) {
   statusMsg.textContent = message;
@@ -680,7 +692,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     submitBtn.disabled = false;
     setProgress(0, false);
     if (xhr.status >= 200 && xhr.status < 300) {
-      showStatus('success', xhr.responseText);
+      showToast(xhr.responseText);
       urlInput.value = '';
       updateSubmitState();
     } else {
@@ -786,10 +798,10 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       .find((m) => /^Sent to /m.test(m))
       ?.match(/^Sent to ([^(\n]+?)(?:\s*\(|$)/m);
     const device = deviceMatch ? deviceMatch[1].trim() : 'your device';
-    showStatus('success', `${total} files sent to ${device}`);
+    showToast(`${total} files sent to ${device}`);
     resetFormAfterUpload();
   } else {
-    showStatus('success', formatSuccessMessages(successMessages));
+    showToast(formatSuccessMessages(successMessages));
     setFiles([]);
   }
   urlInput.value = '';

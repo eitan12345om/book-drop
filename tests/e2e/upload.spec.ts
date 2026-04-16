@@ -37,7 +37,7 @@ test('upload a text file and see success message', async ({ page }) => {
   });
   await page.locator('#submit-btn').click();
 
-  await expect(page.locator('#status-msg')).toContainText('Sent to', { timeout: 10_000 });
+  await expect(page.locator('.toast')).toContainText('Sent to', { timeout: 10_000 });
 });
 
 test('autoselects kindlegen when key belongs to a Kindle device', async ({ page }) => {
@@ -105,7 +105,7 @@ test('key input is preserved after a successful upload', async ({ page }) => {
     buffer: Buffer.from('hello ebook'),
   });
   await page.locator('#submit-btn').click();
-  await expect(page.locator('#status-msg')).toContainText('Sent to', { timeout: 10_000 });
+  await expect(page.locator('.toast')).toContainText('Sent to', { timeout: 10_000 });
 
   await expect(page.locator('#keyinput')).toHaveValue(key);
 });
@@ -176,7 +176,7 @@ test('uploads multiple files sequentially and both appear on download page', asy
     { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('second file') },
   ]);
   await uploadPage.locator('#submit-btn').click();
-  await expect(uploadPage.locator('#status-msg')).toContainText('sent', {
+  await expect(uploadPage.locator('.toast')).toContainText('sent', {
     timeout: 15_000,
     ignoreCase: true,
   });
@@ -320,7 +320,7 @@ test('updates file queue status during upload', async ({ browser }) => {
   ]);
 
   await uploadPage.locator('#submit-btn').click();
-  await expect(uploadPage.locator('#status-msg')).toContainText('sent', {
+  await expect(uploadPage.locator('.toast')).toContainText('sent', {
     timeout: 15_000,
     ignoreCase: true,
   });
@@ -352,7 +352,7 @@ test('shows recently sent file after successful upload', async ({ page }) => {
     buffer: Buffer.from('hello ebook'),
   });
   await page.locator('#submit-btn').click();
-  await expect(page.locator('#status-msg')).toContainText('Sent to', { timeout: 10_000 });
+  await expect(page.locator('.toast')).toContainText('Sent to', { timeout: 10_000 });
 
   await expect(page.locator('#history')).toBeVisible();
   await expect(page.locator('#history-list li').nth(0)).toContainText('my-book.txt');
