@@ -464,20 +464,62 @@
 
 // ─── Recently sent history ────────────────────────────────────────────────────
 
-#history {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid m.token('border');
-  border-top: 1px solid var(--border);
+details#history.card {
+  margin-top: 1rem;
 }
 
-.history-title {
-  font-size: 0.8rem;
+.history-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+  font-size: t.$font-xs;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   @include m.theme-prop(color, 'text-muted');
-  margin-bottom: 0.4rem;
+  margin: 0;
+  user-select: none;
+
+  // Hide native disclosure triangle
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  // Custom chevron
+  &::after {
+    content: '›';
+    font-size: 1rem;
+    line-height: 1;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    @include m.theme-prop(color, 'text-muted');
+    transition:
+      transform 0.15s,
+      background 0.12s;
+    flex-shrink: 0;
+  }
+
+  &:hover::after {
+    @include m.theme-prop(background, 'border');
+  }
+
+  &:active::after {
+    @include m.theme-prop(background, 'accent-subtle');
+  }
+}
+
+details#history[open] .history-summary {
+  margin-bottom: 0.6rem;
+
+  &::after {
+    transform: rotate(90deg);
+  }
 }
 
 .history-list {
@@ -505,7 +547,7 @@
 }
 
 .history-time {
-  font-size: 0.8rem;
+  font-size: t.$font-sm;
   @include m.theme-prop(color, 'text-muted');
   white-space: nowrap;
 }

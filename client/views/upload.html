@@ -166,11 +166,6 @@
           multiple
         />
 
-        <div id="history" class="hidden" aria-label="Recently sent">
-          <h3 class="history-title">Recently sent</h3>
-          <ul id="history-list" class="history-list"></ul>
-        </div>
-
         <div class="card">
           <h2 class="card-title">Or send a URL</h2>
           <label for="urlinput" class="field-label">Web address</label>
@@ -218,6 +213,11 @@
           <div id="progress-fill" class="progress-fill"></div>
         </div>
       </form>
+
+      <details id="history" class="card hidden">
+        <summary class="history-summary">Recently sent</summary>
+        <ul id="history-list" class="history-list"></ul>
+      </details>
 
       <div class="card instructions">
         <h2 class="card-title">How it works</h2>
