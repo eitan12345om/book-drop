@@ -692,6 +692,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     submitBtn.disabled = false;
     setProgress(0, false);
     if (xhr.status >= 200 && xhr.status < 300) {
+      hideStatus();
       showToast(xhr.responseText);
       urlInput.value = '';
       updateSubmitState();
@@ -792,6 +793,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   setProgress(0, false);
   addToHistory(successMessages);
   renderHistory();
+  hideStatus();
   if (total > 1) {
     // Queue rows already show ✓ done — just show a brief summary, keep queue visible.
     const deviceMatch = successMessages
