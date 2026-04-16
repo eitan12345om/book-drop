@@ -381,6 +381,45 @@ test('history is capped at 5 entries', async ({ page }) => {
   await expect(page.locator('#history-list li')).toHaveCount(5);
 });
 
+test('shows toast for successes and inline error on partial failure', async ({ page }) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Kobo/4.0 Test', 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  const key = (await apiRes.json()).key as string;
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill(key);
+
+  // Intercept /upload: succeed for the first call, fail for the second
+  let uploadCount = 0;
+  await page.route('/upload', async (route) => {
+    uploadCount++;
+    if (uploadCount === 1) {
+      await route.fulfill({
+        status: 200,
+        body: 'Sent to Kobo (test.txt)',
+      });
+    } else {
+      await route.fulfill({
+        status: 429,
+        body: 'File limit reached - this session supports up to 5 files',
+      });
+    }
+  });
+
+  await page.locator('#file-input').setInputFiles([
+    { name: 'first.txt', mimeType: 'text/plain', buffer: Buffer.from('a') },
+    { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('b') },
+  ]);
+  await page.locator('#submit-btn').click();
+
+  // Toast should appear for the 1 successful file
+  await expect(page.locator('.toast')).toContainText('1 file sent to Kobo', { timeout: 5_000 });
+  // Inline error for the failure — no "N of M files sent" prefix
+  await expect(page.locator('#status-msg')).toContainText('File limit reached');
+  await expect(page.locator('#status-msg')).not.toContainText('1 of 2 files sent');
+});
+
 test('history clears between browser sessions', async ({ browser }) => {
   const ctx1 = await browser.newContext({ baseURL: 'http://localhost:3001' });
   const page1 = await ctx1.newPage();

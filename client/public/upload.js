@@ -460,6 +460,16 @@ dropZone.addEventListener('drop', (e) => {
 fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 urlInput.addEventListener('input', updateSubmitState);
 
+/** Builds a brief success summary string suitable for a toast. */
+function buildSuccessToast(messages) {
+  const deviceMatch = messages
+    .find((m) => /^Sent to /m.test(m))
+    ?.match(/^Sent to ([^(\n]+?)(?:\s*\(|$)/m);
+  const device = deviceMatch ? deviceMatch[1].trim() : 'your device';
+  const count = messages.length;
+  return count === 1 ? `1 file sent to ${device}` : `${count} files sent to ${device}`;
+}
+
 /** Shows a self-dismissing toast notification for 3 seconds. */
 function showToast(message) {
   const toast = document.createElement('div');
@@ -749,6 +759,14 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       }
       submitBtn.disabled = false;
       setProgress(0, false);
+      if (successMessages.length > 0) {
+        addToHistory(successMessages);
+        renderHistory();
+        showToast(buildSuccessToast(successMessages));
+        resetFormAfterUpload();
+        urlInput.value = '';
+        updateSubmitState();
+      }
       if (err.message === 'read') {
         showStatus(
           'error',
@@ -774,9 +792,15 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       }
       submitBtn.disabled = false;
       setProgress(0, false);
-      const prefix =
-        i > 0 ? `${i} of ${total} files sent - ` : total > 1 ? `0 of ${total} files sent - ` : '';
-      showStatus('error', prefix + (xhr.responseText || 'Upload failed.'));
+      if (successMessages.length > 0) {
+        addToHistory(successMessages);
+        renderHistory();
+        showToast(buildSuccessToast(successMessages));
+        resetFormAfterUpload();
+        urlInput.value = '';
+        updateSubmitState();
+      }
+      showStatus('error', xhr.responseText || 'Upload failed.');
       return;
     }
 
@@ -796,11 +820,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   hideStatus();
   if (total > 1) {
     // Queue rows already show ✓ done — just show a brief summary, keep queue visible.
-    const deviceMatch = successMessages
-      .find((m) => /^Sent to /m.test(m))
-      ?.match(/^Sent to ([^(\n]+?)(?:\s*\(|$)/m);
-    const device = deviceMatch ? deviceMatch[1].trim() : 'your device';
-    showToast(`${total} files sent to ${device}`);
+    showToast(buildSuccessToast(successMessages));
     resetFormAfterUpload();
   } else {
     showToast(formatSuccessMessages(successMessages));
