@@ -555,6 +555,9 @@
   border: 1px solid m.token('success-border');
   border: 1px solid var(--success-border);
   @include m.theme-prop(color, 'success-text');
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.12),
+    0 2px 4px rgba(0, 0, 0, 0.08);
   animation:
     toast-in 0.2s ease,
     toast-out 0.3s ease 2.7s forwards;
