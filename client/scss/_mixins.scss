@@ -62,6 +62,18 @@
   #{$property}: var(--#{$token-name});
 }
 
+// Emit a border (or border-side) with plain fallback + var() override.
+// $side: null for all sides, or 'top' | 'right' | 'bottom' | 'left'.
+@mixin theme-border($token-name, $width: 1px, $style: solid, $side: null) {
+  @if $side {
+    border-#{$side}: $width $style token($token-name);
+    border-#{$side}: $width $style var(--#{$token-name});
+  } @else {
+    border: $width $style token($token-name);
+    border: $width $style var(--#{$token-name});
+  }
+}
+
 // ─── Focus helpers ────────────────────────────────────────────────────────────
 
 // Standard 2px accent outline for :focus-visible rules.

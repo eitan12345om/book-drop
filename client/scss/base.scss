@@ -48,14 +48,14 @@ body {
 
 a {
   @include m.theme-prop(color, 'accent');
-}
 
-a:hover {
-  @include m.theme-prop(color, 'accent-hover');
-}
+  &:hover {
+    @include m.theme-prop(color, 'accent-hover');
+  }
 
-a:focus-visible {
-  @include m.focus-ring;
+  &:focus-visible {
+    @include m.focus-ring;
+  }
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -72,33 +72,32 @@ a:focus-visible {
   position: relative;
   text-align: center;
   margin-bottom: 2rem;
-}
 
-.page-header h1 {
-  font-size: t.$font-xl;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0 0 0.3rem;
-}
+  h1 {
+    font-size: t.$font-xl;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.3rem;
+  }
 
-.page-header p {
-  @include m.theme-prop(color, 'text-muted');
-  margin: 0;
-  font-size: 0.9rem;
-}
+  p {
+    @include m.theme-prop(color, 'text-muted');
+    margin: 0;
+    font-size: 0.9rem;
+  }
 
-.page-header .btn-theme {
-  position: absolute;
-  top: 0;
-  right: 0;
+  .btn-theme {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
 }
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 .card {
   @include m.theme-prop(background, 'surface');
-  border: 1px solid m.token('border');
-  border: 1px solid var(--border);
+  @include m.theme-border('border');
   border-radius: t.$radius-lg;
   box-shadow: t.$shadow;
   margin-bottom: 1rem;
@@ -124,8 +123,7 @@ a:focus-visible {
   width: 2.75rem;
   height: 2.75rem;
   padding: 0.875rem;
-  border: 1px solid m.token('border');
-  border: 1px solid var(--border);
+  @include m.theme-border('border');
   border-radius: t.$radius-sm;
   @include m.theme-prop(background, 'surface');
   @include m.theme-prop(color, 'text-muted');
@@ -135,33 +133,35 @@ a:focus-visible {
   transition:
     border-color 0.12s,
     color 0.12s;
+
+  &:hover {
+    @include m.theme-prop(border-color, 'accent');
+    @include m.theme-prop(color, 'accent');
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
+
+  svg {
+    width: 1rem;
+    height: 1rem;
+    display: block;
+  }
+
+  .icon-sun {
+    display: none;
+  }
 }
 
-.btn-theme:hover {
-  @include m.theme-prop(border-color, 'accent');
-  @include m.theme-prop(color, 'accent');
-}
+[data-theme='dark'] .btn-theme {
+  .icon-sun {
+    display: block;
+  }
 
-.btn-theme:focus-visible {
-  @include m.focus-ring;
-}
-
-.btn-theme svg {
-  width: 1rem;
-  height: 1rem;
-  display: block;
-}
-
-.btn-theme .icon-sun {
-  display: none;
-}
-
-[data-theme='dark'] .btn-theme .icon-sun {
-  display: block;
-}
-
-[data-theme='dark'] .btn-theme .icon-moon {
-  display: none;
+  .icon-moon {
+    display: none;
+  }
 }
 
 // ─── E-reader overrides ───────────────────────────────────────────────────────
@@ -223,17 +223,17 @@ html.ereader {
 
 .instructions {
   margin-top: 1rem;
-}
 
-.instructions p {
-  font-size: t.$font-base;
-  @include m.theme-prop(color, 'text-muted');
-  line-height: 1.65;
-  margin: 0 0 0.6rem;
-}
+  p {
+    font-size: t.$font-base;
+    @include m.theme-prop(color, 'text-muted');
+    line-height: 1.65;
+    margin: 0 0 0.6rem;
 
-.instructions p:last-child {
-  margin-bottom: 0;
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
 }
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
@@ -246,7 +246,6 @@ html.ereader {
   font-size: t.$font-sm;
   margin-top: 2rem;
   padding-top: 1.25rem;
-  border-top: 1px solid m.token('border');
-  border-top: 1px solid var(--border);
+  @include m.theme-border('border', 1px, solid, 'top');
   line-height: 1.8;
 }

@@ -1,8 +1,6 @@
 @use 'tokens' as t;
 @use 'mixins' as m;
 
-// ─── Header ───────────────────────────────────────────────────────────────────
-
 // ─── Fields ───────────────────────────────────────────────────────────────────
 
 .field-label {
@@ -29,20 +27,19 @@
   max-width: 260px;
   padding: 0.5rem 0.75rem;
   width: 100%;
-  border: 1px solid m.token('border');
-  border: 1px solid var(--border);
+  @include m.theme-border('border');
   border-radius: t.$radius-sm;
   @include m.theme-prop(background, 'bg');
   @include m.theme-prop(color, 'text');
   transition:
     border-color 0.12s,
     box-shadow 0.12s;
-}
 
-.key-input:focus {
-  outline: none;
-  @include m.theme-prop(border-color, 'accent');
-  @include m.focus-glow;
+  &:focus {
+    outline: none;
+    @include m.theme-prop(border-color, 'accent');
+    @include m.focus-glow;
+  }
 }
 
 // ─── URL input ────────────────────────────────────────────────────────────────
@@ -50,8 +47,7 @@
 .url-input {
   width: 100%;
   padding: 0.6rem 0.85rem;
-  border: 1px solid m.token('border');
-  border: 1px solid var(--border);
+  @include m.theme-border('border');
   border-radius: t.$radius-sm;
   @include m.theme-prop(background, 'bg');
   @include m.theme-prop(color, 'text');
@@ -60,19 +56,18 @@
   transition:
     border-color 0.12s,
     box-shadow 0.12s;
-}
 
-.url-input:focus {
-  outline: none;
-  @include m.theme-prop(border-color, 'accent');
-  @include m.focus-glow;
+  &:focus {
+    outline: none;
+    @include m.theme-prop(border-color, 'accent');
+    @include m.focus-glow;
+  }
 }
 
 // ─── Drop zone ────────────────────────────────────────────────────────────────
 
 .zone {
-  border: 2px dashed m.token('border');
-  border: 2px dashed var(--border);
+  @include m.theme-border('border', 2px, dashed);
   border-radius: t.$radius;
   padding: 2rem 1.5rem;
   text-align: center;
@@ -82,21 +77,21 @@
     border-color 0.12s,
     background 0.12s;
   user-select: none;
-}
 
-.zone:focus-visible {
-  @include m.focus-ring;
-}
+  &:focus-visible {
+    @include m.focus-ring;
+  }
 
-.zone:hover,
-.zone.dragging {
-  @include m.theme-prop(border-color, 'accent');
-  @include m.theme-prop(background, 'accent-subtle');
-}
+  &:hover,
+  &.dragging {
+    @include m.theme-prop(border-color, 'accent');
+    @include m.theme-prop(background, 'accent-subtle');
+  }
 
-.zone.has-file {
-  @include m.theme-prop(border-color, 'success-border');
-  @include m.theme-prop(background, 'success-bg');
+  &.has-file {
+    @include m.theme-prop(border-color, 'success-border');
+    @include m.theme-prop(background, 'success-bg');
+  }
 }
 
 .zone-icon {
@@ -109,10 +104,10 @@
   font-size: 0.9rem;
   @include m.theme-prop(color, 'text-muted');
   margin: 0;
-}
 
-.zone-label strong {
-  @include m.theme-prop(color, 'accent');
+  strong {
+    @include m.theme-prop(color, 'accent');
+  }
 }
 
 .zone-formats {
@@ -175,37 +170,40 @@
   @include m.webkit(align-items, flex-start);
   @include m.flex-gap-row(0.6rem);
   padding: 0.7rem 0.85rem;
-  border: 1px solid m.token('border');
-  border: 1px solid var(--border);
+  @include m.theme-border('border');
   border-radius: t.$radius-sm;
   cursor: pointer;
   transition:
     border-color 0.12s,
     background 0.12s;
+
+  &:has(input:checked) {
+    @include m.theme-prop(border-color, 'accent');
+    @include m.theme-prop(background, 'accent-subtle');
+  }
+
+  &:has(input:disabled) {
+    opacity: 0.45;
+    cursor: not-allowed;
+
+    input {
+      cursor: not-allowed;
+    }
+  }
+
+  input[type='checkbox'] {
+    margin-top: 0.2rem;
+    @include m.theme-prop(accent-color, 'accent');
+    width: 1rem;
+    height: 1rem;
+    @include m.webkit(flex-shrink, 0);
+    cursor: pointer;
+  }
 }
 
-.option-item:has(input:checked) {
-  @include m.theme-prop(border-color, 'accent');
-  @include m.theme-prop(background, 'accent-subtle');
-}
-
-.option-item:has(input:disabled),
 .option-disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.option-item:has(input:disabled) input {
-  cursor: not-allowed;
-}
-
-.option-item input[type='checkbox'] {
-  margin-top: 0.2rem;
-  @include m.theme-prop(accent-color, 'accent');
-  width: 1rem;
-  height: 1rem;
-  @include m.webkit(flex-shrink, 0);
-  cursor: pointer;
 }
 
 .option-label-row {
@@ -246,8 +244,7 @@
   display: inline-block;
   padding: 0.35rem 0.9rem;
   @include m.theme-prop(background, 'surface');
-  border: 1px solid m.token('text-muted');
-  border: 1px solid var(--text-muted);
+  @include m.theme-border('text-muted');
   border-radius: t.$radius-sm;
   @include m.theme-prop(color, 'text');
   font-size: t.$font-sm;
@@ -256,18 +253,18 @@
   touch-action: manipulation;
   line-height: 1;
   transition: background 0.12s;
-}
 
-.btn-secondary:hover {
-  @include m.theme-prop(background, 'bg');
-}
+  &:hover {
+    @include m.theme-prop(background, 'bg');
+  }
 
-.btn-secondary:active {
-  @include m.theme-prop(background, 'border');
-}
+  &:active {
+    @include m.theme-prop(background, 'border');
+  }
 
-.btn-secondary:focus-visible {
-  @include m.focus-ring;
+  &:focus-visible {
+    @include m.focus-ring;
+  }
 }
 
 .btn-primary {
@@ -285,23 +282,23 @@
   touch-action: manipulation;
   transition: background 0.12s;
   line-height: 1;
-}
 
-.btn-primary:hover:not(:disabled) {
-  @include m.theme-prop(background, 'accent-hover');
-}
+  &:hover:not(:disabled) {
+    @include m.theme-prop(background, 'accent-hover');
+  }
 
-.btn-primary:active:not(:disabled) {
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-}
+  &:active:not(:disabled) {
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
 
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 
-.btn-primary:focus-visible {
-  @include m.focus-ring;
+  &:focus-visible {
+    @include m.focus-ring;
+  }
 }
 
 // ─── Status message ───────────────────────────────────────────────────────────
@@ -328,32 +325,29 @@
   margin-top: 0.85rem;
   line-height: 1.5;
   white-space: pre-wrap;
-}
 
-.status-success {
-  @include m.theme-prop(background, 'success-bg');
-  border: 1px solid m.token('success-border');
-  border: 1px solid var(--success-border);
-  @include m.theme-prop(color, 'success-text');
-}
+  &.status-success {
+    @include m.theme-prop(background, 'success-bg');
+    @include m.theme-border('success-border');
+    @include m.theme-prop(color, 'success-text');
+  }
 
-.status-error {
-  @include m.theme-prop(background, 'error-bg');
-  border: 1px solid m.token('error-border');
-  border: 1px solid var(--error-border);
-  @include m.theme-prop(color, 'error-text');
-}
+  &.status-error {
+    @include m.theme-prop(background, 'error-bg');
+    @include m.theme-border('error-border');
+    @include m.theme-prop(color, 'error-text');
+  }
 
-.status-info {
-  @include m.theme-prop(background, 'surface');
-  border: 1px solid m.token('border');
-  border: 1px solid var(--border);
-  @include m.theme-prop(color, 'text-muted');
-}
+  &.status-info {
+    @include m.theme-prop(background, 'surface');
+    @include m.theme-border('border');
+    @include m.theme-prop(color, 'text-muted');
+  }
 
-.is-processing::after {
-  content: '';
-  animation: ellipsis 1.2s step-end infinite;
+  &.is-processing::after {
+    content: '';
+    animation: ellipsis 1.2s step-end infinite;
+  }
 }
 
 // ─── File queue ───────────────────────────────────────────────────────────────
@@ -373,8 +367,7 @@
     padding: 0.5rem 0.75rem;
     border-radius: t.$radius-sm;
     @include m.theme-prop(background, 'surface');
-    border: 1px solid m.token('border');
-    border: 1px solid var(--border);
+    @include m.theme-border('border');
   }
 }
 
@@ -388,13 +381,13 @@
 }
 
 .fq-size {
-  font-size: 0.8rem;
+  font-size: t.$font-sm;
   @include m.theme-prop(color, 'text-muted');
   white-space: nowrap;
 }
 
 .fq-status {
-  font-size: 0.75rem;
+  font-size: t.$font-xs;
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   white-space: nowrap;
@@ -403,23 +396,18 @@
 
   &.fq-uploading {
     @include m.theme-prop(background, 'surface');
-    border: 1px solid m.token('border');
-    border: 1px solid var(--border);
+    @include m.theme-border('border');
     @include m.theme-prop(color, 'text');
   }
 
   &.fq-done {
-    background: m.token('success-bg');
-    background: var(--success-bg);
-    color: m.token('success-text');
-    color: var(--success-text);
+    @include m.theme-prop(background, 'success-bg');
+    @include m.theme-prop(color, 'success-text');
   }
 
   &.fq-error {
-    background: m.token('error-bg');
-    background: var(--error-bg);
-    color: m.token('error-text');
-    color: var(--error-text);
+    @include m.theme-prop(background, 'error-bg');
+    @include m.theme-prop(color, 'error-text');
   }
 }
 
@@ -428,7 +416,7 @@
   border: none;
   cursor: pointer;
   padding: 0.1rem 0.3rem;
-  font-size: 1rem;
+  font-size: t.$font-lg;
   line-height: 1;
   @include m.theme-prop(color, 'text-muted');
   border-radius: t.$radius-sm;
@@ -451,21 +439,33 @@
   border-radius: 2px;
   overflow: hidden;
   margin-top: 0.7rem;
-}
 
-.progress-fill {
-  height: 100%;
-  // --progress is set dynamically by JS; 0% is the initial fallback
-  width: var(--progress, 0%);
-  @include m.theme-prop(background, 'accent');
-  border-radius: 2px;
-  transition: width 0.2s ease;
+  .progress-fill {
+    height: 100%;
+    // --progress is set dynamically by JS; 0% is the initial fallback
+    width: var(--progress, 0%);
+    @include m.theme-prop(background, 'accent');
+    border-radius: 2px;
+    transition: width 0.2s ease;
+  }
 }
 
 // ─── Recently sent history ────────────────────────────────────────────────────
 
-details#history.card {
-  margin-top: 1rem;
+details#history {
+  &.card {
+    margin-top: 1rem;
+  }
+
+  &[open] {
+    .history-summary {
+      margin-bottom: 0.6rem;
+    }
+
+    .history-chevron::after {
+      transform: rotate(135deg);
+    }
+  }
 }
 
 .history-summary {
@@ -482,7 +482,6 @@ details#history.card {
   margin: 0;
   user-select: none;
 
-  // Hide native disclosure triangle
   &::-webkit-details-marker {
     display: none;
   }
@@ -515,14 +514,6 @@ details#history.card {
     transform: rotate(45deg);
     transition: transform 0.15s;
   }
-}
-
-details#history[open] .history-summary {
-  margin-bottom: 0.6rem;
-}
-
-details#history[open] .history-chevron::after {
-  transform: rotate(135deg);
 }
 
 .history-list {
@@ -597,8 +588,7 @@ details#history[open] .history-chevron::after {
   max-width: 320px;
   pointer-events: auto;
   @include m.theme-prop(background, 'success-bg');
-  border: 1px solid m.token('success-border');
-  border: 1px solid var(--success-border);
+  @include m.theme-border('success-border');
   @include m.theme-prop(color, 'success-text');
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.12),
