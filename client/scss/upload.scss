@@ -487,39 +487,42 @@ details#history.card {
     display: none;
   }
 
-  // Custom chevron
-  &::after {
-    content: '›';
-    font-size: 1rem;
-    line-height: 1;
-    width: 1.5rem;
-    height: 1.5rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    @include m.theme-prop(color, 'text-muted');
-    transition:
-      transform 0.15s,
-      background 0.12s;
-    flex-shrink: 0;
-  }
-
-  &:hover::after {
+  &:hover .history-chevron {
     @include m.theme-prop(background, 'border');
   }
 
-  &:active::after {
+  &:active .history-chevron {
     @include m.theme-prop(background, 'accent-subtle');
+  }
+}
+
+.history-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.12s;
+
+  &::after {
+    content: '';
+    width: 0.35rem;
+    height: 0.35rem;
+    border-right: 1.5px solid currentColor;
+    border-top: 1.5px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.15s;
   }
 }
 
 details#history[open] .history-summary {
   margin-bottom: 0.6rem;
+}
 
-  &::after {
-    transform: rotate(90deg);
-  }
+details#history[open] .history-chevron::after {
+  transform: rotate(135deg);
 }
 
 .history-list {
