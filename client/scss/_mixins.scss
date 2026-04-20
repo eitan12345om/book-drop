@@ -89,6 +89,49 @@
   box-shadow: 0 0 0 4px var(--accent-glow);
 }
 
+// ─── Button base ─────────────────────────────────────────────────────────────
+
+// Base shape for square icon buttons (theme toggle, refresh).
+// Padding-based centering: (2.75rem button − 1rem icon) / 2 = 0.875rem.
+@mixin btn-icon-base {
+  @include inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0.875rem;
+  @include theme-border('border');
+  border-radius: t.$radius-sm;
+  @include theme-prop(background, 'surface');
+  @include webkit(flex-shrink, 0);
+
+  svg {
+    width: 1rem;
+    height: 1rem;
+    display: block;
+  }
+}
+
+// ─── Input focus ─────────────────────────────────────────────────────────────
+
+// Standard focus state for text/url inputs.
+@mixin input-focus {
+  &:focus {
+    outline: none;
+    @include theme-prop(border-color, 'accent');
+    @include focus-glow;
+  }
+}
+
+// ─── Text truncation ─────────────────────────────────────────────────────────
+
+// Single-line truncation for flex children.
+@mixin truncate {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 // ─── Responsive breakpoints ───────────────────────────────────────────────────
 
 @mixin breakpoint($name) {

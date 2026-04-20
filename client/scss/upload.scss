@@ -32,14 +32,9 @@
   @include m.theme-prop(background, 'bg');
   @include m.theme-prop(color, 'text');
   transition:
-    border-color 0.12s,
-    box-shadow 0.12s;
-
-  &:focus {
-    outline: none;
-    @include m.theme-prop(border-color, 'accent');
-    @include m.focus-glow;
-  }
+    border-color t.$duration,
+    box-shadow t.$duration;
+  @include m.input-focus;
 }
 
 // ─── URL input ────────────────────────────────────────────────────────────────
@@ -54,14 +49,9 @@
   font-size: t.$font-lg;
   font-family: inherit;
   transition:
-    border-color 0.12s,
-    box-shadow 0.12s;
-
-  &:focus {
-    outline: none;
-    @include m.theme-prop(border-color, 'accent');
-    @include m.focus-glow;
-  }
+    border-color t.$duration,
+    box-shadow t.$duration;
+  @include m.input-focus;
 }
 
 // ─── Drop zone ────────────────────────────────────────────────────────────────
@@ -74,8 +64,8 @@
   cursor: pointer;
   touch-action: manipulation;
   transition:
-    border-color 0.12s,
-    background 0.12s;
+    border-color t.$duration,
+    background t.$duration;
   user-select: none;
 
   &:focus-visible {
@@ -174,8 +164,8 @@
   border-radius: t.$radius-sm;
   cursor: pointer;
   transition:
-    border-color 0.12s,
-    background 0.12s;
+    border-color t.$duration,
+    background t.$duration;
 
   &:has(input:checked) {
     @include m.theme-prop(border-color, 'accent');
@@ -248,11 +238,8 @@
   border-radius: t.$radius-sm;
   @include m.theme-prop(color, 'text');
   font-size: t.$font-sm;
-  font-family: inherit;
-  cursor: pointer;
-  touch-action: manipulation;
   line-height: 1;
-  transition: background 0.12s;
+  transition: background t.$duration;
 
   &:hover {
     @include m.theme-prop(background, 'bg');
@@ -260,10 +247,6 @@
 
   &:active {
     @include m.theme-prop(background, 'border');
-  }
-
-  &:focus-visible {
-    @include m.focus-ring;
   }
 }
 
@@ -277,10 +260,7 @@
   border-radius: t.$radius;
   font-size: t.$font-lg;
   font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  touch-action: manipulation;
-  transition: background 0.12s;
+  transition: background t.$duration;
   line-height: 1;
 
   &:hover:not(:disabled) {
@@ -294,10 +274,6 @@
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-  }
-
-  &:focus-visible {
-    @include m.focus-ring;
   }
 }
 
@@ -372,11 +348,7 @@
 }
 
 .fq-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include m.truncate;
   font-size: t.$font-base;
 }
 
@@ -414,7 +386,6 @@
 .fq-remove {
   background: none;
   border: none;
-  cursor: pointer;
   padding: 0.1rem 0.3rem;
   font-size: t.$font-lg;
   line-height: 1;
@@ -424,10 +395,6 @@
   &:hover {
     @include m.theme-prop(color, 'text');
     @include m.theme-prop(background, 'border');
-  }
-
-  &:focus-visible {
-    @include m.focus-ring;
   }
 }
 
@@ -503,7 +470,7 @@ details#history {
   height: 1.5rem;
   border-radius: 50%;
   flex-shrink: 0;
-  transition: background 0.12s;
+  transition: background t.$duration;
 
   &::after {
     content: '';
@@ -533,11 +500,7 @@ details#history {
 }
 
 .history-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include m.truncate;
 }
 
 .history-time {
