@@ -390,7 +390,6 @@ test('shows toast for successes and inline error on partial failure', async ({ p
   await page.goto('/');
   await page.locator('#keyinput').fill(key);
 
-  // Intercept /upload: succeed for the first call, fail for the second
   let uploadCount = 0;
   await page.route('/upload', async (route) => {
     uploadCount++;
@@ -413,9 +412,7 @@ test('shows toast for successes and inline error on partial failure', async ({ p
   ]);
   await page.locator('#submit-btn').click();
 
-  // Toast should appear for the 1 successful file
   await expect(page.locator('.toast')).toContainText('1 file sent to Kobo', { timeout: 5_000 });
-  // Inline error for the failure — no "N of M files sent" prefix
   await expect(page.locator('#status-msg')).toContainText('File limit reached');
   await expect(page.locator('#status-msg')).not.toContainText('1 of 2 files sent');
 });
