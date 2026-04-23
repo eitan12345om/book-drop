@@ -16,10 +16,12 @@ export function isValidKey(k: string): boolean {
 
 export const TYPE_EPUB = 'application/epub+zip';
 export const TYPE_MOBI = 'application/x-mobipocket-ebook';
+export const TYPE_AZW3 = 'application/vnd.amazon.mobi8-ebook';
 
 export const ALLOWED_TYPES = new Set([
   TYPE_EPUB,
   TYPE_MOBI,
+  TYPE_AZW3,
   'application/pdf',
   'application/vnd.comicbook+zip',
   'application/vnd.comicbook-rar',
@@ -29,7 +31,16 @@ export const ALLOWED_TYPES = new Set([
   'application/x-rar-compressed',
 ]);
 
-export const ALLOWED_EXTENSIONS = new Set(['epub', 'mobi', 'pdf', 'cbz', 'cbr', 'html', 'txt']);
+export const ALLOWED_EXTENSIONS = new Set([
+  'epub',
+  'mobi',
+  'azw3',
+  'pdf',
+  'cbz',
+  'cbr',
+  'html',
+  'txt',
+]);
 
 /** Returns true if the user-agent string looks like an e-reader browser. */
 export function isEreaderAgent(agent: string): boolean {
