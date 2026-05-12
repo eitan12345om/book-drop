@@ -10,7 +10,7 @@ RUN corepack enable pnpm
 WORKDIR /build
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN HUSKY=0 pnpm install --frozen-lockfile
 
 COPY src ./src
 COPY tsconfig.json ./
