@@ -19,8 +19,12 @@
     "transfer",
     "epub",
     "mobi",
+    "azw3",
     "pdf"
   ],
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
