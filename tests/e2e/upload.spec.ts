@@ -192,15 +192,94 @@ test('uploads multiple files sequentially and both appear on download page', asy
   await koboCtx.close();
 });
 
-test('disables conversion options when multiple files are selected', async ({ page }) => {
+test('enables conversion options when multiple files of the same type are selected', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([
     { name: 'first.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 1') },
     { name: 'second.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 2') },
   ]);
+  await expect(page.locator('#kepubify')).toBeEnabled();
+  await expect(page.locator('#kindlegen')).toBeEnabled();
+  await expect(page.locator('#options-note')).toBeVisible();
+  await expect(page.locator('#options-note')).toHaveText(
+    '2 .epub files selected — options apply to all.'
+  );
+});
+
+test('disables conversion options when multiple files have different formats', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'first.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub') },
+    { name: 'second.pdf', mimeType: 'application/pdf', buffer: Buffer.from('fake pdf') },
+  ]);
   await expect(page.locator('#kepubify')).toBeDisabled();
   await expect(page.locator('#kindlegen')).toBeDisabled();
-  await expect(page.locator('#options-note')).toBeVisible();
+  await expect(page.locator('#pdfcropmargins')).toBeDisabled();
+  await expect(page.locator('#options-note')).toHaveText(
+    'Conversion options are unavailable when files have different formats.'
+  );
+});
+
+test('treats mixed-case extensions as same type', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'one.EPUB', mimeType: 'application/epub+zip', buffer: Buffer.from('fake 1') },
+    { name: 'two.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake 2') },
+  ]);
+  await expect(page.locator('#kepubify')).toBeEnabled();
+  await expect(page.locator('#kindlegen')).toBeEnabled();
+});
+
+test('removing a file re-evaluates option availability', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'book.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub') },
+    { name: 'doc.pdf', mimeType: 'application/pdf', buffer: Buffer.from('fake pdf') },
+  ]);
+  await expect(page.locator('#kepubify')).toBeDisabled();
+  // Remove the .pdf — queue order matches setInputFiles order, so pdf is index 1
+  await page.locator('#file-queue li[data-index="1"] .fq-remove').click();
+  await expect(page.locator('#kepubify')).toBeEnabled();
+  await expect(page.locator('#options-note')).toBeHidden();
+});
+
+test('conversion option propagates to every request in multi-file upload', async ({ page }) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Kobo/4.0 Test', 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  const key = (await apiRes.json()).key as string;
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill(key);
+  await page.locator('#file-input').setInputFiles([
+    { name: 'first.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 1') },
+    { name: 'second.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 2') },
+  ]);
+  await page.locator('#kepubify').check();
+
+  const seen: string[] = [];
+  await page.route('/upload', async (route) => {
+    const body = route.request().postData() ?? '';
+    seen.push(body);
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/plain',
+      body: 'Sent to Kobo\nFilename: out.epub',
+    });
+  });
+
+  await page.locator('#submit-btn').click();
+  await expect(page.locator('.toast')).toContainText('sent', {
+    timeout: 15_000,
+    ignoreCase: true,
+  });
+
+  expect(seen).toHaveLength(2);
+  for (const body of seen) {
+    expect(body).toContain('name="kepubify"');
+  }
 });
 
 test('shows animated processing state while server processes upload', async ({ page }) => {

@@ -140,15 +140,34 @@ function buildOptionsGrid() {
   });
 }
 
+/** Returns lowercased extension including the leading dot, or '' if none. */
+function getExtension(name) {
+  const i = name.lastIndexOf('.');
+  return i >= 0 && i < name.length - 1 ? name.slice(i).toLowerCase() : '';
+}
+
+/** Returns the shared extension across files (lowercased, with dot), or null if mixed/missing. */
+function commonExtension(files) {
+  if (files.length === 0) {
+    return null;
+  }
+  const first = getExtension(files[0].name);
+  if (!first) {
+    return null;
+  }
+  return files.every((f) => getExtension(f.name) === first) ? first : null;
+}
+
 /**
- * Enables or disables options based on the selected file.
- * When file is null (no selection or multiple files selected), all extension-restricted
- * options are disabled — multiple files may have mixed types and the server ignores
- * inapplicable conversions, but disabling avoids confusing silent no-ops.
+ * Enables or disables options based on the selected files.
+ * Single file or multiple files of the same extension → options gated by that extension.
+ * Multiple files with mixed extensions → all extension-restricted options disabled
+ * (server skips inapplicable conversions per file, but disabling avoids silent no-ops).
  */
-function updateOptionAvailability(file) {
-  if (!file) {
-    // No file or multiple files selected — disable all extension-restricted options
+function updateOptionAvailability(files) {
+  const ext = commonExtension(files);
+
+  if (!ext) {
     OPTIONS.forEach(({ id, enabledExtensions }) => {
       if (!enabledExtensions) {
         return;
@@ -166,17 +185,18 @@ function updateOptionAvailability(file) {
     });
     if (optionsNote) {
       optionsNote.textContent =
-        selectedFiles.length > 1
-          ? 'Conversion options are unavailable when multiple files are selected.'
+        files.length > 1
+          ? 'Conversion options are unavailable when files have different formats.'
           : '';
-      optionsNote.classList.toggle('hidden', selectedFiles.length <= 1);
+      optionsNote.classList.toggle('hidden', files.length <= 1);
     }
     return;
   }
 
   if (optionsNote) {
-    optionsNote.textContent = '';
-    optionsNote.classList.add('hidden');
+    optionsNote.textContent =
+      files.length > 1 ? `${files.length} ${ext} files selected — options apply to all.` : '';
+    optionsNote.classList.toggle('hidden', files.length <= 1);
   }
 
   OPTIONS.forEach(({ id, enabledExtensions }) => {
@@ -187,7 +207,6 @@ function updateOptionAvailability(file) {
     if (!input) {
       return;
     }
-    const ext = '.' + file.name.split('.').pop().toLowerCase();
     const enabled = enabledExtensions.includes(ext);
     const wasDisabled = input.disabled;
     input.disabled = !enabled;
@@ -290,8 +309,7 @@ function setFiles(files) {
     });
     fileQueue.classList.remove('hidden');
   }
-  // Pass single file for per-type options; null disables extension-restricted options for mixed
-  updateOptionAvailability(files.length === 1 ? files[0] : null);
+  updateOptionAvailability(files);
 }
 
 /** Updates the status badge for file at index in the queue list. */
@@ -326,7 +344,7 @@ function resetFormAfterUpload() {
   dropZone.classList.remove('has-file');
   dropZone.setAttribute('aria-label', 'Choose or drop ebook files');
   fileInput.value = '';
-  updateOptionAvailability(null);
+  updateOptionAvailability([]);
 }
 
 const HISTORY_KEY = 'bookdrop-sent';
