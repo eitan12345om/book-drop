@@ -3,15 +3,28 @@ import fs from 'fs/promises';
 import express from 'express';
 import { createApp } from './app.js';
 import { logger } from './logger.js';
-import { PORT, UPLOAD_DIR } from './config.js';
+import { PORT, UPLOAD_DIR, MAX_EXPIRE_MS, UPLOAD_CLEANUP_INTERVAL_MS } from './config.js';
+import { cleanExpiredUploads } from './cleanup.js';
 
 async function main(): Promise<void> {
-  await fs.rm(UPLOAD_DIR, { recursive: true, force: true });
+  const { app, keys } = createApp();
+
+  await cleanExpiredUploads(UPLOAD_DIR, keys, MAX_EXPIRE_MS);
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
 
-  const { app } = createApp();
-
   const server = http.createServer(app);
+
+  const cleanupTimer = setInterval(
+    () => void cleanExpiredUploads(UPLOAD_DIR, keys, MAX_EXPIRE_MS),
+    UPLOAD_CLEANUP_INTERVAL_MS
+  );
+
+  function shutdown() {
+    clearInterval(cleanupTimer);
+    server.close(() => process.exit(0));
+  }
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 
   // Handle Expect: 100-continue — send the interim response before Express
   // reads the body, so large uploads aren't streamed before validation.

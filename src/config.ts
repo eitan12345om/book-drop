@@ -29,3 +29,4 @@ export const MAX_URLS_PER_KEY = envInt('MAX_URLS_PER_KEY', 20);
 export const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY ?? '';
 export const SSE_MAX_DURATION_MS = envInt('SSE_MAX_DURATION_MS', 30 * 60_000);
 export const SSE_HEARTBEAT_MS = envInt('SSE_HEARTBEAT_MS', 25_000);
+export const UPLOAD_CLEANUP_INTERVAL_MS = envInt('UPLOAD_CLEANUP_INTERVAL_MS', MAX_EXPIRE_MS);
