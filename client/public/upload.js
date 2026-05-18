@@ -852,12 +852,12 @@ async function checkPendingShare() {
   }
 }
 
-/** Saves current checkbox states to localStorage. */
+/** Saves current checkbox states to localStorage, skipping disabled checkboxes. */
 function saveOptions() {
   const state = {};
   OPTIONS.forEach(({ id }) => {
     const el = document.getElementById(id);
-    if (el) state[id] = el.checked;
+    if (el && !el.disabled) state[id] = el.checked;
   });
   try {
     localStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify(state));
