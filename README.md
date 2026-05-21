@@ -58,23 +58,23 @@ Uses Node.js's built-in test runner (`node:test`) — no extra test framework ne
 
 Copy `.env.example` to `.env` to customise these values.
 
-| Variable                     | Default      | Description                                                                                   |
-| ---------------------------- | ------------ | --------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                   | _(unset)_    | Set to `test` to disable HSTS and `upgrade-insecure-requests` (e.g. for local HTTP dev)       |
-| `PORT`                       | `3001`       | HTTP port the server listens on                                                               |
-| `UPLOAD_DIR`                 | `uploads`    | Directory for temporary file storage                                                          |
-| `EXPIRE_DELAY_MS`            | `300000`     | Inactivity timeout per key (ms)                                                               |
-| `MAX_EXPIRE_MS`              | `3600000`    | Hard maximum key lifetime (ms)                                                                |
-| `MAX_FILE_SIZE`              | `838860800`  | Upload size limit in bytes (800 MB)                                                           |
-| `MAX_DISK_BYTES`             | `1073741824` | Total upload directory size cap in bytes (1 GB); uploads returning 507 when exceeded          |
-| `MAX_FILES_PER_KEY`          | `5`          | Max files staged per session key; further uploads return 400                                  |
-| `MAX_URLS_PER_KEY`           | `20`         | Max URLs staged per session key; further submissions return 400                               |
-| `MAX_KEYS_PER_IP`            | `3`          | Max concurrent sessions per IP; further requests return 429                                   |
-| `RATE_LIMIT_WINDOW_MS`       | `900000`     | Rate-limit window for `/generate` (ms)                                                        |
-| `RATE_LIMIT_MAX`             | `20`         | Max key generations per window per IP                                                         |
-| `LOG_LEVEL`                  | `info`       | Pino log level (`trace`, `debug`, `info`, `warn`, `error`)                                    |
-| `UPLOAD_CLEANUP_INTERVAL_MS` | `3600000`    | How often the orphaned-file cleanup worker runs (ms); defaults to `MAX_EXPIRE_MS`             |
-| `GOOGLE_BOOKS_API_KEY`       | _(unset)_    | Google Books API key for EPUB metadata enrichment; without it the API may rate-limit requests |
+| Variable                     | Default      | Description                                                                                                                           |
+| ---------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `DISABLE_HSTS`               | _(unset)_    | Set to `1` to disable HSTS and `upgrade-insecure-requests`. Use only when serving plain HTTP without a TLS-terminating reverse proxy. |
+| `PORT`                       | `3001`       | HTTP port the server listens on                                                                                                       |
+| `UPLOAD_DIR`                 | `uploads`    | Directory for temporary file storage                                                                                                  |
+| `EXPIRE_DELAY_MS`            | `300000`     | Inactivity timeout per key (ms)                                                                                                       |
+| `MAX_EXPIRE_MS`              | `3600000`    | Hard maximum key lifetime (ms)                                                                                                        |
+| `MAX_FILE_SIZE`              | `838860800`  | Upload size limit in bytes (800 MB)                                                                                                   |
+| `MAX_DISK_BYTES`             | `1073741824` | Total upload directory size cap in bytes (1 GB); uploads returning 507 when exceeded                                                  |
+| `MAX_FILES_PER_KEY`          | `5`          | Max files staged per session key; further uploads return 400                                                                          |
+| `MAX_URLS_PER_KEY`           | `20`         | Max URLs staged per session key; further submissions return 400                                                                       |
+| `MAX_KEYS_PER_IP`            | `3`          | Max concurrent sessions per IP; further requests return 429                                                                           |
+| `RATE_LIMIT_WINDOW_MS`       | `900000`     | Rate-limit window for `/generate` (ms)                                                                                                |
+| `RATE_LIMIT_MAX`             | `20`         | Max key generations per window per IP                                                                                                 |
+| `LOG_LEVEL`                  | `info`       | Pino log level (`trace`, `debug`, `info`, `warn`, `error`)                                                                            |
+| `UPLOAD_CLEANUP_INTERVAL_MS` | `3600000`    | How often the orphaned-file cleanup worker runs (ms); defaults to `MAX_EXPIRE_MS`                                                     |
+| `GOOGLE_BOOKS_API_KEY`       | _(unset)_    | Google Books API key for EPUB metadata enrichment; without it the API may rate-limit requests                                         |
 
 ## Docker
 
@@ -84,3 +84,5 @@ docker compose up -d
 ```
 
 The service will be available at `http://localhost:3001`.
+
+Serving plain HTTP (no reverse-proxy TLS)? Set `DISABLE_HSTS=1` — see env vars above.

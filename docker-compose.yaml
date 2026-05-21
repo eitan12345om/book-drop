@@ -9,3 +9,9 @@ services:
       - '3001:3001'
     cpus: 1.0
     mem_limit: 1g
+    env_file:
+      - path: .env
+        required: false
+    # environment:
+    #   # Plain-HTTP self-host (no TLS-terminating reverse proxy):
+    #   - DISABLE_HSTS=1

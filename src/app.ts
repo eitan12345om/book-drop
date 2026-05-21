@@ -5,6 +5,7 @@ import compression from 'compression';
 import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { DISABLE_HSTS } from './config.js';
 import { logger } from './logger.js';
 import type { KeyInfo } from './types.js';
 import { isEreaderAgent } from './utils.js';
@@ -41,8 +42,7 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
   });
   app.use(
     helmet({
-      // HSTS breaks HTTP on local dev (browser remembers it and upgrades future requests)
-      hsts: process.env.NODE_ENV !== 'test',
+      hsts: !DISABLE_HSTS,
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
@@ -56,8 +56,7 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
           baseUri: ["'self'"],
           formAction: ["'self'"],
           frameAncestors: ["'none'"],
-          // upgrade-insecure-requests breaks local HTTP dev by forcing CSS/JS to HTTPS
-          upgradeInsecureRequests: process.env.NODE_ENV !== 'test' ? [] : null,
+          upgradeInsecureRequests: DISABLE_HSTS ? null : [],
         },
       },
     })

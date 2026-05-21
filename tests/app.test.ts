@@ -1148,3 +1148,11 @@ describe('GET /events/:key', () => {
     });
   });
 });
+
+describe('HSTS', () => {
+  it('sends Strict-Transport-Security header by default', async () => {
+    const { app } = createApp();
+    const res = await request(app).get('/health');
+    assert.ok(res.headers['strict-transport-security']);
+  });
+});
