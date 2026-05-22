@@ -26,6 +26,17 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
   const nonceMap = new WeakMap<IncomingMessage, string>();
   const notifySSE = makeNotifySSE(sseClients);
 
+  app.use((req, res, next) => {
+    if (!DISABLE_HSTS && !req.secure)
+    {
+      res.status(400).type('text').send('Book-Drop is configured to use HSTS, but you connected over HTTP. Either connect over HTTPS or set environmental variable "DISABLE_HSTS=1" to disable.');
+
+      return;
+    }
+
+    next();
+  });
+
   app.use(
     compression({
       filter: (req, res) => {
