@@ -95,6 +95,7 @@ const OPTIONS = [
 ];
 
 const MUTUALLY_EXCLUSIVE = ['kepubify', 'kindlegen'];
+const OPTIONS_STORAGE_KEY = 'bookdrop-options';
 
 /** Renders the conversion option checkboxes into the options grid. */
 function buildOptionsGrid() {
@@ -869,6 +870,43 @@ async function checkPendingShare() {
   }
 }
 
+/** Saves current checkbox states to localStorage, skipping disabled checkboxes. */
+function saveOptions() {
+  const state = {};
+  OPTIONS.forEach(({ id }) => {
+    const el = document.getElementById(id);
+    if (el && !el.disabled) {
+      state[id] = el.checked;
+    }
+  });
+  try {
+    localStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+/** Returns saved option states from localStorage, or null if none. */
+function loadSavedOptions() {
+  try {
+    const raw = localStorage.getItem(OPTIONS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Applies a state object to checkboxes and updates defaultChecked so re-enables respect the preference. */
+function applyOptions(state) {
+  OPTIONS.forEach(({ id }) => {
+    if (id in state) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.dataset.defaultChecked = String(state[id]);
+      }
+      setOption(id, state[id]);
+    }
+  });
+}
+
 /** Sets a conversion checkbox by id, triggering mutual-exclusion side-effects. */
 function setOption(id, checked) {
   const el = document.getElementById(id);
@@ -909,6 +947,21 @@ document.getElementById('keyinput').addEventListener('input', function (e) {
 
 buildOptionsGrid();
 wireMutualExclusion();
+
+// Restore saved option preferences from localStorage, then wire change listeners to persist updates.
+(function () {
+  const savedState = loadSavedOptions();
+  if (savedState) {
+    applyOptions(savedState);
+  }
+  OPTIONS.forEach(({ id }) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', saveOptions);
+    }
+  });
+})();
+
 checkPendingShare();
 renderHistory();
 

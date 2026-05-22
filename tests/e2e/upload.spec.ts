@@ -496,6 +496,20 @@ test('shows toast for successes and inline error on partial failure', async ({ p
   await expect(page.locator('#status-msg')).not.toContainText('1 of 2 files sent');
 });
 
+test('restores saved conversion options from localStorage on reload', async ({ page }) => {
+  await page.goto('/');
+
+  await page.locator('#transliteration').check();
+  await page.locator('#pdfcropmargins').check();
+
+  await page.reload();
+
+  await expect(page.locator('#transliteration')).toBeChecked();
+  await expect(page.locator('#pdfcropmargins')).toBeChecked();
+  await expect(page.locator('#kepubify')).not.toBeChecked();
+  await expect(page.locator('#kindlegen')).not.toBeChecked();
+});
+
 test('history clears between browser sessions', async ({ browser }) => {
   const ctx1 = await browser.newContext({ baseURL: 'http://localhost:3001' });
   const page1 = await ctx1.newPage();
