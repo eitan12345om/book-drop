@@ -857,7 +857,9 @@ function saveOptions() {
   const state = {};
   OPTIONS.forEach(({ id }) => {
     const el = document.getElementById(id);
-    if (el && !el.disabled) state[id] = el.checked;
+    if (el && !el.disabled) {
+      state[id] = el.checked;
+    }
   });
   try {
     localStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify(state));
@@ -872,19 +874,6 @@ function loadSavedOptions() {
   } catch {
     return null;
   }
-}
-
-/** Parses ?options= query param into a state object {id: boolean}, or null if absent. */
-function parseQueryOptions() {
-  const params = new URLSearchParams(location.search);
-  const raw = params.get('options');
-  if (!raw) return null;
-  const enabled = new Set(raw.split(',').map((s) => s.trim()).filter(Boolean));
-  const state = {};
-  OPTIONS.forEach(({ id }) => {
-    state[id] = enabled.has(id);
-  });
-  return state;
 }
 
 /** Applies a state object to checkboxes and updates defaultChecked so re-enables respect the preference. */
@@ -941,20 +930,17 @@ document.getElementById('keyinput').addEventListener('input', function (e) {
 buildOptionsGrid();
 wireMutualExclusion();
 
-// Apply options: query params take precedence over localStorage
+// Restore saved option preferences from localStorage, then wire change listeners to persist updates.
 (function () {
-  const queryState = parseQueryOptions();
-  if (queryState) {
-    applyOptions(queryState);
-  } else {
-    const savedState = loadSavedOptions();
-    if (savedState) {
-      applyOptions(savedState);
-    }
+  const savedState = loadSavedOptions();
+  if (savedState) {
+    applyOptions(savedState);
   }
   OPTIONS.forEach(({ id }) => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('change', saveOptions);
+    if (el) {
+      el.addEventListener('change', saveOptions);
+    }
   });
 })();
 

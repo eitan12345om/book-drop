@@ -431,26 +431,6 @@ test('restores saved conversion options from localStorage on reload', async ({ p
   await expect(page.locator('#kindlegen')).not.toBeChecked();
 });
 
-test('pre-selects options from ?options= query param', async ({ page }) => {
-  await page.goto('/?options=transliteration,pdfcropmargins');
-
-  await expect(page.locator('#transliteration')).toBeChecked();
-  await expect(page.locator('#pdfcropmargins')).toBeChecked();
-  await expect(page.locator('#kepubify')).not.toBeChecked();
-  await expect(page.locator('#kindlegen')).not.toBeChecked();
-  await expect(page.locator('#fetchmetadata')).not.toBeChecked();
-});
-
-test('query param options take precedence over localStorage', async ({ page }) => {
-  await page.goto('/');
-  await page.locator('#transliteration').check();
-
-  await page.goto('/?options=fetchmetadata');
-
-  await expect(page.locator('#fetchmetadata')).toBeChecked();
-  await expect(page.locator('#transliteration')).not.toBeChecked();
-});
-
 test('history clears between browser sessions', async ({ browser }) => {
   const ctx1 = await browser.newContext({ baseURL: 'http://localhost:3001' });
   const page1 = await ctx1.newPage();
