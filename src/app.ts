@@ -51,9 +51,16 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
     nonceMap.set(req, crypto.randomBytes(16).toString('base64'));
     next();
   });
+  app.use((_req, res, next) => {
+    res.setHeader(
+      'Permissions-Policy',
+      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()'
+    );
+    next();
+  });
   app.use(
     helmet({
-      hsts: !DISABLE_HSTS,
+      hsts: DISABLE_HSTS ? false : { maxAge: 31536000, includeSubDomains: true },
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
