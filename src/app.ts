@@ -88,7 +88,6 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
     });
     next();
   });
-  app.use(express.static(STATIC_DIR));
 
   app.get('/health', (_req, res) => res.send('ok'));
 
@@ -106,6 +105,8 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
 
     next();
   });
+
+  app.use(express.static(STATIC_DIR));
 
   app.use(makeKeysRouter(keys, sseClients, notifySSE));
   app.use(makeUploadRouter(keys, notifySSE));
