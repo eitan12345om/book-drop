@@ -1,4 +1,4 @@
-const ACCEPTED_EXTENSIONS = ['.epub', '.mobi', '.azw3', '.pdf', '.txt', '.cbz', '.cbr'];
+const ACCEPTED_EXTENSIONS = ['.epub', '.mobi', '.azw3', '.pdf', '.txt', '.html', '.cbz', '.cbr'];
 const ACCEPT_ATTR = [
   ...ACCEPTED_EXTENSIONS,
   'application/epub+zip',
@@ -6,6 +6,7 @@ const ACCEPT_ATTR = [
   'application/x-mobipocket-ebook',
   'application/vnd.amazon.mobi8-ebook',
   'application/pdf',
+  'text/html',
   'application/vnd.comicbook+zip',
   'application/vnd.comicbook-rar',
 ].join(',');

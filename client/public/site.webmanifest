@@ -22,14 +22,18 @@
             "application/epub+zip",
             "application/epub",
             "application/x-mobipocket-ebook",
+            "application/vnd.amazon.mobi8-ebook",
             "application/pdf",
             "text/plain",
+            "text/html",
             "application/vnd.comicbook+zip",
             "application/vnd.comicbook-rar",
             ".epub",
             ".mobi",
+            ".azw3",
             ".pdf",
             ".txt",
+            ".html",
             ".cbz",
             ".cbr"
           ]
