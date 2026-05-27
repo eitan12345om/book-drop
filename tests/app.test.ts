@@ -1,8 +1,9 @@
 import { describe, it, before, after, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import request from 'supertest';
+import supertest from 'supertest';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import type { Application } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -22,6 +23,11 @@ import type { KeyInfo } from '../src/types.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = path.join(__dirname, '../static');
 const VIEWS_DIR = path.join(__dirname, '../static-views');
+
+// Pre-sets `X-Forwarded-Proto: https` so requests pass the HSTS gate.
+// Mirrors production, where a TLS-terminating proxy sets this header and
+// `app.set('trust proxy', 1)` makes `req.secure === true`.
+const request = (app: Application) => supertest.agent(app).set('X-Forwarded-Proto', 'https');
 
 before(async () => {
   await fs.mkdir('uploads', { recursive: true });
@@ -1066,7 +1072,7 @@ describe('GET /events/:key', () => {
             hostname: 'localhost',
             port,
             path: `/events/${encodeURIComponent(key)}`,
-            headers: { 'User-Agent': agent },
+            headers: { 'User-Agent': agent, 'X-Forwarded-Proto': 'https' },
           },
           (res) => {
             try {
@@ -1120,7 +1126,7 @@ describe('GET /events/:key', () => {
             hostname: 'localhost',
             port,
             path: `/events/${encodeURIComponent(key)}`,
-            headers: { 'User-Agent': agent },
+            headers: { 'User-Agent': agent, 'X-Forwarded-Proto': 'https' },
           },
           (res) => {
             res.on('data', () => {
@@ -1154,5 +1160,18 @@ describe('HSTS', () => {
     const { app } = createApp();
     const res = await request(app).get('/health');
     assert.ok(res.headers['strict-transport-security']);
+  });
+
+  it('rejects plain HTTP requests with 400', async () => {
+    const { app } = createApp();
+    const res = await supertest(app).get('/');
+    assert.strictEqual(res.status, 400);
+    assert.match(res.text, /HSTS/);
+  });
+
+  it('still serves /health over plain HTTP', async () => {
+    const { app } = createApp();
+    const res = await supertest(app).get('/health');
+    assert.strictEqual(res.status, 200);
   });
 });
