@@ -88,9 +88,26 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
     });
     next();
   });
-  app.use(express.static(STATIC_DIR));
 
   app.get('/health', (_req, res) => res.send('ok'));
+
+  app.use((req, res, next) => {
+    if (!DISABLE_HSTS && !req.secure) {
+      res
+        .status(400)
+        .type('text')
+        .send(
+          'Book-Drop is configured to use HSTS, but you connected over HTTP. Either connect over HTTPS or set environment variable "DISABLE_HSTS=1" to disable.'
+        );
+
+      return;
+    }
+
+    next();
+  });
+
+  app.use(express.static(STATIC_DIR));
+
   app.use(makeKeysRouter(keys, sseClients, notifySSE));
   app.use(makeUploadRouter(keys, notifySSE));
 

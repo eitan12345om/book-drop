@@ -40,3 +40,6 @@ static
 # Logs
 *.log
 logs
+
+# Temp
+.tmp
