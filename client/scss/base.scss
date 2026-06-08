@@ -96,10 +96,12 @@ a {
     font-size: 0.9rem;
   }
 
-  .btn-theme {
+  .header-actions {
     position: absolute;
     top: 0;
     right: 0;
+    @include m.flex;
+    @include m.flex-gap-row(0.5rem);
   }
 }
 
@@ -149,6 +151,21 @@ a {
 
   .icon-moon {
     display: none;
+  }
+}
+
+// ─── Help button ──────────────────────────────────────────────────────────────
+
+.btn-help {
+  @include m.btn-icon-base;
+  @include m.theme-prop(color, 'text-muted');
+  transition:
+    border-color t.$duration,
+    color t.$duration;
+
+  &:hover {
+    @include m.theme-prop(border-color, 'accent');
+    @include m.theme-prop(color, 'accent');
   }
 }
 

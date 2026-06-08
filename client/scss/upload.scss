@@ -560,3 +560,102 @@ details#history {
     toast-in 0.2s ease,
     toast-out 0.3s ease 2.7s forwards;
 }
+
+// ─── How it works modal ──────────────────────────────────────────────────────
+
+@keyframes howto-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.howto-dialog {
+  // Reset native <dialog> chrome
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-width: min(480px, calc(100vw - 2rem));
+  width: 100%;
+
+  &::backdrop {
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  &[open] {
+    animation: howto-in 0.18s ease-out;
+  }
+}
+
+.howto-form {
+  position: relative;
+  @include m.theme-prop(background, 'surface');
+  @include m.theme-prop(color, 'text');
+  @include m.theme-border('border');
+  border-radius: t.$radius-lg;
+  box-shadow: t.$shadow;
+  padding: 1.5rem 1.5rem 1.25rem;
+
+  p {
+    font-size: t.$font-base;
+    @include m.theme-prop(color, 'text-muted');
+    line-height: 1.65;
+    margin: 0 0 0.85rem;
+  }
+}
+
+.howto-title {
+  font-size: t.$font-lg;
+  font-weight: 600;
+  margin: 0 0 0.9rem;
+  padding-right: 2rem; // leave room for close button
+  @include m.theme-prop(color, 'text');
+}
+
+.howto-close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: t.$radius-sm;
+  @include m.theme-prop(color, 'text-muted');
+  @include m.inline-flex;
+  @include m.webkit(align-items, center);
+  @include m.webkit(justify-content, center);
+  transition:
+    background t.$duration,
+    color t.$duration;
+
+  svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    display: block;
+  }
+
+  &:hover {
+    @include m.theme-prop(background, 'border');
+    @include m.theme-prop(color, 'text');
+  }
+}
+
+.howto-got-it {
+  display: block;
+  width: fit-content;
+  margin: 0.5rem auto 0;
+  font-size: t.$font-base;
+  padding: 0.6rem 1.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .howto-dialog[open] {
+    animation: none;
+  }
+}

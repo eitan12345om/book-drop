@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { SUPPRESS_HOWTO_STORAGE } from '../../playwright.config';
 
 test('shows upload page for desktop user-agent', async ({ page }) => {
   await page.goto('/');
@@ -157,7 +158,7 @@ test('uploads multiple files sequentially and both appear on download page', asy
   // Open Kobo download page first so it generates its own key
   const koboCtx = await browser.newContext({
     userAgent: koboUA,
-    baseURL: 'http://localhost:3001',
+    baseURL: `http://localhost:${process.env.E2E_PORT ?? '3001'}`,
   });
   const koboPage = await koboCtx.newPage();
   await koboPage.goto('/');
@@ -167,7 +168,10 @@ test('uploads multiple files sequentially and both appear on download page', asy
   const key = (await koboPage.locator('#key-display').textContent())?.trim() as string;
 
   // Upload two files to that key from the upload page
-  const uploadCtx = await browser.newContext({ baseURL: 'http://localhost:3001' });
+  const uploadCtx = await browser.newContext({
+    baseURL: `http://localhost:${process.env.E2E_PORT ?? '3001'}`,
+    storageState: SUPPRESS_HOWTO_STORAGE,
+  });
   const uploadPage = await uploadCtx.newPage();
   await uploadPage.goto('/');
   await uploadPage.locator('#keyinput').fill(key);
@@ -381,7 +385,10 @@ test('remove button in queue removes file from selection', async ({ page }) => {
 
 test('updates file queue status during upload', async ({ browser }) => {
   const koboUA = 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36';
-  const koboCtx = await browser.newContext({ userAgent: koboUA, baseURL: 'http://localhost:3001' });
+  const koboCtx = await browser.newContext({
+    userAgent: koboUA,
+    baseURL: `http://localhost:${process.env.E2E_PORT ?? '3001'}`,
+  });
   const koboPage = await koboCtx.newPage();
   await koboPage.goto('/');
   await expect(koboPage.locator('#key-display')).not.toHaveText('\u2013\u2013\u2013\u2013', {
@@ -389,7 +396,10 @@ test('updates file queue status during upload', async ({ browser }) => {
   });
   const key = (await koboPage.locator('#key-display').textContent())?.trim() as string;
 
-  const uploadCtx = await browser.newContext({ baseURL: 'http://localhost:3001' });
+  const uploadCtx = await browser.newContext({
+    baseURL: `http://localhost:${process.env.E2E_PORT ?? '3001'}`,
+    storageState: SUPPRESS_HOWTO_STORAGE,
+  });
   const uploadPage = await uploadCtx.newPage();
   await uploadPage.goto('/');
   await uploadPage.locator('#keyinput').fill(key);
@@ -511,7 +521,10 @@ test('restores saved conversion options from localStorage on reload', async ({ p
 });
 
 test('history clears between browser sessions', async ({ browser }) => {
-  const ctx1 = await browser.newContext({ baseURL: 'http://localhost:3001' });
+  const ctx1 = await browser.newContext({
+    baseURL: `http://localhost:${process.env.E2E_PORT ?? '3001'}`,
+    storageState: SUPPRESS_HOWTO_STORAGE,
+  });
   const page1 = await ctx1.newPage();
 
   const apiRes = await page1.request.post('/generate', {
@@ -531,7 +544,10 @@ test('history clears between browser sessions', async ({ browser }) => {
   await ctx1.close();
 
   // New browser context = new sessionStorage
-  const ctx2 = await browser.newContext({ baseURL: 'http://localhost:3001' });
+  const ctx2 = await browser.newContext({
+    baseURL: `http://localhost:${process.env.E2E_PORT ?? '3001'}`,
+    storageState: SUPPRESS_HOWTO_STORAGE,
+  });
   const page2 = await ctx2.newPage();
   await page2.goto('/');
   await expect(page2.locator('#history')).toBeHidden();
