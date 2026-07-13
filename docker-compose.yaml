@@ -9,6 +9,11 @@ services:
       - '3001:3001'
     cpus: 1.0
     mem_limit: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
     env_file:
       - path: .env
         required: false
