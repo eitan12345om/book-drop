@@ -1,0 +1,21 @@
+name: deploy
+  on:
+    push:
+      branches: [main]
+
+  concurrency:
+    group: deploy
+    cancel-in-progress: true
+
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Trigger deploy over SSH
+          uses: appleboy/ssh-action@v1
+          with:
+            host: ${{ secrets.DEPLOY_HOST }}
+            username: ${{ secrets.DEPLOY_USER }}
+            key: ${{ secrets.DEPLOY_SSH_KEY }}
+            fingerprint: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+            script: exit 0
