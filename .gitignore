@@ -43,3 +43,4 @@ logs
 
 # Temp
 .tmp
+docker-compose.override.yml
