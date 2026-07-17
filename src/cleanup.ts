@@ -1,13 +1,10 @@
 import fsp from 'fs/promises';
+import type { Stats } from 'fs';
 import path from 'path';
 import { logger } from './logger.js';
 import type { KeyInfo } from './types.js';
 
-function getFileAgeMs(
-  filePath: string,
-  stat: Awaited<ReturnType<typeof fsp.stat>>,
-  now: number
-): number {
+function getFileAgeMs(filePath: string, stat: Stats, now: number): number {
   const birthMs = Number(stat.birthtimeMs);
   // birthtimeMs may be 0 on NFS/some filesystems — fall back to filename timestamp
   if (birthMs > 0) {
