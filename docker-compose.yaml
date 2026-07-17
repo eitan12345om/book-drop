@@ -6,7 +6,7 @@ services:
     container_name: book-drop
     restart: unless-stopped
     ports:
-      - '3001:3001'
+      - '${PORT:-3001}:${PORT:-3001}'
     cpus: 1.0
     mem_limit: 1g
     logging:
@@ -17,6 +17,5 @@ services:
     env_file:
       - path: .env
         required: false
-    # environment:
-    #   # Plain-HTTP self-host (no TLS-terminating reverse proxy):
-    #   - DISABLE_HSTS=1
+    environment:
+      - PORT

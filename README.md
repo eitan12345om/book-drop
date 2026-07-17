@@ -83,6 +83,6 @@ docker compose build
 docker compose up -d
 ```
 
-The service will be available at `http://localhost:3001`.
+The service will be available at `http://localhost:3001` (or whatever PORT you use).
 
 Serving plain HTTP (no reverse-proxy TLS)? Set `DISABLE_HSTS=1` — see env vars above.

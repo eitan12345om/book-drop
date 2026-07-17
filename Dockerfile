@@ -63,5 +63,5 @@ USER appuser
 
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD curl -f http://localhost:3001/health || exit 1
+  CMD curl -f http://localhost:${PORT:-3001}/health || exit 1
 CMD ["node", "dist/server.js"]
