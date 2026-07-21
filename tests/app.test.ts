@@ -1175,3 +1175,41 @@ describe('HSTS', () => {
     assert.strictEqual(res.status, 200);
   });
 });
+
+describe('POST /share (Web Share Target)', () => {
+  it('303-redirects a shared url to the upload page with ?shared_url', async () => {
+    const { app } = createApp();
+    const res = await request(app).post('/share').field('url', 'https://example.com/article');
+    assert.strictEqual(res.status, 303);
+    assert.strictEqual(
+      res.headers.location,
+      `/?shared_url=${encodeURIComponent('https://example.com/article')}`
+    );
+  });
+
+  it('extracts a url embedded in shared text', async () => {
+    const { app } = createApp();
+    const res = await request(app)
+      .post('/share')
+      .field('text', 'Loved this: https://example.com/story');
+    assert.strictEqual(res.status, 303);
+    assert.strictEqual(
+      res.headers.location,
+      `/?shared_url=${encodeURIComponent('https://example.com/story')}`
+    );
+  });
+
+  it('redirects to / when the share has no usable url', async () => {
+    const { app } = createApp();
+    const res = await request(app).post('/share').field('text', 'no link here');
+    assert.strictEqual(res.status, 303);
+    assert.strictEqual(res.headers.location, '/');
+  });
+
+  it('falls back to / gracefully when a file is shared (no active service worker)', async () => {
+    const { app } = createApp();
+    const res = await request(app).post('/share').attach('file', Buffer.from('dummy'), 'book.epub');
+    assert.strictEqual(res.status, 303);
+    assert.strictEqual(res.headers.location, '/');
+  });
+});

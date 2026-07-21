@@ -13,6 +13,7 @@ import {
   clientIp,
   doTransliterate,
   deleteFile,
+  extractSharedUrl,
   readEpubMetadata,
   writeEpubMetadata,
   fetchGoogleBooksMetadata,
@@ -369,5 +370,79 @@ describe('deleteFile', () => {
     const unlinkMock = mock.method(fs, 'unlink', (_path: string, cb: Function) => cb(enoent));
     assert.doesNotThrow(() => deleteFile('/tmp/nonexistent.epub'));
     unlinkMock.mock.restore();
+  });
+});
+
+// ── extractSharedUrl (Web Share Target) ──────────────────────────────────────
+
+describe('extractSharedUrl', () => {
+  it('returns a valid url from the dedicated url field', () => {
+    assert.strictEqual(
+      extractSharedUrl({ url: 'https://example.com/book.epub' }),
+      'https://example.com/book.epub'
+    );
+  });
+
+  it('trims surrounding whitespace on the url field', () => {
+    assert.strictEqual(
+      extractSharedUrl({ url: '  https://example.com/x  ' }),
+      'https://example.com/x'
+    );
+  });
+
+  it('falls back to the first http(s) URL embedded in text (Android puts links here)', () => {
+    assert.strictEqual(
+      extractSharedUrl({ text: 'Great read: https://example.com/article check it out' }),
+      'https://example.com/article'
+    );
+  });
+
+  it('prefers the url field over a url in text', () => {
+    assert.strictEqual(
+      extractSharedUrl({ url: 'https://a.example/one', text: 'https://b.example/two' }),
+      'https://a.example/one'
+    );
+  });
+
+  it('takes the first URL when text has several', () => {
+    assert.strictEqual(
+      extractSharedUrl({ text: 'https://first.example/a and https://second.example/b' }),
+      'https://first.example/a'
+    );
+  });
+
+  it('strips trailing punctuation from a URL in text', () => {
+    assert.strictEqual(
+      extractSharedUrl({ text: 'see (https://example.com/page).' }),
+      'https://example.com/page'
+    );
+  });
+
+  it('rejects non-http(s) schemes in the url field and falls through to text', () => {
+    assert.strictEqual(
+      extractSharedUrl({ url: 'javascript:alert(1)', text: 'https://safe.example/ok' }),
+      'https://safe.example/ok'
+    );
+  });
+
+  it('rejects a javascript: url with no http fallback', () => {
+    assert.strictEqual(extractSharedUrl({ url: 'javascript:alert(1)' }), null);
+  });
+
+  it('rejects a url longer than 2048 chars', () => {
+    const huge = `https://example.com/${'a'.repeat(2100)}`;
+    assert.strictEqual(extractSharedUrl({ url: huge }), null);
+  });
+
+  it('returns null when there is no url anywhere', () => {
+    assert.strictEqual(extractSharedUrl({ text: 'just some plain text, no link' }), null);
+    assert.strictEqual(extractSharedUrl({}), null);
+  });
+
+  it('tolerates non-string / missing fields', () => {
+    assert.strictEqual(
+      extractSharedUrl({ url: undefined as unknown as string, text: 42 as unknown as string }),
+      null
+    );
   });
 });

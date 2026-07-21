@@ -1,5 +1,6 @@
 {
   "name": "BookDrop",
+  "id": "/",
   "short_name": "BookDrop",
   "start_url": "/",
   "scope": "/",
@@ -15,6 +16,9 @@
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
       "files": [
         {
           "name": "file",

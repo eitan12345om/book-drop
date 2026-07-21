@@ -35,7 +35,7 @@ const progressFill = document.getElementById('progress-fill');
 const pageUrlLink = document.getElementById('page-url');
 const optionsNote = document.getElementById('options-note');
 
-const receiveUrl = window.location.origin + '/receive';
+const receiveUrl = `${window.location.origin}/receive`;
 pageUrlLink.href = receiveUrl;
 pageUrlLink.textContent = receiveUrl;
 
@@ -321,7 +321,7 @@ function setFileQueueStatus(index, text, modifier) {
     return;
   }
   el.textContent = text;
-  el.className = 'fq-status' + (modifier ? ` fq-${modifier}` : '');
+  el.className = `fq-status${modifier ? ` fq-${modifier}` : ''}`;
 }
 
 /** Hides remove buttons in the queue (during upload). */
@@ -556,16 +556,16 @@ function formatSuccessMessages(messages) {
     // Multiple files: one summary header, then a bulleted filename list.
     const deviceMatch = fileMessages[0].match(/^Sent to ([^(\n]+?)(?:\s*\(|$)/m);
     const device = deviceMatch ? deviceMatch[1].trim() : 'your device';
-    lines.push(fileMessages.length + ' files sent to ' + device);
+    lines.push(`${fileMessages.length} files sent to ${device}`);
     for (let j = 0; j < fileMessages.length; j++) {
       const filenameMatch = fileMessages[j].match(/^Filename: (.+)$/m);
       if (!filenameMatch) {
         continue;
       }
-      let entry = '\u2022 ' + filenameMatch[1];
+      let entry = `\u2022 ${filenameMatch[1]}`;
       const convMatch = fileMessages[j].match(/converted with ([^)]+)\)/);
       if (convMatch) {
-        entry += ' \u2014 converted with ' + convMatch[1];
+        entry += ` \u2014 converted with ${convMatch[1]}`;
       }
       if (/Metadata lookup failed/.test(fileMessages[j])) {
         entry += ' \u2014 metadata unchanged';
@@ -919,7 +919,7 @@ function setOption(id, checked) {
 
 /** Queries the device type for a key and autoselects the matching conversion option. */
 function lookupDevice(key) {
-  fetch('/device/' + key)
+  fetch(`/device/${key}`)
     .then(function (r) {
       return r.ok ? r.json() : null;
     })
@@ -982,4 +982,20 @@ renderHistory();
   if (trimmed.length === 4) {
     lookupDevice(trimmed);
   }
+})();
+
+// Pre-fill the URL field from ?shared_url= (Web Share Target — a link shared into BookDrop).
+// The server (or service worker) derives this from the share's url/text fields; the value is
+// re-validated server-side on upload, so we only need to drop it into the field here.
+(function () {
+  const shared = new URLSearchParams(location.search).get('shared_url');
+  if (!shared) {
+    return;
+  }
+  const input = document.getElementById('urlinput');
+  if (!input) {
+    return;
+  }
+  input.value = shared;
+  updateSubmitState();
 })();

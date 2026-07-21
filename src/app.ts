@@ -3,12 +3,13 @@ import type { IncomingMessage } from 'node:http';
 import express from 'express';
 import compression from 'compression';
 import helmet from 'helmet';
+import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { DISABLE_HSTS } from './config.js';
 import { logger } from './logger.js';
 import type { KeyInfo } from './types.js';
-import { isEreaderAgent } from './utils.js';
+import { isEreaderAgent, extractSharedUrl } from './utils.js';
 import { serveHtml, makeNotifySSE } from './middleware.js';
 import { makeKeysRouter } from './routes/keys.js';
 import { makeUploadRouter } from './routes/upload.js';
@@ -111,7 +112,18 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
   app.use(makeKeysRouter(keys, sseClients, notifySSE));
   app.use(makeUploadRouter(keys, notifySSE));
 
-  app.post('/share', (_req, res) => res.redirect('/'));
+  // Web Share Target. A service worker normally handles /share client-side; this is
+  // the fallback when it isn't yet controlling the page. Shared files can't be recovered
+  // here (no session), but a shared link can — extract it and hand it to the upload page.
+  // multer().none() parses the multipart text fields; a stray file field just errors,
+  // which we swallow and treat as "no url".
+  const parseShare = multer().none();
+  app.post('/share', (req, res) => {
+    parseShare(req, res, () => {
+      const url = extractSharedUrl((req.body ?? {}) as { url?: unknown; text?: unknown });
+      res.redirect(303, url ? `/?shared_url=${encodeURIComponent(url)}` : '/');
+    });
+  });
   app.get('/receive', (req, res, next) => {
     const ereaderClass = isEreaderAgent(req.get('user-agent') ?? '') ? 'ereader' : '';
     void serveHtml(VIEWS_DIR, 'download.html', nonceMap.get(req) ?? '', res, next, {

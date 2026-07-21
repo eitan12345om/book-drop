@@ -63,6 +63,33 @@ export function isValidUrl(raw: string): boolean {
   }
 }
 
+export const MAX_SHARED_URL_LENGTH = 2048;
+
+/**
+ * Extracts a shareable http(s) URL from Web Share Target fields.
+ * Prefers the dedicated `url` field; falls back to the first http(s) URL found in
+ * `text` (many Android apps, including Chrome, put a shared link in `text`, not `url`).
+ * Trailing punctuation is trimmed. Returns null when no valid, in-bounds URL is present.
+ *
+ * NOTE: A minimal copy of this logic lives in client/public/sw.js (a service worker
+ * can't import from src/). Keep the two in sync — this is the canonical, tested one.
+ */
+export function extractSharedUrl(fields: { url?: unknown; text?: unknown }): string | null {
+  const url = typeof fields.url === 'string' ? fields.url.trim() : '';
+  if (url && url.length <= MAX_SHARED_URL_LENGTH && isValidUrl(url)) {
+    return url;
+  }
+  const text = typeof fields.text === 'string' ? fields.text : '';
+  const match = text.match(/https?:\/\/[^\s]+/i);
+  if (match) {
+    const candidate = match[0].replace(/[.,;:!?)\]}>"']+$/, '');
+    if (candidate.length <= MAX_SHARED_URL_LENGTH && isValidUrl(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 /** Returns the real client IP, preferring Cloudflare's CF-Connecting-IP header over req.ip. */
 export function clientIp(req: express.Request): string {
   return (req.headers['cf-connecting-ip'] as string) ?? req.ip ?? 'unknown';
