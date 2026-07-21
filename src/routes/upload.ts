@@ -352,7 +352,7 @@ export function makeUploadRouter(
             ));
           } catch (convErr) {
             const ref = newErrorRef();
-            logger.error({ err: convErr, key, ref }, 'Conversion failed');
+            logger.warn({ err: convErr, key, ref }, 'Conversion failed');
             deleteFile(req.file.path);
             res.status(500).json({
               error: convErr instanceof ConversionError ? convErr.userMessage : 'Conversion failed',
