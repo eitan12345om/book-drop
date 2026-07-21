@@ -391,7 +391,16 @@ export function makeUploadRouter(
           });
           expireKey(key, keys);
           logger.info(
-            { key, filename: finalName, size: convertedSize, ip: clientIp(req) },
+            {
+              key,
+              filename: finalName,
+              ext: path.extname(finalName).slice(1),
+              mimetype,
+              converted: conversionTool !== null,
+              size: convertedSize,
+              originalSize: req.file.size,
+              ip: clientIp(req),
+            },
             'File staged'
           );
           notifySSE(key, info);
