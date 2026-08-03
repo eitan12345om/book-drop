@@ -6,6 +6,24 @@ import { logger } from './logger.js';
 /** KindleGen is much slower than the other converters, so it gets its own cap. */
 const KINDLEGEN_TIMEOUT_MS = 100_000;
 
+class TimeoutError extends Error {}
+
+export class ConversionError extends Error {
+  /** The tool's own reason the book won't convert, when it gives one that is safe to show. */
+  readonly userMessage?: string;
+
+  constructor(
+    public readonly tool: string,
+    public readonly timedOut: boolean,
+    message: string,
+    options?: { cause?: unknown; userMessage?: string }
+  ) {
+    super(message, options);
+    this.name = 'ConversionError';
+    this.userMessage = options?.userMessage;
+  }
+}
+
 /** Deletes a file, silently ignoring ENOENT. */
 async function deleteFile(filePath: string): Promise<void> {
   try {
@@ -34,7 +52,7 @@ function spawnProcess(
     const proc = spawn(cmd, args, { cwd });
     const timer = setTimeout(() => {
       proc.kill();
-      reject(new Error(`${cmd} timed out after ${timeoutMs} ms`));
+      reject(new TimeoutError(`${cmd} timed out after ${timeoutMs} ms`));
     }, timeoutMs);
     const appendOutput = (d: Buffer): void => {
       if (!truncated) {
@@ -61,18 +79,6 @@ function spawnProcess(
       }
     });
   });
-}
-
-/** A conversion failure whose `userMessage` is safe to show to the uploader. */
-export class ConversionError extends Error {
-  constructor(
-    message: string,
-    readonly userMessage: string,
-    options?: ErrorOptions
-  ) {
-    super(message, options);
-    this.name = 'ConversionError';
-  }
 }
 
 const KINDLEGEN_ERROR_MESSAGES: Record<string, string> = {
@@ -116,12 +122,10 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
       [basename(outPath), 'outfile.mobi']
     );
     const reason = kindlegenErrorReason(msg);
-    if (reason) {
-      throw new ConversionError(msg, `KindleGen couldn't convert this EPUB: ${reason}`, {
-        cause: err,
-      });
-    }
-    throw new Error(msg, { cause: err });
+    throw new ConversionError('KindleGen', err instanceof TimeoutError, msg, {
+      cause: err,
+      userMessage: reason ? `KindleGen couldn't convert this EPUB: ${reason}` : undefined,
+    });
   } finally {
     await deleteFile(inputPath);
     await deleteFile(mobi8Path);
@@ -145,7 +149,7 @@ export async function convertWithKepubify(inputPath: string): Promise<string> {
       [basename(inputPath), 'infile.epub'],
       [basename(outPath), 'outfile.kepub.epub']
     );
-    throw new Error(msg, { cause: err });
+    throw new ConversionError('Kepubify', err instanceof TimeoutError, msg, { cause: err });
   } finally {
     await deleteFile(inputPath);
   }
@@ -170,7 +174,7 @@ export async function convertWithPdfCropMargins(inputPath: string): Promise<stri
       [basename(inputPath), 'infile.pdf'],
       [basename(outPath), 'outfile.pdf']
     );
-    throw new Error(msg, { cause: err });
+    throw new ConversionError('pdfCropMargins', err instanceof TimeoutError, msg, { cause: err });
   } finally {
     await deleteFile(inputPath);
   }

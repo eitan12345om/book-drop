@@ -109,6 +109,14 @@ function uniqueFilename(name: string, existingNames: string[]): string {
 
 const FILE_TOO_LARGE = `File too large — the limit is ${formatLimit(MAX_FILE_SIZE)} per file.`;
 
+const CONVERSION_GUIDANCE: Record<string, string> = {
+  Kepubify:
+    'Could not convert this EPUB to the Kobo format. Turn off the "Kobo format" option and send it again — Kobo readers open standard EPUBs fine, just without the kepub enhancements.',
+  KindleGen:
+    'Could not convert this EPUB to the Kindle format. Turn off the "Kindle format" option to send the original EPUB instead.',
+  pdfCropMargins: 'Could not crop this PDF. Turn off "Crop PDF margins" to send the original PDF.',
+};
+
 async function runConversion(
   filePath: string,
   filename: string,
@@ -352,10 +360,21 @@ export function makeUploadRouter(
             ));
           } catch (convErr) {
             const ref = newErrorRef();
-            logger.warn({ err: convErr, key, ref }, 'Conversion failed');
             deleteFile(req.file.path);
-            res.status(500).json({
-              error: convErr instanceof ConversionError ? convErr.userMessage : 'Conversion failed',
+            const tool = convErr instanceof ConversionError ? convErr.tool : null;
+            if (convErr instanceof ConversionError && convErr.timedOut) {
+              logger.error({ err: convErr, key, tool, ref }, 'Conversion timed out');
+              res
+                .status(500)
+                .json({ error: 'Conversion timed out — please try sending the file again.', ref });
+              return;
+            }
+            logger.warn({ err: convErr, key, tool, ref }, 'Conversion failed');
+            res.status(400).json({
+              error:
+                (convErr instanceof ConversionError && convErr.userMessage) ||
+                (tool && CONVERSION_GUIDANCE[tool]) ||
+                'Conversion failed. Try sending the file again with the conversion options turned off to transfer the original file.',
               ref,
             });
             return;

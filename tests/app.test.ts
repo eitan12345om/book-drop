@@ -642,7 +642,7 @@ describe('POST /upload', () => {
     assert.match(res.body.error, /URL limit/i);
   });
 
-  it('returns 500 with a generic message when conversion fails', async () => {
+  it('returns 400 with actionable guidance when conversion fails', async () => {
     // Relies on kepubify not being installed in the test environment.
     // An EPUB uploaded with kepubify=true to a Kobo user agent triggers kepubify conversion.
     const { app, key } = await generateKey('Kobo/1.0 Test');
@@ -656,8 +656,8 @@ describe('POST /upload', () => {
         filename: 'book.epub',
         contentType: 'application/epub+zip',
       });
-    assert.strictEqual(res.status, 500);
-    assert.strictEqual(res.body.error, 'Conversion failed');
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.error, /Kobo format/i);
   });
 
   it('attempts the Kobo conversion for a Kobo whose user-agent is upper-case', async () => {
@@ -671,8 +671,8 @@ describe('POST /upload', () => {
         filename: 'book.epub',
         contentType: 'application/epub+zip',
       });
-    assert.strictEqual(res.status, 500);
-    assert.strictEqual(res.body.error, 'Conversion failed');
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.error, /Kobo format/i);
   });
 
   it('names a Tolino in the success response', async () => {
@@ -1398,7 +1398,7 @@ exit 2
       .field('kindlegen', '1')
       .attach('file', epub, { filename: 'book.epub', contentType: 'application/epub+zip' });
 
-    assert.strictEqual(res.status, 500);
+    assert.strictEqual(res.status, 400);
     assert.strictEqual(
       res.body.error,
       "KindleGen couldn't convert this EPUB: Language not recognized in metadata. " +
