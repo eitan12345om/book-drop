@@ -643,8 +643,22 @@ describe('POST /upload', () => {
   });
 
   it('returns 400 with actionable guidance when conversion fails', async () => {
-    // Relies on kepubify not being installed in the test environment.
-    // An EPUB uploaded with kepubify=true to a Kobo user agent triggers kepubify conversion.
+    const { app, key } = await generateKey('Kobo/1.0 Test');
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('User-Agent', 'Kobo/1.0 Test')
+      .field('key', key)
+      .field('kobo', 'true')
+      .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
+        filename: 'book.epub',
+        contentType: 'application/epub+zip',
+      });
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.error, /Kobo format/i);
+  });
+
+  it('still honours the tool-named fields sent by older clients', async () => {
     const { app, key } = await generateKey('Kobo/1.0 Test');
     const res = await request(app)
       .post('/upload')

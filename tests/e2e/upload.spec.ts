@@ -106,7 +106,9 @@ test('success message for a URL on its own', async ({ page }) => {
   await expect(page.locator('.toast')).toHaveText('URL added: https://example.com/book');
 });
 
-test('autoselects kindlegen when key belongs to a Kindle device', async ({ page }) => {
+test('autoselects the Kindle format option when key belongs to a Kindle device', async ({
+  page,
+}) => {
   const apiRes = await page.request.post('/generate', {
     headers: {
       'User-Agent': 'Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0',
@@ -118,11 +120,11 @@ test('autoselects kindlegen when key belongs to a Kindle device', async ({ page 
   await page.goto('/');
   await page.locator('#keyinput').fill(key);
 
-  await expect(page.locator('#kindlegen')).toBeChecked({ timeout: 3_000 });
-  await expect(page.locator('#kepubify')).not.toBeChecked();
+  await expect(page.locator('#kindle')).toBeChecked({ timeout: 3_000 });
+  await expect(page.locator('#kobo')).not.toBeChecked();
 });
 
-test('autoselects kepubify when key belongs to a Kobo device', async ({ page }) => {
+test('autoselects the Kobo format option when key belongs to a Kobo device', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36',
@@ -132,13 +134,12 @@ test('autoselects kepubify when key belongs to a Kobo device', async ({ page }) 
   const key = (await apiRes.json()).key as string;
 
   await page.goto('/');
-  // kepubify is checked by default; fill a non-Kobo key first to clear it, then fill the Kobo key
-  await page.locator('#kindlegen').check();
-  await expect(page.locator('#kepubify')).not.toBeChecked();
+  await page.locator('#kindle').check();
+  await expect(page.locator('#kobo')).not.toBeChecked();
   await page.locator('#keyinput').fill(key);
 
-  await expect(page.locator('#kepubify')).toBeChecked({ timeout: 3_000 });
-  await expect(page.locator('#kindlegen')).not.toBeChecked();
+  await expect(page.locator('#kobo')).toBeChecked({ timeout: 3_000 });
+  await expect(page.locator('#kindle')).not.toBeChecked();
 });
 
 test('clears format converters when key belongs to a Tolino device', async ({ page }) => {
@@ -153,8 +154,8 @@ test('clears format converters when key belongs to a Tolino device', async ({ pa
   await page.goto('/');
   await page.locator('#keyinput').fill(key);
 
-  await expect(page.locator('#kepubify')).not.toBeChecked({ timeout: 3_000 });
-  await expect(page.locator('#kindlegen')).not.toBeChecked();
+  await expect(page.locator('#kobo')).not.toBeChecked({ timeout: 3_000 });
+  await expect(page.locator('#kindle')).not.toBeChecked();
 });
 
 test('key input is preserved after a successful upload', async ({ page }) => {
@@ -187,7 +188,7 @@ test('pre-fills key from URL parameter and auto-selects device', async ({ page }
 
   await page.goto(`/?key=${key}`);
   await expect(page.locator('#keyinput')).toHaveValue(key);
-  await expect(page.locator('#kepubify')).toBeChecked({ timeout: 5_000 });
+  await expect(page.locator('#kobo')).toBeChecked({ timeout: 5_000 });
 });
 
 test('update metadata option is enabled when no file is selected', async ({ page }) => {
@@ -278,8 +279,8 @@ test('downloads a Chinese-named EPUB under its original name on Kobo', async ({ 
   const uploadPage = await uploadCtx.newPage();
   await uploadPage.goto('/');
   await uploadPage.locator('#keyinput').fill(key);
-  await expect(uploadPage.locator('#kepubify')).toBeChecked({ timeout: 5_000 });
-  await uploadPage.locator('#kepubify').uncheck();
+  await expect(uploadPage.locator('#kobo')).toBeChecked({ timeout: 5_000 });
+  await uploadPage.locator('#kobo').uncheck();
   await uploadPage.locator('#file-input').setInputFiles({
     name: '三体.epub',
     mimeType: 'application/epub+zip',
@@ -312,8 +313,8 @@ test('enables conversion options when multiple files of the same type are select
       buffer: fakeEpub('fake epub 2'),
     },
   ]);
-  await expect(page.locator('#kepubify')).toBeEnabled();
-  await expect(page.locator('#kindlegen')).toBeEnabled();
+  await expect(page.locator('#kobo')).toBeEnabled();
+  await expect(page.locator('#kindle')).toBeEnabled();
   await expect(page.locator('#options-note')).toBeVisible();
   await expect(page.locator('#options-note')).toHaveText(
     '2 .epub files selected — options apply to all.'
@@ -330,9 +331,9 @@ test('disables conversion options when multiple files have different formats', a
     },
     { name: 'second.pdf', mimeType: 'application/pdf', buffer: Buffer.from('fake pdf') },
   ]);
-  await expect(page.locator('#kepubify')).toBeDisabled();
-  await expect(page.locator('#kindlegen')).toBeDisabled();
-  await expect(page.locator('#pdfcropmargins')).toBeDisabled();
+  await expect(page.locator('#kobo')).toBeDisabled();
+  await expect(page.locator('#kindle')).toBeDisabled();
+  await expect(page.locator('#pdfcrop')).toBeDisabled();
   await expect(page.locator('#options-note')).toHaveText(
     'Conversion options are unavailable when files have different formats.'
   );
@@ -344,8 +345,8 @@ test('treats mixed-case extensions as same type', async ({ page }) => {
     { name: 'one.EPUB', mimeType: 'application/epub+zip', buffer: fakeEpub('fake 1') },
     { name: 'two.epub', mimeType: 'application/epub+zip', buffer: fakeEpub('fake 2') },
   ]);
-  await expect(page.locator('#kepubify')).toBeEnabled();
-  await expect(page.locator('#kindlegen')).toBeEnabled();
+  await expect(page.locator('#kobo')).toBeEnabled();
+  await expect(page.locator('#kindle')).toBeEnabled();
 });
 
 test('removing a file re-evaluates option availability', async ({ page }) => {
@@ -358,10 +359,10 @@ test('removing a file re-evaluates option availability', async ({ page }) => {
     },
     { name: 'doc.pdf', mimeType: 'application/pdf', buffer: Buffer.from('fake pdf') },
   ]);
-  await expect(page.locator('#kepubify')).toBeDisabled();
+  await expect(page.locator('#kobo')).toBeDisabled();
   // Remove the .pdf — queue order matches setInputFiles order, so pdf is index 1
   await page.locator('#file-queue li[data-index="1"] .fq-remove').click();
-  await expect(page.locator('#kepubify')).toBeEnabled();
+  await expect(page.locator('#kobo')).toBeEnabled();
   await expect(page.locator('#options-note')).toBeHidden();
 });
 
@@ -385,7 +386,7 @@ test('conversion option propagates to every request in multi-file upload', async
       buffer: fakeEpub('fake epub 2'),
     },
   ]);
-  await page.locator('#kepubify').check();
+  await page.locator('#kobo').check();
 
   const seen: string[] = [];
   await page.route('/upload', async (route) => {
@@ -405,7 +406,7 @@ test('conversion option propagates to every request in multi-file upload', async
 
   expect(seen).toHaveLength(2);
   for (const body of seen) {
-    expect(body).toContain('name="kepubify"');
+    expect(body).toContain('name="kobo"');
   }
 });
 
@@ -577,7 +578,7 @@ test('links a failure with a reference to a prefilled bug report', async ({ page
 
   await page.goto('/');
   await page.locator('#keyinput').fill('ABCD');
-  await expect(page.locator('#kepubify')).toBeChecked();
+  await expect(page.locator('#kobo')).toBeChecked();
   await page.locator('#file-input').setInputFiles({
     name: 'Private Title.epub',
     mimeType: 'application/epub+zip',
@@ -896,14 +897,30 @@ test('restores saved conversion options from localStorage on reload', async ({ p
   await page.goto('/');
 
   await page.locator('#transliteration').check();
-  await page.locator('#pdfcropmargins').check();
+  await page.locator('#pdfcrop').check();
 
   await page.reload();
 
   await expect(page.locator('#transliteration')).toBeChecked();
-  await expect(page.locator('#pdfcropmargins')).toBeChecked();
-  await expect(page.locator('#kepubify')).not.toBeChecked();
-  await expect(page.locator('#kindlegen')).not.toBeChecked();
+  await expect(page.locator('#pdfcrop')).toBeChecked();
+  await expect(page.locator('#kobo')).not.toBeChecked();
+  await expect(page.locator('#kindle')).not.toBeChecked();
+});
+
+test('restores options saved under the old tool names', async ({ page }) => {
+  await page.goto('/');
+
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'bookdrop-options',
+      JSON.stringify({ kepubify: true, kindlegen: false, pdfcropmargins: true })
+    );
+  });
+  await page.reload();
+
+  await expect(page.locator('#kobo')).toBeChecked();
+  await expect(page.locator('#pdfcrop')).toBeChecked();
+  await expect(page.locator('#kindle')).not.toBeChecked();
 });
 
 test('history clears between browser sessions', async ({ browser }) => {

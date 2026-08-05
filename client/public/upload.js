@@ -65,8 +65,8 @@ if (!isIOS) {
 
 const OPTIONS = [
   {
-    id: 'kepubify',
-    name: 'kepubify',
+    id: 'kobo',
+    name: 'kobo',
     label: 'Kobo format',
     tag: 'Kobo · EPUB',
     description:
@@ -75,18 +75,18 @@ const OPTIONS = [
     enabledExtensions: ['.epub'],
   },
   {
-    id: 'kindlegen',
-    name: 'kindlegen',
+    id: 'kindle',
+    name: 'kindle',
     label: 'Kindle format',
     tag: 'Kindle · EPUB',
     description:
-      "Converts EPUB to MOBI so Kindle can open it — Kindle doesn't natively support EPUB. Only runs when sending an EPUB to a Kindle.",
+      "Converts EPUB to a Kindle-readable format — Kindle doesn't natively support EPUB. Only runs when sending an EPUB to a Kindle.",
     defaultChecked: false,
     enabledExtensions: ['.epub'],
   },
   {
-    id: 'pdfcropmargins',
-    name: 'pdfcropmargins',
+    id: 'pdfcrop',
+    name: 'pdfcrop',
     label: 'Crop PDF margins',
     tag: 'PDF only',
     description:
@@ -121,8 +121,14 @@ const appVersion = document.getElementById('app-version')?.textContent ?? 'unkno
 /** Device type of the key in the key field, from /device/:key; null until known. */
 let detectedDevice = null;
 
-const MUTUALLY_EXCLUSIVE = ['kepubify', 'kindlegen'];
+const MUTUALLY_EXCLUSIVE = ['kobo', 'kindle'];
 const OPTIONS_STORAGE_KEY = 'bookdrop-options';
+
+const LEGACY_OPTION_IDS = {
+  kepubify: 'kobo',
+  kindlegen: 'kindle',
+  pdfcropmargins: 'pdfcrop',
+};
 
 /** Renders the conversion option checkboxes into the options grid. */
 function buildOptionsGrid() {
@@ -1092,7 +1098,19 @@ function saveOptions() {
 function loadSavedOptions() {
   try {
     const raw = localStorage.getItem(OPTIONS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) {
+      return null;
+    }
+    const state = JSON.parse(raw);
+    Object.entries(LEGACY_OPTION_IDS).forEach(([oldId, newId]) => {
+      if (oldId in state) {
+        if (!(newId in state)) {
+          state[newId] = state[oldId];
+        }
+        delete state[oldId];
+      }
+    });
+    return state;
   } catch {
     return null;
   }
@@ -1132,12 +1150,12 @@ function lookupDevice(key) {
         return;
       }
       if (data.device === 'Kindle') {
-        setOption('kindlegen', true);
+        setOption('kindle', true);
       } else if (data.device === 'Kobo') {
-        setOption('kepubify', true);
+        setOption('kobo', true);
       } else if (data.device === 'Tolino') {
-        setOption('kepubify', false);
-        setOption('kindlegen', false);
+        setOption('kobo', false);
+        setOption('kindle', false);
       }
     })
     .catch(function () {});

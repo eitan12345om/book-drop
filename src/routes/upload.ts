@@ -311,9 +311,9 @@ export function makeUploadRouter(
         }
 
         const conversionOptions: ConversionOptions = {
-          kindle: !!req.body?.kindlegen,
-          kobo: !!req.body?.kepubify,
-          pdfcrop: !!req.body?.pdfcropmargins,
+          kindle: !!(req.body?.kindle ?? req.body?.kindlegen),
+          kobo: !!(req.body?.kobo ?? req.body?.kepubify),
+          pdfcrop: !!(req.body?.pdfcrop ?? req.body?.pdfcropmargins),
         };
 
         const device = detectEreader(info.agent);
