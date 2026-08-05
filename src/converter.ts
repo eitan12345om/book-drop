@@ -308,3 +308,30 @@ export async function convert(intent: ConversionIntent, inputPath: string): Prom
     throw err;
   }
 }
+
+/**
+ * Reports at startup whether each configured backend's executable can be spawned, so a
+ * misconfigured image is visible in the logs rather than discovered by the first user to
+ * tick a conversion option. Missing tools are logged but not fatal: sending files works
+ * without any converter, so refusing to boot would turn lost conversions into an outage.
+ *
+ * Exit status is ignored — the tools disagree on how to report a version, and only a
+ * spawn failure tells us the binary is absent.
+ */
+export async function reportConverterAvailability(): Promise<void> {
+  const intents: ConversionIntent[] = ['kobo', 'kindle', 'pdfcrop'];
+  await Promise.all(
+    intents.map(async (intent) => {
+      const { command, tool } = backendFor(intent);
+      try {
+        await spawnProcess(command, ['--version'], '/tmp', () => true, 10_000);
+        logger.info({ intent, tool, command }, 'Converter available');
+      } catch (err) {
+        logger.error(
+          { err, intent, tool, command },
+          'Configured converter is unavailable — this conversion will fail for every upload'
+        );
+      }
+    })
+  );
+}
