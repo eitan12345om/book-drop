@@ -11,12 +11,8 @@ import {
   reservePendingDisk,
   releasePendingDisk,
 } from '../keyStore.js';
-import {
-  ConversionError,
-  convertWithKindlegen,
-  convertWithKepubify,
-  convertWithPdfCropMargins,
-} from '../converter.js';
+import { backendFor, convert, ConversionError } from '../converter.js';
+import type { ConversionIntent } from '../converter.js';
 import {
   MAX_FILE_SIZE,
   MAX_DISK_BYTES,
@@ -76,20 +72,42 @@ export function sanitiseFilename(
   return filename;
 }
 
+export interface ConversionOptions {
+  kindle: boolean;
+  kobo: boolean;
+  pdfcrop: boolean;
+}
+
+/**
+ * Decides which conversion the upload calls for, or null for a straight passthrough.
+ * Which tool performs it is the registry's concern.
+ */
+function intentFor(
+  mimetype: string,
+  device: Ereader | null,
+  options: ConversionOptions
+): ConversionIntent | null {
+  if (mimetype === TYPE_EPUB && device === 'Kindle' && options.kindle) {
+    return 'kindle';
+  }
+  if (mimetype === TYPE_EPUB && device === 'Kobo' && options.kobo) {
+    return 'kobo';
+  }
+  if (mimetype === 'application/pdf' && options.pdfcrop) {
+    return 'pdfcrop';
+  }
+  return null;
+}
+
 /** Predicts the display filename after conversion without running it (pure function). */
 function predictConvertedFilename(
   sanitised: string,
   mimetype: string,
   device: Ereader | null,
-  options: { kindlegen: boolean; kepubify: boolean; pdfcropmargins: boolean }
+  options: ConversionOptions
 ): string {
-  if (mimetype === TYPE_EPUB && device === 'Kindle' && options.kindlegen) {
-    return sanitised.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.mobi');
-  }
-  if (mimetype === TYPE_EPUB && device === 'Kobo' && options.kepubify) {
-    return sanitised.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.kepub.epub');
-  }
-  return sanitised;
+  const intent = intentFor(mimetype, device, options);
+  return intent ? backendFor(intent).outputName(sanitised) : sanitised;
 }
 
 /** Returns name unchanged, or appends (2), (3), … until unique among existingNames. */
@@ -109,12 +127,11 @@ function uniqueFilename(name: string, existingNames: string[]): string {
 
 const FILE_TOO_LARGE = `File too large — the limit is ${formatLimit(MAX_FILE_SIZE)} per file.`;
 
-const CONVERSION_GUIDANCE: Record<string, string> = {
-  Kepubify:
-    'Could not convert this EPUB to the Kobo format. Turn off the "Kobo format" option and send it again — Kobo readers open standard EPUBs fine, just without the kepub enhancements.',
-  KindleGen:
+const CONVERSION_GUIDANCE: Record<ConversionIntent, string> = {
+  kobo: 'Could not convert this EPUB to the Kobo format. Turn off the "Kobo format" option and send it again — Kobo readers open standard EPUBs fine, just without the kepub enhancements.',
+  kindle:
     'Could not convert this EPUB to the Kindle format. Turn off the "Kindle format" option to send the original EPUB instead.',
-  pdfCropMargins: 'Could not crop this PDF. Turn off "Crop PDF margins" to send the original PDF.',
+  pdfcrop: 'Could not crop this PDF. Turn off "Crop PDF margins" to send the original PDF.',
 };
 
 async function runConversion(
@@ -122,35 +139,18 @@ async function runConversion(
   filename: string,
   mimetype: string,
   device: Ereader | null,
-  options: { kindlegen: boolean; kepubify: boolean; pdfcropmargins: boolean },
+  options: ConversionOptions,
   key: string
 ): Promise<{ convertedPath: string; conversionTool: string | null; filename: string }> {
-  if (mimetype === TYPE_EPUB && device === 'Kindle' && options.kindlegen) {
-    const conversionTool = 'KindleGen';
-    const newFilename = filename.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.mobi');
-    logger.info({ key, tool: conversionTool, mimetype }, 'Conversion started');
-    const convertedPath = await convertWithKindlegen(filePath);
-    logger.info({ key, tool: conversionTool }, 'Conversion succeeded');
-    return { convertedPath, conversionTool, filename: newFilename };
+  const intent = intentFor(mimetype, device, options);
+  if (!intent) {
+    return { convertedPath: filePath, conversionTool: null, filename };
   }
-  if (mimetype === TYPE_EPUB && device === 'Kobo' && options.kepubify) {
-    const conversionTool = 'Kepubify';
-    const newFilename = filename
-      .replace(/\.kepub\.epub$/i, '.epub')
-      .replace(/\.epub$/i, '.kepub.epub');
-    logger.info({ key, tool: conversionTool, mimetype }, 'Conversion started');
-    const convertedPath = await convertWithKepubify(filePath);
-    logger.info({ key, tool: conversionTool }, 'Conversion succeeded');
-    return { convertedPath, conversionTool, filename: newFilename };
-  }
-  if (mimetype === 'application/pdf' && options.pdfcropmargins) {
-    const conversionTool = 'pdfCropMargins';
-    logger.info({ key, tool: conversionTool, mimetype }, 'Conversion started');
-    const convertedPath = await convertWithPdfCropMargins(filePath);
-    logger.info({ key, tool: conversionTool }, 'Conversion succeeded');
-    return { convertedPath, conversionTool, filename };
-  }
-  return { convertedPath: filePath, conversionTool: null, filename };
+  const backend = backendFor(intent);
+  logger.info({ key, intent, tool: backend.tool, mimetype }, 'Conversion started');
+  const convertedPath = await convert(intent, filePath);
+  logger.info({ key, intent, tool: backend.tool }, 'Conversion succeeded');
+  return { convertedPath, conversionTool: backend.tool, filename: backend.outputName(filename) };
 }
 
 export function makeUploadRouter(
@@ -310,10 +310,10 @@ export function makeUploadRouter(
           return;
         }
 
-        const conversionOptions = {
-          kindlegen: !!req.body?.kindlegen,
-          kepubify: !!req.body?.kepubify,
-          pdfcropmargins: !!req.body?.pdfcropmargins,
+        const conversionOptions: ConversionOptions = {
+          kindle: !!req.body?.kindlegen,
+          kobo: !!req.body?.kepubify,
+          pdfcrop: !!req.body?.pdfcropmargins,
         };
 
         const device = detectEreader(info.agent);
@@ -362,18 +362,19 @@ export function makeUploadRouter(
             const ref = newErrorRef();
             deleteFile(req.file.path);
             const tool = convErr instanceof ConversionError ? convErr.tool : null;
+            const intent = convErr instanceof ConversionError ? convErr.intent : undefined;
             if (convErr instanceof ConversionError && convErr.timedOut) {
-              logger.error({ err: convErr, key, tool, ref }, 'Conversion timed out');
+              logger.error({ err: convErr, key, tool, intent, ref }, 'Conversion timed out');
               res
                 .status(500)
                 .json({ error: 'Conversion timed out — please try sending the file again.', ref });
               return;
             }
-            logger.warn({ err: convErr, key, tool, ref }, 'Conversion failed');
+            logger.warn({ err: convErr, key, tool, intent, ref }, 'Conversion failed');
             res.status(400).json({
               error:
                 (convErr instanceof ConversionError && convErr.userMessage) ||
-                (tool && CONVERSION_GUIDANCE[tool]) ||
+                (intent && CONVERSION_GUIDANCE[intent]) ||
                 'Conversion failed. Try sending the file again with the conversion options turned off to transfer the original file.',
               ref,
             });

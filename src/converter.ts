@@ -8,9 +8,16 @@ const KINDLEGEN_TIMEOUT_MS = 100_000;
 
 class TimeoutError extends Error {}
 
+/** What the user asked for, independent of which tool performs it. */
+export type ConversionIntent = 'kobo' | 'kindle' | 'pdfcrop';
+
 export class ConversionError extends Error {
   /** The tool's own reason the book won't convert, when it gives one that is safe to show. */
   readonly userMessage?: string;
+
+  /** Which conversion was being attempted; attached by the registry, since a backend
+   * only knows its own tool and can serve more than one intent. */
+  intent?: ConversionIntent;
 
   constructor(
     public readonly tool: string,
@@ -100,6 +107,11 @@ function sanitizeOutput(message: string, ...replacements: [string, string][]): s
   return replacements.reduce((msg, [from, to]) => msg.replaceAll(from, to), message);
 }
 
+/** Strips any e-reader-specific extension so a fresh one can be applied. */
+function stripEbookExtension(filename: string): string {
+  return filename.replace(/\.kepub\.epub$/i, '').replace(/\.(epub|mobi|azw3)$/i, '');
+}
+
 /** Converts an EPUB to MOBI using kindlegen, deleting the original on completion. */
 export async function convertWithKindlegen(inputPath: string): Promise<string> {
   const outPath = inputPath.replace(/\.epub$/i, '.mobi');
@@ -177,5 +189,70 @@ export async function convertWithPdfCropMargins(inputPath: string): Promise<stri
     throw new ConversionError('pdfCropMargins', err instanceof TimeoutError, msg, { cause: err });
   } finally {
     await deleteFile(inputPath);
+  }
+}
+
+export interface ConverterBackend {
+  /** Display name, shown to users in success messages and used as a log field. */
+  readonly tool: string;
+  /** Executable that must be present on PATH for this backend to work. */
+  readonly command: string;
+  /** The filename the user will receive, given the name they uploaded. */
+  outputName(filename: string): string;
+  /** Runs the conversion and resolves with the path to the converted file. */
+  run(inputPath: string): Promise<string>;
+}
+
+const BACKENDS: Record<ConversionIntent, Record<string, ConverterBackend>> = {
+  kobo: {
+    kepubify: {
+      tool: 'Kepubify',
+      command: 'kepubify',
+      outputName: (filename) => `${stripEbookExtension(filename)}.kepub.epub`,
+      run: convertWithKepubify,
+    },
+  },
+  kindle: {
+    kindlegen: {
+      tool: 'KindleGen',
+      command: 'kindlegen',
+      outputName: (filename) => `${stripEbookExtension(filename)}.mobi`,
+      run: convertWithKindlegen,
+    },
+  },
+  pdfcrop: {
+    pdfcropmargins: {
+      tool: 'pdfCropMargins',
+      command: 'pdfcropmargins',
+      outputName: (filename) => filename,
+      run: convertWithPdfCropMargins,
+    },
+  },
+};
+
+const SELECTED: Record<ConversionIntent, string> = {
+  kobo: 'kepubify',
+  kindle: 'kindlegen',
+  pdfcrop: 'pdfcropmargins',
+};
+
+/** Returns the backend currently configured to serve an intent. */
+export function backendFor(intent: ConversionIntent): ConverterBackend {
+  const backend = BACKENDS[intent][SELECTED[intent]];
+  if (!backend) {
+    throw new Error(`No converter backend "${SELECTED[intent]}" for ${intent}`);
+  }
+  return backend;
+}
+
+/** Runs an intent through its configured backend, tagging failures with the intent. */
+export async function convert(intent: ConversionIntent, inputPath: string): Promise<string> {
+  try {
+    return await backendFor(intent).run(inputPath);
+  } catch (err) {
+    if (err instanceof ConversionError) {
+      err.intent = intent;
+    }
+    throw err;
   }
 }

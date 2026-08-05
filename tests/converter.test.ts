@@ -1,6 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  backendFor,
+  convert,
+  ConversionError,
   convertWithKindlegen,
   convertWithKepubify,
   convertWithPdfCropMargins,
@@ -53,6 +56,48 @@ describe('convertWithPdfCropMargins', () => {
           err.message.toLowerCase().includes('pdfcropmargins'),
           `Expected 'pdfcropmargins' in error: ${err.message}`
         );
+        return true;
+      }
+    );
+  });
+});
+
+describe('backendFor', () => {
+  it('resolves each intent to the tool that serves it', () => {
+    assert.strictEqual(backendFor('kobo').tool, 'Kepubify');
+    assert.strictEqual(backendFor('kindle').tool, 'KindleGen');
+    assert.strictEqual(backendFor('pdfcrop').tool, 'pdfCropMargins');
+  });
+
+  it('names Kobo output with the double extension Kobo devices require', () => {
+    assert.strictEqual(backendFor('kobo').outputName('book.epub'), 'book.kepub.epub');
+    assert.strictEqual(backendFor('kobo').outputName('book.kepub.epub'), 'book.kepub.epub');
+  });
+
+  it('names Kindle output with the format the backend produces', () => {
+    assert.strictEqual(backendFor('kindle').outputName('book.epub'), 'book.mobi');
+    assert.strictEqual(backendFor('kindle').outputName('book.kepub.epub'), 'book.mobi');
+  });
+
+  it('leaves PDF filenames untouched', () => {
+    assert.strictEqual(backendFor('pdfcrop').outputName('paper.pdf'), 'paper.pdf');
+  });
+
+  it('preserves dots in the book title when swapping the extension', () => {
+    assert.strictEqual(
+      backendFor('kindle').outputName('Vol. 2 - A.B.C..epub'),
+      'Vol. 2 - A.B.C..mobi'
+    );
+  });
+});
+
+describe('convert', () => {
+  it('tags failures with the intent so the route can explain which option to turn off', async () => {
+    await assert.rejects(
+      () => convert('kobo', '/tmp/_book-drop_test.epub'),
+      (err: Error) => {
+        assert.ok(err instanceof ConversionError);
+        assert.strictEqual((err as ConversionError).intent, 'kobo');
         return true;
       }
     );
