@@ -99,4 +99,9 @@ docker compose up -d
 
 The service will be available at `http://localhost:3001` (or whatever PORT you use).
 
+The image ships calibre plus kepubify and KindleGen, so the converter can be switched with
+an environment variable and no rebuild. calibre accounts for roughly 850 MB of the image; to
+trade flexibility for size, build with `--build-arg INSTALL_LEGACY_TOOLS=0` to drop the older
+tools, or `--build-arg INSTALL_CALIBRE=0` to keep only them.
+
 Serving plain HTTP (no reverse-proxy TLS)? Set `DISABLE_HSTS=1` — see env vars above.
