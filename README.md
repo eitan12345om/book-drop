@@ -15,10 +15,17 @@ Supported formats: EPUB, MOBI, AZW3, PDF, CBZ, CBR, HTML, TXT, PNG, JPG.
 
 Optional conversions (requires external tools — see below):
 
-- EPUB → KEPUB (Kobo, via kepubify) — better typography and font control
-- EPUB → MOBI (Kindle, via KindleGen) — Kindle doesn't support EPUB natively
+- EPUB → KEPUB (Kobo) — better typography and font control
+- EPUB → AZW3 (Kindle) — Kindle doesn't support EPUB natively
 - PDF margin cropping (via pdfCropMargins) — fills more of the small screen
 - Update EPUB metadata from Google Books — patches title, author, publisher, etc. and shows a before/after diff on the download page (requires a `GOOGLE_BOOKS_API_KEY`)
+
+Both e-reader conversions run through [calibre](https://calibre-ebook.com/) by default. calibre
+copes with malformed EPUBs that the single-purpose tools reject — a dangling table-of-contents
+anchor, for instance, makes KindleGen discard an otherwise finished book. [kepubify](https://pgaskin.net/kepubify/)
+and [KindleGen](http://web.archive.org/web/*/http://kindlegen.s3.amazonaws.com/kindlegen*) are still
+selectable via `KOBO_CONVERTER` and `KINDLE_CONVERTER`. PDF cropping has no calibre equivalent:
+calibre lays out PDFs it generates rather than trimming the pages of an existing one.
 
 ## Running locally
 
@@ -26,9 +33,13 @@ Optional conversions (requires external tools — see below):
 
 - Node.js 26 or later
 - pnpm 12 (see [pnpm installation](https://pnpm.io/installation), or `pnpm self-update` from pnpm 11.10+)
-- _(Optional)_ [kepubify](https://pgaskin.net/kepubify/) in `PATH`
-- _(Optional)_ [KindleGen](http://web.archive.org/web/*/http://kindlegen.s3.amazonaws.com/kindlegen*) in `PATH`
+- _(Optional)_ [calibre](https://calibre-ebook.com/download) 8.0 or later, with `ebook-convert` in `PATH` — earlier versions cannot write KEPUB
+- _(Optional)_ [kepubify](https://pgaskin.net/kepubify/) in `PATH`, if `KOBO_CONVERTER=kepubify`
+- _(Optional)_ [KindleGen](http://web.archive.org/web/*/http://kindlegen.s3.amazonaws.com/kindlegen*) in `PATH`, if `KINDLE_CONVERTER=kindlegen`
 - _(Optional)_ [pdfCropMargins](https://github.com/abarker/pdfCropMargins) (`pip install pdfCropMargins`)
+
+Missing tools are logged at startup and only break the conversion that needs them; sending
+files still works.
 
 ### Development
 
@@ -58,23 +69,26 @@ Uses Node.js's built-in test runner (`node:test`) — no extra test framework ne
 
 Copy `.env.example` to `.env` to customise these values.
 
-| Variable                     | Default      | Description                                                                                                                           |
-| ---------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `DISABLE_HSTS`               | _(unset)_    | Set to `1` to disable HSTS and `upgrade-insecure-requests`. Use only when serving plain HTTP without a TLS-terminating reverse proxy. |
-| `PORT`                       | `3001`       | HTTP port the server listens on                                                                                                       |
-| `UPLOAD_DIR`                 | `uploads`    | Directory for temporary file storage                                                                                                  |
-| `EXPIRE_DELAY_MS`            | `300000`     | Inactivity timeout per key (ms)                                                                                                       |
-| `MAX_EXPIRE_MS`              | `3600000`    | Hard maximum key lifetime (ms)                                                                                                        |
-| `MAX_FILE_SIZE`              | `838860800`  | Upload size limit in bytes (800 MB)                                                                                                   |
-| `MAX_DISK_BYTES`             | `1073741824` | Total upload directory size cap in bytes (1 GB); uploads returning 507 when exceeded                                                  |
-| `MAX_FILES_PER_KEY`          | `5`          | Max files staged per session key; further uploads return 400                                                                          |
-| `MAX_URLS_PER_KEY`           | `20`         | Max URLs staged per session key; further submissions return 400                                                                       |
-| `MAX_KEYS_PER_IP`            | `3`          | Max concurrent sessions per IP; further requests return 429                                                                           |
-| `RATE_LIMIT_WINDOW_MS`       | `900000`     | Rate-limit window for `/generate` (ms)                                                                                                |
-| `RATE_LIMIT_MAX`             | `20`         | Max key generations per window per IP                                                                                                 |
-| `LOG_LEVEL`                  | `info`       | Pino log level (`trace`, `debug`, `info`, `warn`, `error`)                                                                            |
-| `UPLOAD_CLEANUP_INTERVAL_MS` | `3600000`    | How often the orphaned-file cleanup worker runs (ms); defaults to `MAX_EXPIRE_MS`                                                     |
-| `GOOGLE_BOOKS_API_KEY`       | _(unset)_    | Google Books API key for EPUB metadata enrichment; without it the API may rate-limit requests                                         |
+| Variable                     | Default      | Description                                                                                                                                                    |
+| ---------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DISABLE_HSTS`               | _(unset)_    | Set to `1` to disable HSTS and `upgrade-insecure-requests`. Use only when serving plain HTTP without a TLS-terminating reverse proxy.                          |
+| `PORT`                       | `3001`       | HTTP port the server listens on                                                                                                                                |
+| `UPLOAD_DIR`                 | `uploads`    | Directory for temporary file storage                                                                                                                           |
+| `EXPIRE_DELAY_MS`            | `300000`     | Inactivity timeout per key (ms)                                                                                                                                |
+| `MAX_EXPIRE_MS`              | `3600000`    | Hard maximum key lifetime (ms)                                                                                                                                 |
+| `MAX_FILE_SIZE`              | `838860800`  | Upload size limit in bytes (800 MB)                                                                                                                            |
+| `MAX_DISK_BYTES`             | `1073741824` | Total upload directory size cap in bytes (1 GB); uploads returning 507 when exceeded                                                                           |
+| `MAX_FILES_PER_KEY`          | `5`          | Max files staged per session key; further uploads return 400                                                                                                   |
+| `MAX_URLS_PER_KEY`           | `20`         | Max URLs staged per session key; further submissions return 400                                                                                                |
+| `MAX_KEYS_PER_IP`            | `3`          | Max concurrent sessions per IP; further requests return 429                                                                                                    |
+| `RATE_LIMIT_WINDOW_MS`       | `900000`     | Rate-limit window for `/generate` (ms)                                                                                                                         |
+| `RATE_LIMIT_MAX`             | `20`         | Max key generations per window per IP                                                                                                                          |
+| `LOG_LEVEL`                  | `info`       | Pino log level (`trace`, `debug`, `info`, `warn`, `error`)                                                                                                     |
+| `UPLOAD_CLEANUP_INTERVAL_MS` | `3600000`    | How often the orphaned-file cleanup worker runs (ms); defaults to `MAX_EXPIRE_MS`                                                                              |
+| `GOOGLE_BOOKS_API_KEY`       | _(unset)_    | Google Books API key for EPUB metadata enrichment; without it the API may rate-limit requests                                                                  |
+| `KOBO_CONVERTER`             | `calibre`    | Tool behind the "Kobo format" option: `calibre` or `kepubify`                                                                                                  |
+| `KINDLE_CONVERTER`           | `calibre`    | Tool behind the "Kindle format" option: `calibre` or `kindlegen`                                                                                               |
+| `KINDLE_OUTPUT_FORMAT`       | `azw3`       | Format calibre produces for Kindle: `azw3` or `mobi`. AZW3 suits modern Kindles; MOBI is for pre-2011 models. Ignored by `kindlegen`, which always writes MOBI |
 
 ## Docker
 

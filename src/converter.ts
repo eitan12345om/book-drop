@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import { spawn } from 'child_process';
 import { basename, dirname, join } from 'path';
 import { logger } from './logger.js';
+import { KINDLE_CONVERTER, KINDLE_OUTPUT_FORMAT, KOBO_CONVERTER } from './config.js';
 
 /** KindleGen is much slower than the other converters, so it gets its own cap. */
 const KINDLEGEN_TIMEOUT_MS = 100_000;
@@ -167,6 +168,45 @@ export async function convertWithKepubify(inputPath: string): Promise<string> {
   }
 }
 
+/**
+ * Converts an EPUB with calibre, deleting the original on completion.
+ *
+ * calibre picks the output format from the file extension, and ".kepub.epub" reads as
+ * plain EPUB — which silently yields an EPUB with no Kobo markup. Kobo devices in turn
+ * only recognise sideloaded kepubs by that exact double extension, so kepub output is
+ * written as ".kepub" and renamed afterwards.
+ */
+export async function convertWithCalibre(
+  inputPath: string,
+  format: 'kepub' | 'azw3' | 'mobi'
+): Promise<string> {
+  const base = stripEbookExtension(inputPath);
+  const workPath = `${base}.${format}`;
+  const outPath = format === 'kepub' ? `${base}.kepub.epub` : workPath;
+  try {
+    await spawnProcess(
+      'ebook-convert',
+      [basename(inputPath), basename(workPath)],
+      dirname(inputPath)
+    );
+    if (workPath !== outPath) {
+      await fs.rename(workPath, outPath);
+    }
+    return outPath;
+  } catch (err) {
+    await deleteFile(workPath);
+    await deleteFile(outPath);
+    const msg = sanitizeOutput(
+      (err as Error).message,
+      [basename(inputPath), 'infile.epub'],
+      [basename(workPath), `outfile.${format}`]
+    );
+    throw new ConversionError('calibre', err instanceof TimeoutError, msg, { cause: err });
+  } finally {
+    await deleteFile(inputPath);
+  }
+}
+
 /** Crops white margins from a PDF using pdfcropmargins, deleting the original on completion. */
 export async function convertWithPdfCropMargins(inputPath: string): Promise<string> {
   const dir = dirname(inputPath);
@@ -205,6 +245,12 @@ export interface ConverterBackend {
 
 const BACKENDS: Record<ConversionIntent, Record<string, ConverterBackend>> = {
   kobo: {
+    calibre: {
+      tool: 'calibre',
+      command: 'ebook-convert',
+      outputName: (filename) => `${stripEbookExtension(filename)}.kepub.epub`,
+      run: (inputPath) => convertWithCalibre(inputPath, 'kepub'),
+    },
     kepubify: {
       tool: 'Kepubify',
       command: 'kepubify',
@@ -213,6 +259,12 @@ const BACKENDS: Record<ConversionIntent, Record<string, ConverterBackend>> = {
     },
   },
   kindle: {
+    calibre: {
+      tool: 'calibre',
+      command: 'ebook-convert',
+      outputName: (filename) => `${stripEbookExtension(filename)}.${KINDLE_OUTPUT_FORMAT}`,
+      run: (inputPath) => convertWithCalibre(inputPath, KINDLE_OUTPUT_FORMAT),
+    },
     kindlegen: {
       tool: 'KindleGen',
       command: 'kindlegen',
@@ -231,8 +283,8 @@ const BACKENDS: Record<ConversionIntent, Record<string, ConverterBackend>> = {
 };
 
 const SELECTED: Record<ConversionIntent, string> = {
-  kobo: 'kepubify',
-  kindle: 'kindlegen',
+  kobo: KOBO_CONVERTER,
+  kindle: KINDLE_CONVERTER,
   pdfcrop: 'pdfcropmargins',
 };
 
