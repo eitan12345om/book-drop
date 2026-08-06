@@ -81,6 +81,19 @@ after(async () => {
   await fs.rm(VIEWS_DIR, { recursive: true, force: true });
 });
 
+/** Runs fn with no converter on PATH, so a conversion fails the same way on every machine. */
+async function withoutConverters<T>(fn: () => Promise<T>): Promise<T> {
+  const emptyDir = await fs.mkdtemp(path.join(os.tmpdir(), 'no-converters-'));
+  const originalPath = process.env.PATH;
+  process.env.PATH = emptyDir;
+  try {
+    return await fn();
+  } finally {
+    process.env.PATH = originalPath;
+    await fs.rm(emptyDir, { recursive: true, force: true });
+  }
+}
+
 async function generateKey(agent = 'Mozilla/5.0 TestBrowser') {
   const { app, keys } = createApp();
   const res = await request(app)
@@ -642,50 +655,56 @@ describe('POST /upload', () => {
     assert.match(res.body.error, /URL limit/i);
   });
 
-  it('returns 400 with actionable guidance when conversion fails', async () => {
+  it('returns 500 with actionable guidance when the converter is not installed', async () => {
     const { app, key } = await generateKey('Kobo/1.0 Test');
-    const res = await request(app)
-      .post('/upload')
-      .set('X-Requested-With', 'XMLHttpRequest')
-      .set('User-Agent', 'Kobo/1.0 Test')
-      .field('key', key)
-      .field('kobo', 'true')
-      .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
-        filename: 'book.epub',
-        contentType: 'application/epub+zip',
-      });
-    assert.strictEqual(res.status, 400);
+    const res = await withoutConverters(async () =>
+      request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .set('User-Agent', 'Kobo/1.0 Test')
+        .field('key', key)
+        .field('kobo', 'true')
+        .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
+          filename: 'book.epub',
+          contentType: 'application/epub+zip',
+        })
+    );
+    assert.strictEqual(res.status, 500);
     assert.match(res.body.error, /Kobo format/i);
   });
 
   it('still honours the tool-named fields sent by older clients', async () => {
     const { app, key } = await generateKey('Kobo/1.0 Test');
-    const res = await request(app)
-      .post('/upload')
-      .set('X-Requested-With', 'XMLHttpRequest')
-      .set('User-Agent', 'Kobo/1.0 Test')
-      .field('key', key)
-      .field('kepubify', 'true')
-      .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
-        filename: 'book.epub',
-        contentType: 'application/epub+zip',
-      });
-    assert.strictEqual(res.status, 400);
+    const res = await withoutConverters(async () =>
+      request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .set('User-Agent', 'Kobo/1.0 Test')
+        .field('key', key)
+        .field('kepubify', 'true')
+        .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
+          filename: 'book.epub',
+          contentType: 'application/epub+zip',
+        })
+    );
+    assert.strictEqual(res.status, 500);
     assert.match(res.body.error, /Kobo format/i);
   });
 
   it('attempts the Kobo conversion for a Kobo whose user-agent is upper-case', async () => {
     const { app, key } = await generateKey('KOBO/1.0 Test');
-    const res = await request(app)
-      .post('/upload')
-      .set('X-Requested-With', 'XMLHttpRequest')
-      .field('key', key)
-      .field('kepubify', 'true')
-      .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
-        filename: 'book.epub',
-        contentType: 'application/epub+zip',
-      });
-    assert.strictEqual(res.status, 400);
+    const res = await withoutConverters(async () =>
+      request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .field('key', key)
+        .field('kepubify', 'true')
+        .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
+          filename: 'book.epub',
+          contentType: 'application/epub+zip',
+        })
+    );
+    assert.strictEqual(res.status, 500);
     assert.match(res.body.error, /Kobo format/i);
   });
 

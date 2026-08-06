@@ -17,6 +17,17 @@ const KINDLEGEN_TIMEOUT_MS = 100_000;
 
 class TimeoutError extends Error {}
 
+/** Rejection from spawn itself, which says the tool is absent rather than unhappy. */
+class SpawnError extends Error {
+  constructor(
+    message: string,
+    readonly code: string | undefined
+  ) {
+    super(message);
+    this.name = 'SpawnError';
+  }
+}
+
 /** What the user asked for, independent of which tool performs it. */
 export type ConversionIntent = 'kobo' | 'kindle' | 'pdfcrop';
 
@@ -27,6 +38,9 @@ export class ConversionError extends Error {
   /** Which conversion was being attempted; attached by the registry, since a backend
    * only knows its own tool and can serve more than one intent. */
   intent?: ConversionIntent;
+
+  /** True when the tool could not be started at all, which is our fault, not the book's. */
+  toolMissing = false;
 
   constructor(
     public readonly tool: string,
@@ -84,7 +98,9 @@ function spawnProcess(
     proc.stderr.on('data', appendOutput);
     proc.once('error', (err) => {
       clearTimeout(timer);
-      reject(new Error(`${cmd} spawn error: ${err.message}`));
+      reject(
+        new SpawnError(`${cmd} spawn error: ${err.message}`, (err as NodeJS.ErrnoException).code)
+      );
     });
     proc.once('close', (code) => {
       clearTimeout(timer);
@@ -311,7 +327,10 @@ export function backendFor(intent: ConversionIntent): ConverterBackend {
   return backend;
 }
 
-/** Runs an intent through its configured backend once a slot is free, tagging failures with the intent. */
+/**
+ * Runs an intent through its configured backend once a slot is free, tagging failures
+ * with the intent and with whether the tool was missing altogether.
+ */
 export async function convert(intent: ConversionIntent, inputPath: string): Promise<string> {
   try {
     return await conversionSlots.run(async (queuedMs) => {
@@ -326,6 +345,7 @@ export async function convert(intent: ConversionIntent, inputPath: string): Prom
   } catch (err) {
     if (err instanceof ConversionError) {
       err.intent = intent;
+      err.toolMissing = err.cause instanceof SpawnError && err.cause.code === 'ENOENT';
     }
     throw err;
   }

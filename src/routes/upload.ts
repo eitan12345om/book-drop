@@ -135,23 +135,25 @@ const CONVERSION_GUIDANCE: Record<ConversionIntent, string> = {
   pdfcrop: 'Could not crop this PDF. Turn off "Crop PDF margins" to send the original PDF.',
 };
 
+const FALLBACK_GUIDANCE =
+  'Conversion failed. Try sending the file again with the conversion options turned off to transfer the original file.';
+
 async function runConversion(
   filePath: string,
-  filename: string,
   mimetype: string,
   device: Ereader | null,
   options: ConversionOptions,
   key: string
-): Promise<{ convertedPath: string; conversionTool: string | null; filename: string }> {
+): Promise<{ convertedPath: string; conversionTool: string | null }> {
   const intent = intentFor(mimetype, device, options);
   if (!intent) {
-    return { convertedPath: filePath, conversionTool: null, filename };
+    return { convertedPath: filePath, conversionTool: null };
   }
   const backend = backendFor(intent);
   logger.info({ key, intent, tool: backend.tool, mimetype }, 'Conversion started');
   const convertedPath = await convert(intent, filePath);
   logger.info({ key, intent, tool: backend.tool }, 'Conversion succeeded');
-  return { convertedPath, conversionTool: backend.tool, filename: backend.outputName(filename) };
+  return { convertedPath, conversionTool: backend.tool };
 }
 
 export function makeUploadRouter(
@@ -353,7 +355,6 @@ export function makeUploadRouter(
           try {
             ({ convertedPath, conversionTool } = await runConversion(
               req.file.path,
-              sanitised,
               mimetype,
               device,
               conversionOptions,
@@ -367,24 +368,27 @@ export function makeUploadRouter(
               res
                 .set('Retry-After', '30')
                 .status(503)
-                .send('Too many conversions in progress — please try again in a moment.');
+                .json({
+                  error: 'Too many conversions in progress — please try again in a moment.',
+                });
               return;
             }
             const tool = convErr instanceof ConversionError ? convErr.tool : null;
             const intent = convErr instanceof ConversionError ? convErr.intent : undefined;
+            const turnOff = (intent && CONVERSION_GUIDANCE[intent]) ?? FALLBACK_GUIDANCE;
+            if (convErr instanceof ConversionError && convErr.toolMissing) {
+              logger.error({ err: convErr, key, tool, intent, ref }, 'Converter is not installed');
+              res.status(500).json({ error: turnOff, ref });
+              return;
+            }
             if (convErr instanceof ConversionError && convErr.timedOut) {
               logger.error({ err: convErr, key, tool, intent, ref }, 'Conversion timed out');
-              res
-                .status(500)
-                .json({ error: 'Conversion timed out — please try sending the file again.', ref });
+              res.status(504).json({ error: turnOff, ref });
               return;
             }
             logger.warn({ err: convErr, key, tool, intent, ref }, 'Conversion failed');
             res.status(400).json({
-              error:
-                (convErr instanceof ConversionError && convErr.userMessage) ||
-                (intent && CONVERSION_GUIDANCE[intent]) ||
-                'Conversion failed. Try sending the file again with the conversion options turned off to transfer the original file.',
+              error: (convErr instanceof ConversionError && convErr.userMessage) || turnOff,
               ref,
             });
             return;
