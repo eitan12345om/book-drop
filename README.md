@@ -120,10 +120,25 @@ around 800 MB (measured at roughly 1.4 GB unpacked with it, 650 MB without, on a
 trade flexibility for size, build with `--build-arg INSTALL_LEGACY_TOOLS=0` to drop the older
 tools, or `--build-arg INSTALL_CALIBRE=0` to keep only them.
 
-Conversions are CPU-bound, and the container is limited to one CPU by `docker-compose.yaml`.
-Running several at once makes each one slower without adding throughput, so they are limited
-to `MAX_CONCURRENT_CONVERSIONS` at a time; further uploads wait briefly and are then refused
-with a 503 rather than being allowed to time out. Raising the limit only helps if you also
-give the container more CPU.
+Conversions are CPU-bound, so the container's CPU allowance is what decides how many books
+it can convert at once. Running more of them than there are CPUs does not add throughput, it
+just makes each one slower — and since the conversion timeout is wall clock, enough of them
+at once makes them all fail together. They are therefore limited to
+`MAX_CONCURRENT_CONVERSIONS` at a time; further uploads wait briefly and are then refused
+with a 503 rather than being admitted to a queue they would time out in.
+
+The container defaults to one CPU and 1 GB, set through `CPUS` and `MEM_LIMIT` in `.env`.
+Give it one CPU per concurrent conversion and around 250 MB of memory for each, plus room
+for the app itself. On a 2-vCPU host, for example:
+
+```sh
+CPUS=2.0
+MEM_LIMIT=4g
+MAX_CONCURRENT_CONVERSIONS=2
+```
+
+Memory beyond that buys nothing: a spare 8 GB will not convert a book any faster than a
+spare 8 MB. If uploads are being refused with a 503, the `queuedMs` and `durationMs` fields
+in the conversion logs show whether the queue is too short or the CPU too slow.
 
 Serving plain HTTP (no reverse-proxy TLS)? Set `DISABLE_HSTS=1` — see env vars above.
