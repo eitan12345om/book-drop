@@ -8,8 +8,6 @@ import { cleanExpiredUploads } from './cleanup.js';
 import { reportConverterAvailability } from './converter.js';
 
 async function main(): Promise<void> {
-  await reportConverterAvailability();
-
   const { app, keys } = createApp();
 
   await cleanExpiredUploads(UPLOAD_DIR, keys, MAX_EXPIRE_MS);
@@ -38,6 +36,7 @@ async function main(): Promise<void> {
 
   server.listen(PORT, () => {
     logger.info({ port: PORT }, `book-drop listening on http://localhost:${PORT}`);
+    void reportConverterAvailability();
   });
 }
 
