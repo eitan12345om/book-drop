@@ -76,7 +76,7 @@ Copy `.env.example` to `.env` to customise these values.
 | `UPLOAD_DIR`                 | `uploads`    | Directory for temporary file storage                                                                                                                           |
 | `EXPIRE_DELAY_MS`            | `300000`     | Inactivity timeout per key (ms)                                                                                                                                |
 | `MAX_EXPIRE_MS`              | `3600000`    | Hard maximum key lifetime (ms)                                                                                                                                 |
-| `MAX_FILE_SIZE`              | `838860800`  | Upload size limit in bytes (800 MB)                                                                                                                            |
+| `MAX_FILE_SIZE`              | `104857600`  | Upload size limit in bytes (100 MB)                                                                                                                            |
 | `MAX_DISK_BYTES`             | `1073741824` | Total upload directory size cap in bytes (1 GB); uploads returning 507 when exceeded                                                                           |
 | `MAX_FILES_PER_KEY`          | `5`          | Max files staged per session key; further uploads return 400                                                                                                   |
 | `MAX_URLS_PER_KEY`           | `20`         | Max URLs staged per session key; further submissions return 400                                                                                                |
