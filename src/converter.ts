@@ -2,7 +2,15 @@ import fs from 'fs/promises';
 import { spawn } from 'child_process';
 import { basename, dirname, join } from 'path';
 import { logger } from './logger.js';
-import { KINDLE_CONVERTER, KINDLE_OUTPUT_FORMAT, KOBO_CONVERTER } from './config.js';
+import {
+  KINDLE_CONVERTER,
+  KINDLE_OUTPUT_FORMAT,
+  KOBO_CONVERTER,
+  MAX_CONCURRENT_CONVERSIONS,
+  MAX_CONVERSION_WAIT_MS,
+  MAX_QUEUED_CONVERSIONS,
+} from './config.js';
+import { Semaphore } from './semaphore.js';
 
 /** KindleGen is much slower than the other converters, so it gets its own cap. */
 const KINDLEGEN_TIMEOUT_MS = 100_000;
@@ -288,6 +296,12 @@ const SELECTED: Record<ConversionIntent, string> = {
   pdfcrop: 'pdfcropmargins',
 };
 
+const conversionSlots = new Semaphore(
+  MAX_CONCURRENT_CONVERSIONS,
+  MAX_QUEUED_CONVERSIONS,
+  MAX_CONVERSION_WAIT_MS
+);
+
 /** Returns the backend currently configured to serve an intent. */
 export function backendFor(intent: ConversionIntent): ConverterBackend {
   const backend = BACKENDS[intent][SELECTED[intent]];
@@ -297,10 +311,18 @@ export function backendFor(intent: ConversionIntent): ConverterBackend {
   return backend;
 }
 
-/** Runs an intent through its configured backend, tagging failures with the intent. */
+/** Runs an intent through its configured backend once a slot is free, tagging failures with the intent. */
 export async function convert(intent: ConversionIntent, inputPath: string): Promise<string> {
   try {
-    return await backendFor(intent).run(inputPath);
+    return await conversionSlots.run(async (queuedMs) => {
+      if (queuedMs > 0) {
+        logger.info(
+          { intent, queuedMs, active: conversionSlots.activeCount },
+          'Conversion waited for a free slot'
+        );
+      }
+      return backendFor(intent).run(inputPath);
+    });
   } catch (err) {
     if (err instanceof ConversionError) {
       err.intent = intent;

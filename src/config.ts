@@ -55,5 +55,9 @@ export const KINDLE_OUTPUT_FORMAT = envChoice(
   ['azw3', 'mobi'] as const,
   'azw3'
 );
+
+export const MAX_CONCURRENT_CONVERSIONS = envInt('MAX_CONCURRENT_CONVERSIONS', 2);
+export const MAX_QUEUED_CONVERSIONS = envInt('MAX_QUEUED_CONVERSIONS', 4);
+export const MAX_CONVERSION_WAIT_MS = envInt('MAX_CONVERSION_WAIT_MS', 30_000);
 export const SSE_HEARTBEAT_MS = envInt('SSE_HEARTBEAT_MS', 25_000);
 export const UPLOAD_CLEANUP_INTERVAL_MS = envInt('UPLOAD_CLEANUP_INTERVAL_MS', MAX_EXPIRE_MS);

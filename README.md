@@ -89,6 +89,9 @@ Copy `.env.example` to `.env` to customise these values.
 | `KOBO_CONVERTER`             | `calibre`    | Tool behind the "Kobo format" option: `calibre` or `kepubify`                                                                                                  |
 | `KINDLE_CONVERTER`           | `calibre`    | Tool behind the "Kindle format" option: `calibre` or `kindlegen`                                                                                               |
 | `KINDLE_OUTPUT_FORMAT`       | `azw3`       | Format calibre produces for Kindle: `azw3` or `mobi`. AZW3 suits modern Kindles; MOBI is for pre-2011 models. Ignored by `kindlegen`, which always writes MOBI |
+| `MAX_CONCURRENT_CONVERSIONS` | `2`          | Conversions allowed to run at the same time; the rest queue                                                                                                    |
+| `MAX_QUEUED_CONVERSIONS`     | `4`          | Uploads allowed to wait for a slot; beyond this, uploads are refused with 503                                                                                  |
+| `MAX_CONVERSION_WAIT_MS`     | `30000`      | How long a queued upload waits for a slot before being refused with 503                                                                                        |
 
 ## Docker
 
@@ -103,5 +106,11 @@ The image ships calibre plus kepubify and KindleGen, so the converter can be swi
 an environment variable and no rebuild. calibre accounts for roughly 850 MB of the image; to
 trade flexibility for size, build with `--build-arg INSTALL_LEGACY_TOOLS=0` to drop the older
 tools, or `--build-arg INSTALL_CALIBRE=0` to keep only them.
+
+Conversions are CPU-bound, and the container is limited to one CPU by `docker-compose.yaml`.
+Running several at once makes each one slower without adding throughput, so they are limited
+to `MAX_CONCURRENT_CONVERSIONS` at a time; further uploads wait briefly and are then refused
+with a 503 rather than being allowed to time out. Raising the limit only helps if you also
+give the container more CPU.
 
 Serving plain HTTP (no reverse-proxy TLS)? Set `DISABLE_HSTS=1` — see env vars above.

@@ -13,6 +13,7 @@ import {
 } from '../keyStore.js';
 import { backendFor, convert, ConversionError } from '../converter.js';
 import type { ConversionIntent } from '../converter.js';
+import { QueueFullError } from '../semaphore.js';
 import {
   MAX_FILE_SIZE,
   MAX_DISK_BYTES,
@@ -361,6 +362,14 @@ export function makeUploadRouter(
           } catch (convErr) {
             const ref = newErrorRef();
             deleteFile(req.file.path);
+            if (convErr instanceof QueueFullError) {
+              logger.warn({ key }, 'Conversion rejected: too many in progress');
+              res
+                .set('Retry-After', '30')
+                .status(503)
+                .send('Too many conversions in progress — please try again in a moment.');
+              return;
+            }
             const tool = convErr instanceof ConversionError ? convErr.tool : null;
             const intent = convErr instanceof ConversionError ? convErr.intent : undefined;
             if (convErr instanceof ConversionError && convErr.timedOut) {
