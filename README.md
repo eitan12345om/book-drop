@@ -65,6 +65,18 @@ pnpm lint
 
 Uses Node.js's built-in test runner (`node:test`) — no extra test framework needed.
 
+`pnpm test` never runs a converter, so it passes on a machine with none installed. The
+conversions themselves are covered separately, against the compiled output, skipping any
+tool that is absent:
+
+```sh
+pnpm build && pnpm test:integration
+
+# or against the image, where every tool is present:
+docker run --rm -v "$PWD/tests:/usr/src/app/tests:ro" --entrypoint node \
+  book-drop --test tests/integration/conversion.test.mjs
+```
+
 ## Environment variables
 
 Copy `.env.example` to `.env` to customise these values.

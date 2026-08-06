@@ -38,6 +38,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "node --import tsx --test \"tests/*.test.ts\"",
+    "test:integration": "node --test \"tests/integration/*.test.mjs\"",
     "test:watch": "node --import tsx --test --watch \"tests/*.test.ts\"",
     "coverage": "c8 --reporter=text --reporter=html node --import tsx --test \"tests/*.test.ts\"",
     "e2e": "playwright test",
