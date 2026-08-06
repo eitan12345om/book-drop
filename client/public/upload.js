@@ -63,6 +63,19 @@ if (!isIOS) {
   fileInput.accept = ACCEPT_ATTR;
 }
 
+/**
+ * Describes the Kindle option in terms of the format the server will actually send,
+ * which the page carries in a meta tag because it is a server-side setting.
+ */
+function kindleFormatDescription() {
+  const format = (
+    document.querySelector('meta[name="kindle-format"]')?.content || 'AZW3'
+  ).toUpperCase();
+  const ageNote =
+    format === 'AZW3' ? ' AZW3 works on Kindles from 2011 onwards.' : ' MOBI works on any Kindle.';
+  return `Converts EPUB to ${format} — Kindle doesn't natively support EPUB.${ageNote} Only runs when sending an EPUB to a Kindle.`;
+}
+
 const OPTIONS = [
   {
     id: 'kobo',
@@ -79,8 +92,7 @@ const OPTIONS = [
     name: 'kindle',
     label: 'Kindle format',
     tag: 'Kindle · EPUB',
-    description:
-      "Converts EPUB to a Kindle-readable format — Kindle doesn't natively support EPUB. Only runs when sending an EPUB to a Kindle.",
+    description: kindleFormatDescription(),
     defaultChecked: false,
     enabledExtensions: ['.epub'],
   },

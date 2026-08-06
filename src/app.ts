@@ -13,8 +13,11 @@ import { isEreaderAgent, extractSharedUrl, formatLimit, newErrorRef } from './ut
 import { serveHtml, makeNotifySSE } from './middleware.js';
 import { makeKeysRouter } from './routes/keys.js';
 import { makeUploadRouter } from './routes/upload.js';
+import { backendFor } from './converter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const KINDLE_FORMAT = backendFor('kindle').outputName('book.epub').split('.').pop()!.toUpperCase();
 
 /** Creates and returns the Express application and the active keys map. */
 export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
@@ -147,6 +150,7 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
           MAX_FILE_SIZE_PLACEHOLDER: String(MAX_FILE_SIZE),
           MAX_FILE_SIZE_LABEL_PLACEHOLDER: formatLimit(MAX_FILE_SIZE),
           VERSION_PLACEHOLDER: BOOKDROP_VERSION,
+          KINDLE_FORMAT_PLACEHOLDER: KINDLE_FORMAT,
         };
     void serveHtml(VIEWS_DIR, page, nonceMap.get(req) ?? '', res, next, extras);
   });

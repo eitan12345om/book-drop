@@ -799,6 +799,20 @@ describe('GET /', () => {
     assert.match(res.text, /Up to 100 MB per file/);
   });
 
+  it('tells the page which Kindle format the configured converter writes', async () => {
+    const { app } = createApp({
+      staticDir: STATIC_DIR,
+      viewsDir: path.join(__dirname, '../client/views'),
+    });
+    const res = await request(app).get('/').set('User-Agent', 'Mozilla/5.0 Chrome/120');
+    assert.strictEqual(res.status, 200);
+    assert.ok(
+      !res.text.includes('KINDLE_FORMAT_PLACEHOLDER'),
+      'Kindle format placeholder must be replaced'
+    );
+    assert.match(res.text, /<meta name="kindle-format" content="(AZW3|MOBI)"/);
+  });
+
   it('serves the download page for a Kobo device', async () => {
     const { app } = createApp({ staticDir: STATIC_DIR, viewsDir: VIEWS_DIR });
     const res = await request(app)
