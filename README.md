@@ -128,8 +128,9 @@ at once makes them all fail together. They are therefore limited to
 with a 503 rather than being admitted to a queue they would time out in.
 
 The container defaults to one CPU and 1 GB, set through `CPUS` and `MEM_LIMIT` in `.env`.
-Give it one CPU per concurrent conversion and around 250 MB of memory for each, plus room
-for the app itself. On a 2-vCPU host, for example:
+Reckon on one CPU per concurrent conversion and around 250 MB of memory for each, plus room
+for the app itself. Fewer CPUs than that still works — the conversions simply share one, and
+each takes correspondingly longer. On a 2-vCPU host, for example:
 
 ```sh
 CPUS=2.0
