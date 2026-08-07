@@ -8,6 +8,17 @@ export function envInt(key: string, fallback: number): number {
   return isNaN(parsed) ? fallback : parsed;
 }
 
+/**
+ * Reads a count from the environment, never returning less than min.
+ *
+ * Clamping matters most for a concurrency limit, where zero reads like "no limit" but
+ * would mean the opposite: no conversion could ever claim a slot, so every upload would
+ * wait out the queue timeout and be refused. The effective values are logged at startup.
+ */
+export function envCount(key: string, fallback: number, min: number): number {
+  return Math.max(min, envInt(key, fallback));
+}
+
 /** Reads one of a fixed set of values from the environment, returning fallback if unset or unrecognised. */
 export function envChoice<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
   const val = process.env[key]?.trim().toLowerCase();
@@ -56,8 +67,8 @@ export const KINDLE_OUTPUT_FORMAT = envChoice(
   'azw3'
 );
 
-export const MAX_CONCURRENT_CONVERSIONS = envInt('MAX_CONCURRENT_CONVERSIONS', 2);
-export const MAX_QUEUED_CONVERSIONS = envInt('MAX_QUEUED_CONVERSIONS', 4);
-export const MAX_CONVERSION_WAIT_MS = envInt('MAX_CONVERSION_WAIT_MS', 30_000);
+export const MAX_CONCURRENT_CONVERSIONS = envCount('MAX_CONCURRENT_CONVERSIONS', 2, 1);
+export const MAX_QUEUED_CONVERSIONS = envCount('MAX_QUEUED_CONVERSIONS', 4, 0);
+export const MAX_CONVERSION_WAIT_MS = envCount('MAX_CONVERSION_WAIT_MS', 30_000, 0);
 export const SSE_HEARTBEAT_MS = envInt('SSE_HEARTBEAT_MS', 25_000);
 export const UPLOAD_CLEANUP_INTERVAL_MS = envInt('UPLOAD_CLEANUP_INTERVAL_MS', MAX_EXPIRE_MS);

@@ -3,7 +3,15 @@ import fs from 'fs/promises';
 import express from 'express';
 import { createApp } from './app.js';
 import { logger } from './logger.js';
-import { PORT, UPLOAD_DIR, MAX_EXPIRE_MS, UPLOAD_CLEANUP_INTERVAL_MS } from './config.js';
+import {
+  PORT,
+  UPLOAD_DIR,
+  MAX_EXPIRE_MS,
+  UPLOAD_CLEANUP_INTERVAL_MS,
+  MAX_CONCURRENT_CONVERSIONS,
+  MAX_CONVERSION_WAIT_MS,
+  MAX_QUEUED_CONVERSIONS,
+} from './config.js';
 import { cleanExpiredUploads } from './cleanup.js';
 import { reportConverterAvailability } from './converter.js';
 
@@ -36,6 +44,14 @@ async function main(): Promise<void> {
 
   server.listen(PORT, () => {
     logger.info({ port: PORT }, `book-drop listening on http://localhost:${PORT}`);
+    logger.info(
+      {
+        maxConcurrent: MAX_CONCURRENT_CONVERSIONS,
+        maxQueued: MAX_QUEUED_CONVERSIONS,
+        maxWaitMs: MAX_CONVERSION_WAIT_MS,
+      },
+      'Conversion limits'
+    );
     void reportConverterAvailability();
   });
 }

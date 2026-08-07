@@ -1,6 +1,6 @@
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { envChoice, envInt } from '../src/config.js';
+import { envChoice, envCount, envInt } from '../src/config.js';
 
 const KEY = 'BOOK_DROP_TEST_CHOICE';
 const CONVERTERS = ['calibre', 'kepubify'] as const;
@@ -29,6 +29,21 @@ describe('envChoice', () => {
     process.env[KEY] = '';
     assert.strictEqual(envChoice(KEY, CONVERTERS, 'calibre'), 'calibre');
   });
+});
+
+describe('envCount', () => {
+  it('refuses a concurrency limit of zero, which would stall every conversion', () => {
+    process.env[KEY] = '0';
+    assert.strictEqual(envCount(KEY, 2, 1), 1);
+    process.env[KEY] = '-4';
+    assert.strictEqual(envCount(KEY, 2, 1), 1);
+  });
+
+  it('allows zero where it is meaningful, such as queueing nothing at all', () => {
+    process.env[KEY] = '0';
+    assert.strictEqual(envCount(KEY, 4, 0), 0);
+  });
+
 });
 
 describe('envInt', () => {
