@@ -101,8 +101,8 @@ Copy `.env.example` to `.env` to customise these values.
 | `KOBO_CONVERTER`             | `calibre`    | Tool behind the "Kobo format" option: `calibre` or `kepubify`                                                                                                  |
 | `KINDLE_CONVERTER`           | `calibre`    | Tool behind the "Kindle format" option: `calibre` or `kindlegen`                                                                                               |
 | `KINDLE_OUTPUT_FORMAT`       | `azw3`       | Format calibre produces for Kindle: `azw3` or `mobi`. AZW3 suits modern Kindles; MOBI is for pre-2011 models. Ignored by `kindlegen`, which always writes MOBI |
-| `MAX_CONCURRENT_CONVERSIONS` | `2`          | Conversions allowed to run at the same time; the rest queue                                                                                                    |
-| `MAX_QUEUED_CONVERSIONS`     | `4`          | Uploads allowed to wait for a slot; beyond this, uploads are refused with 503                                                                                  |
+| `MAX_CONCURRENT_CONVERSIONS` | _(`CPUS`)_   | Conversions allowed to run at the same time; the rest queue. Defaults to `CPUS`, capped at 4                                                                   |
+| `MAX_QUEUED_CONVERSIONS`     | _(2× above)_ | Uploads allowed to wait for a slot; beyond this, uploads are refused with 503                                                                                  |
 | `MAX_CONVERSION_WAIT_MS`     | `30000`      | How long a queued upload waits for a slot before being refused with 503                                                                                        |
 
 ## Docker
@@ -127,16 +127,22 @@ at once makes them all fail together. They are therefore limited to
 `MAX_CONCURRENT_CONVERSIONS` at a time; further uploads wait briefly and are then refused
 with a 503 rather than being admitted to a queue they would time out in.
 
-The container defaults to one CPU and 1 GB, set through `CPUS` and `MEM_LIMIT` in `.env`.
-Reckon on one CPU per concurrent conversion and around 250 MB of memory for each, plus room
-for the app itself. Fewer CPUs than that still works — the conversions simply share one, and
-each takes correspondingly longer. On a 2-vCPU host, for example:
+In practice there is one number to set. `CPUS` and `MEM_LIMIT` in `.env` size the
+container, and `MAX_CONCURRENT_CONVERSIONS` defaults to `CPUS` so the limit follows the
+hardware without being stated twice. Reckon on one CPU per concurrent conversion and
+around 250 MB of memory for each, plus room for the app itself. On a 2-vCPU host:
 
 ```sh
 CPUS=2.0
 MEM_LIMIT=4g
-MAX_CONCURRENT_CONVERSIONS=2
 ```
+
+Fewer CPUs than conversions still works — they simply share, and each takes
+correspondingly longer. The default stops following `CPUS` above four, which is a memory
+guard rather than a CPU one: cores tend to outnumber spare gigabytes, and four conversions
+already want a gigabyte between them. Set `MAX_CONCURRENT_CONVERSIONS` explicitly to go
+higher, and raise `MEM_LIMIT` with it. Whatever ends up in force is logged at startup
+under `Conversion limits`.
 
 Memory beyond that buys nothing: a spare 8 GB will not convert a book any faster than a
 spare 8 MB. If uploads are being refused with a 503, the `queuedMs` and `durationMs` fields

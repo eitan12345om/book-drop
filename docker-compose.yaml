@@ -7,11 +7,11 @@ services:
     restart: unless-stopped
     ports:
       - '${PORT:-3001}:${PORT:-3001}'
-    # Conversions are CPU-bound and each one needs roughly 250 MB, so these are what
-    # actually decide conversion throughput. Defaults suit a 1-vCPU host; see the README
-    # before raising MAX_CONCURRENT_CONVERSIONS to match.
+    # Conversions are CPU-bound and each one needs roughly 250 MB, so these decide
+    # conversion throughput. CPUS reaches the app through env_file below, which sizes
+    # the concurrency limit from it. Defaults suit a 1-vCPU host.
     cpus: ${CPUS:-1.0}
-    mem_limit: ${MEM_LIMIT:-1g}
+    mem_limit: ${MEM_LIMIT:-2g}
     logging:
       driver: json-file
       options:
