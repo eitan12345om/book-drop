@@ -11,7 +11,7 @@ Live at [bookdrop.cc](https://bookdrop.cc) · Forked from [send2ereader](https:/
 3. Pick one or more files and click **Upload and send**.
 4. Download links appear on the ereader within seconds.
 
-Supported formats: EPUB, MOBI, AZW3, PDF, CBZ, CBR, HTML, TXT.
+Supported formats: EPUB, MOBI, AZW3, PDF, CBZ, CBR, HTML, TXT, PNG, JPG.
 
 Optional conversions (requires external tools — see below):
 

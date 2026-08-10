@@ -1,4 +1,16 @@
-const ACCEPTED_EXTENSIONS = ['.epub', '.mobi', '.azw3', '.pdf', '.txt', '.html', '.cbz', '.cbr'];
+const ACCEPTED_EXTENSIONS = [
+  '.epub',
+  '.mobi',
+  '.azw3',
+  '.pdf',
+  '.txt',
+  '.html',
+  '.cbz',
+  '.cbr',
+  '.png',
+  '.jpg',
+  '.jpeg',
+];
 const ACCEPT_ATTR = [
   ...ACCEPTED_EXTENSIONS,
   'application/epub+zip',
@@ -9,6 +21,8 @@ const ACCEPT_ATTR = [
   'text/html',
   'application/vnd.comicbook+zip',
   'application/vnd.comicbook-rar',
+  'image/png',
+  'image/jpeg',
 ].join(',');
 
 // Don't restrict file type on iOS — it breaks the file picker

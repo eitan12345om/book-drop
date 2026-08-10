@@ -29,6 +29,8 @@ export const ALLOWED_TYPES = new Set([
   'text/plain',
   'application/zip',
   'application/x-rar-compressed',
+  'image/png',
+  'image/jpeg',
 ]);
 
 export const ALLOWED_EXTENSIONS = new Set([
@@ -40,6 +42,9 @@ export const ALLOWED_EXTENSIONS = new Set([
   'cbr',
   'html',
   'txt',
+  'png',
+  'jpg',
+  'jpeg',
 ]);
 
 /** Returns true if the user-agent string looks like an e-reader browser. */
