@@ -316,6 +316,40 @@ describe('POST /upload', () => {
     assert.match(res.text, /Sent to/i);
   });
 
+  it('accepts a PNG image (no conversion needed)', async () => {
+    const { app, keys, key } = await generateKey();
+    // Minimal valid 1×1 PNG
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64'
+    );
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', png, { filename: 'cover.png', contentType: 'image/png' });
+    assert.strictEqual(res.status, 200);
+    assert.match(res.text, /Sent to/i);
+    assert.strictEqual(keys.get(key)!.files[0].name, 'cover.png');
+  });
+
+  it('accepts a JPEG image including the .jpeg extension', async () => {
+    const { app, keys, key } = await generateKey();
+    // Minimal valid JPEG (1×1)
+    const jpeg = Buffer.from(
+      '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAn/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAGfAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAQUCf//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQMBAT8Bf//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQIBAT8Bf//Z',
+      'base64'
+    );
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', jpeg, { filename: 'scan.jpeg', contentType: 'image/jpeg' });
+    assert.strictEqual(res.status, 200);
+    assert.match(res.text, /Sent to/i);
+    assert.strictEqual(keys.get(key)!.files[0].name, 'scan.jpeg');
+  });
+
   it('stores file info on the key after a successful upload', async () => {
     const { app, keys, key } = await generateKey();
     await request(app)
