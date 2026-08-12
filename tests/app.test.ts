@@ -677,6 +677,31 @@ describe('GET /:filename', () => {
     const res = await request(app).get(`/mybook.txt?key=${key}`).set('User-Agent', agent);
     assert.strictEqual(res.status, 200);
     assert.ok(res.text.includes('ebook content here'));
+    assert.match(
+      res.headers['content-disposition'] ?? '',
+      /attachment.*mybook\.txt/i,
+      'should force a download prompt for all file types'
+    );
+
+    await fs.rm(tmpFile, { force: true });
+  });
+
+  it('forces a download disposition for image files on non-Kindle agents', async () => {
+    const agent = 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36';
+    const { app, keys, key } = await generateKey(agent);
+    const tmpFile = path.join('uploads', `test-serve-img-${Date.now()}.png`);
+    await fs.writeFile(tmpFile, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    keys.get(key)!.files = [
+      { name: 'cover.png', path: tmpFile, size: 8, uploaded: new Date(), downloadTimer: null },
+    ];
+
+    const res = await request(app).get(`/cover.png?key=${key}`).set('User-Agent', agent);
+    assert.strictEqual(res.status, 200);
+    assert.match(
+      res.headers['content-disposition'] ?? '',
+      /attachment.*cover\.png/i,
+      'images must not be served inline without a download prompt'
+    );
 
     await fs.rm(tmpFile, { force: true });
   });
