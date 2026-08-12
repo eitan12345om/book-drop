@@ -290,11 +290,7 @@ export function makeKeysRouter(
       }
     });
 
-    if (info.agent.includes('Kindle')) {
-      res.download(absPath, filename);
-    } else {
-      res.sendFile(absPath);
-    }
+    res.download(absPath, filename);
   });
 
   return router;
