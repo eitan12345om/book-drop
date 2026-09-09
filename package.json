@@ -70,7 +70,7 @@
     "file-type": "^22.0.1",
     "helmet": "^8.3.0",
     "jszip": "^3.10.1",
-    "multer": "^2.2.0",
+    "multer": "^2.3.0",
     "pino": "^10.3.1",
     "qrcode": "^1.5.4",
     "sanitize-filename": "^1.6.4",
