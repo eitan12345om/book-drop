@@ -378,6 +378,20 @@ test('rejects a file over the size limit before uploading it', async ({ page }) 
   expect(uploads).toBe(0);
 });
 
+test("shows the server's own message when it rejects an upload", async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ZZZZ');
+  await page.locator('#file-input').setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hello ebook'),
+  });
+  await page.locator('#submit-btn').click();
+
+  await expect(page.locator('#status-msg')).toHaveClass(/status-error/);
+  await expect(page.locator('#status-msg')).toHaveText('Unknown key: ZZZZ');
+});
+
 test('shows a plain message when a proxy rejects an upload with an HTML page', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
     headers: { 'User-Agent': 'Kobo/4.0 Test', 'X-Requested-With': 'XMLHttpRequest' },

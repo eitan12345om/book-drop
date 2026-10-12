@@ -291,6 +291,25 @@ describe('POST /upload', () => {
     assert.strictEqual(res.status, 400);
   });
 
+  it('sends its messages as plain text, so the page does not mistake them for a proxy error page', async () => {
+    const { app, key } = await generateKey();
+    const rejected = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', 'ZZZZ')
+      .attach('file', Buffer.from('hello'), { filename: 'test.txt', contentType: 'text/plain' });
+    assert.strictEqual(rejected.status, 400);
+    assert.match(rejected.headers['content-type'], /^text\/plain/);
+
+    const accepted = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', Buffer.from('hello'), { filename: 'test.txt', contentType: 'text/plain' });
+    assert.strictEqual(accepted.status, 200);
+    assert.match(accepted.headers['content-type'], /^text\/plain/);
+  });
+
   it('rejects an empty file', async () => {
     const { app, key } = await generateKey();
     const res = await request(app)
