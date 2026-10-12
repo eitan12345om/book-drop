@@ -58,6 +58,13 @@ export function isEreaderAgent(agent: string): boolean {
   );
 }
 
+/** Returns a size limit as a round figure for display, e.g. "100 MB". */
+export function formatLimit(bytes: number): string {
+  return bytes >= 1024 * 1024
+    ? `${+(bytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${Math.ceil(bytes / 1024)} KB`;
+}
+
 /** Returns true if raw is a valid http or https URL. */
 export function isValidUrl(raw: string): boolean {
   try {

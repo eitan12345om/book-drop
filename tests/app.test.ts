@@ -558,6 +558,17 @@ describe('GET /', () => {
     assert.ok(!res.text.includes('NONCE_PLACEHOLDER'), 'nonce placeholder must be replaced');
   });
 
+  it('tells the page the upload size limit', async () => {
+    const { app } = createApp({
+      staticDir: STATIC_DIR,
+      viewsDir: path.join(__dirname, '../client/views'),
+    });
+    const res = await request(app).get('/').set('User-Agent', 'Mozilla/5.0 Chrome/120');
+    assert.strictEqual(res.status, 200);
+    assert.match(res.text, /<meta name="max-file-size" content="104857600"/);
+    assert.match(res.text, /Up to 100 MB per file/);
+  });
+
   it('serves the download page for a Kobo device', async () => {
     const { app } = createApp({ staticDir: STATIC_DIR, viewsDir: VIEWS_DIR });
     const res = await request(app)

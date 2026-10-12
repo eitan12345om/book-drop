@@ -341,6 +341,70 @@ test('re-enables submit button and shows actionable hint after a network-level u
   await expect(page.locator('#submit-btn')).toBeEnabled();
 });
 
+test('shows the upload size limit in the drop zone', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#zone-limit')).toHaveText('Up to 100 MB per file');
+});
+
+test('rejects a file over the size limit before uploading it', async ({ page }) => {
+  // Shrink the limit the page advertises so the test needn't build a 100 MB buffer.
+  await page.route('/', async (route) => {
+    const response = await route.fetch();
+    const body = (await response.text()).replace(
+      /<meta name="max-file-size" content="\d+"/,
+      '<meta name="max-file-size" content="1024"'
+    );
+    await route.fulfill({ response, body });
+  });
+  let uploads = 0;
+  await page.route('/upload', (route) => {
+    uploads++;
+    return route.abort();
+  });
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#file-input').setInputFiles({
+    name: 'volume-01.cbz',
+    mimeType: 'application/vnd.comicbook+zip',
+    buffer: Buffer.alloc(4096),
+  });
+
+  await expect(page.locator('#status-msg')).toHaveClass(/status-error/);
+  await expect(page.locator('#status-msg')).toContainText(
+    '“volume-01.cbz” is 4 KB — the limit is 1 KB per file.'
+  );
+  await expect(page.locator('#submit-btn')).toBeDisabled();
+  expect(uploads).toBe(0);
+});
+
+test('shows a plain message when a proxy rejects an upload with an HTML page', async ({ page }) => {
+  const apiRes = await page.request.post('/generate', {
+    headers: { 'User-Agent': 'Kobo/4.0 Test', 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  const key = (await apiRes.json()).key as string;
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill(key);
+  await page.locator('#file-input').setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hello ebook'),
+  });
+  await page.route('/upload', (route) =>
+    route.fulfill({
+      status: 413,
+      contentType: 'text/html',
+      body: '<html><head><title>413 Request Entity Too Large</title></head><body>cloudflare</body></html>',
+    })
+  );
+  await page.locator('#submit-btn').click();
+
+  await expect(page.locator('#status-msg')).toHaveText(
+    'File too large — the limit is 100 MB per file.'
+  );
+});
+
 test('shows per-file queue list when multiple files are selected', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([

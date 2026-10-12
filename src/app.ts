@@ -6,10 +6,10 @@ import helmet from 'helmet';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { DISABLE_HSTS } from './config.js';
+import { DISABLE_HSTS, MAX_FILE_SIZE } from './config.js';
 import { logger } from './logger.js';
 import type { KeyInfo } from './types.js';
-import { isEreaderAgent, extractSharedUrl } from './utils.js';
+import { isEreaderAgent, extractSharedUrl, formatLimit } from './utils.js';
 import { serveHtml, makeNotifySSE } from './middleware.js';
 import { makeKeysRouter } from './routes/keys.js';
 import { makeUploadRouter } from './routes/upload.js';
@@ -138,7 +138,12 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
     const ua = req.get('user-agent') ?? '';
     const isEreader = isEreaderAgent(ua);
     const page = isEreader ? 'download.html' : 'upload.html';
-    const extras = isEreader ? { EREADER_CLASS_PLACEHOLDER: 'ereader' } : undefined;
+    const extras: Record<string, string> = isEreader
+      ? { EREADER_CLASS_PLACEHOLDER: 'ereader' }
+      : {
+          MAX_FILE_SIZE_PLACEHOLDER: String(MAX_FILE_SIZE),
+          MAX_FILE_SIZE_LABEL_PLACEHOLDER: formatLimit(MAX_FILE_SIZE),
+        };
     void serveHtml(VIEWS_DIR, page, nonceMap.get(req) ?? '', res, next, extras);
   });
 
