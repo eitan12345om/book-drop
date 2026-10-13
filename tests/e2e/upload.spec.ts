@@ -269,8 +269,7 @@ test('conversion option propagates to every request in multi-file upload', async
     seen.push(body);
     await route.fulfill({
       status: 200,
-      contentType: 'text/plain',
-      body: 'Sent to Kobo\nFilename: out.epub',
+      json: { device: 'Kobo', filename: 'out.epub', conversionTool: null, url: null },
     });
   });
 
@@ -307,8 +306,7 @@ test('shows animated processing state while server processes upload', async ({ p
     await new Promise((r) => setTimeout(r, 2_000));
     await route.fulfill({
       status: 200,
-      contentType: 'text/plain',
-      body: 'Sent to Kobo\nFilename: test.txt',
+      json: { device: 'Kobo', filename: 'test.txt', conversionTool: null, url: null },
     });
   });
   await page.locator('#submit-btn').click();
@@ -416,6 +414,28 @@ test('shows a plain message when a proxy rejects an upload with an HTML page', a
 
   await expect(page.locator('#status-msg')).toHaveText(
     'File too large — the limit is 100 MB per file.'
+  );
+});
+
+test('shows a retry hint when a proxy times out the upload', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#file-input').setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hello ebook'),
+  });
+  await page.route('/upload', (route) =>
+    route.fulfill({
+      status: 524,
+      contentType: 'text/html',
+      body: '<html><head><title>A timeout occurred</title></head><body>cloudflare</body></html>',
+    })
+  );
+  await page.locator('#submit-btn').click();
+
+  await expect(page.locator('#status-msg')).toHaveText(
+    'Upload failed. (HTTP 524) Please try again in a moment.'
   );
 });
 
@@ -563,12 +583,12 @@ test('shows toast for successes and inline error on partial failure', async ({ p
     if (uploadCount === 1) {
       await route.fulfill({
         status: 200,
-        body: 'Sent to Kobo (test.txt)',
+        json: { device: 'Kobo', filename: 'first.txt', conversionTool: null, url: null },
       });
     } else {
       await route.fulfill({
-        status: 429,
-        body: 'File limit reached - this session supports up to 5 files',
+        status: 400,
+        json: { error: 'File limit reached - this session supports up to 5 files' },
       });
     }
   });
