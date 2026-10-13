@@ -331,6 +331,19 @@ export function makeUploadRouter(
         reservePendingDisk(req.file.size);
 
         try {
+          let metadataDiff: MetadataDiff | undefined;
+          let metadataFailed = false;
+          if (req.body?.fetchmetadata && mimetype === TYPE_EPUB) {
+            try {
+              logger.info({ key }, 'Fetching metadata from Google Books');
+              metadataDiff = await updateEpubMetadata(req.file.path);
+              logger.info({ key, changes: Object.keys(metadataDiff).length }, 'Metadata updated');
+            } catch (metaErr) {
+              logger.warn({ err: metaErr, key }, 'Metadata fetch skipped');
+              metadataFailed = true;
+            }
+          }
+
           let convertedPath: string;
           let conversionTool: string | null;
           try {
@@ -365,19 +378,6 @@ export function makeUploadRouter(
             );
             res.status(507).send('Insufficient storage');
             return;
-          }
-
-          let metadataDiff: MetadataDiff | undefined;
-          let metadataFailed = false;
-          if (req.body?.fetchmetadata && mimetype === TYPE_EPUB) {
-            try {
-              logger.info({ key }, 'Fetching metadata from Google Books');
-              metadataDiff = await updateEpubMetadata(convertedPath);
-              logger.info({ key, changes: Object.keys(metadataDiff).length }, 'Metadata updated');
-            } catch (metaErr) {
-              logger.warn({ err: metaErr, key }, 'Metadata fetch skipped');
-              metadataFailed = true;
-            }
           }
 
           addDiskUsage(convertedSize);

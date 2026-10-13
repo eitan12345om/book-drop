@@ -5,7 +5,9 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Application } from 'express';
 import fs from 'fs/promises';
+import os from 'os';
 import path from 'path';
+import JSZip from 'jszip';
 import { fileURLToPath } from 'url';
 import { createApp } from '../src/app.js';
 import {
@@ -1040,6 +1042,75 @@ describe('POST /upload — metadata failure feedback', () => {
     assert.strictEqual(res.status, 200);
     assert.match(res.text, /Sent to/i);
     assert.match(res.text, /Metadata lookup failed/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('POST /upload — metadata with Kindle conversion', () => {
+  let originalFetch: typeof global.fetch;
+  let originalPath: string | undefined;
+  let fakeBinDir: string;
+
+  before(async () => {
+    originalFetch = global.fetch;
+    global.fetch = async () =>
+      Response.json({ items: [{ volumeInfo: { title: 'Fetched Title' } }] });
+
+    // Stands in for kindlegen: writes the EPUB's OPF as the "MOBI", so the output
+    // shows which metadata the EPUB had when it was converted.
+    fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-kindlegen-'));
+    const script = path.join(fakeBinDir, 'kindlegen');
+    await fs.writeFile(script, '#!/bin/sh\nunzip -p "$1" OEBPS/content.opf > "$5"\n');
+    await fs.chmod(script, 0o755);
+    originalPath = process.env.PATH;
+    process.env.PATH = `${fakeBinDir}${path.delimiter}${originalPath}`;
+  });
+
+  after(async () => {
+    global.fetch = originalFetch;
+    process.env.PATH = originalPath;
+    await fs.rm(fakeBinDir, { recursive: true, force: true });
+  });
+
+  it('writes fetched metadata into the EPUB before converting it', async () => {
+    const { app, keys, key } = await generateKey('Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0');
+    const zip = new JSZip();
+    zip.file(
+      'META-INF/container.xml',
+      `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`
+    );
+    zip.file(
+      'OEBPS/content.opf',
+      `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Original Title</dc:title>
+  </metadata>
+</package>`
+    );
+    const epub = await zip.generateAsync({ type: 'nodebuffer' });
+
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .field('fetchmetadata', '1')
+      .field('kindlegen', '1')
+      .attach('file', epub, { filename: 'book.epub', contentType: 'application/epub+zip' });
+
+    assert.strictEqual(res.status, 200);
+    assert.doesNotMatch(res.text, /Metadata lookup failed/i);
+    const [file] = keys.get(key)!.files;
+    assert.strictEqual(file.name, 'book.mobi');
+    assert.deepStrictEqual(file.metadataDiff, {
+      title: { before: 'Original Title', after: 'Fetched Title' },
+    });
+    assert.match(await fs.readFile(file.path, 'utf8'), /Fetched Title/);
   });
 });
 
