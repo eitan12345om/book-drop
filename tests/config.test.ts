@@ -82,7 +82,6 @@ describe('envCount', () => {
     process.env[KEY] = '0';
     assert.strictEqual(envCount(KEY, 4, 0), 0);
   });
-
 });
 
 describe('envInt', () => {
