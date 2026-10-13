@@ -673,6 +673,25 @@ describe('POST /upload', () => {
     assert.match(res.body.error, /Kobo format/i);
   });
 
+  it('does not tell a Kindle user to send the EPUB, which a Kindle cannot open', async () => {
+    const { app, key } = await generateKey('Kindle/3.0 Test');
+    const res = await withoutConverters(async () =>
+      request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .set('User-Agent', 'Kindle/3.0 Test')
+        .field('key', key)
+        .field('kindle', 'true')
+        .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
+          filename: 'book.epub',
+          contentType: 'application/epub+zip',
+        })
+    );
+    assert.strictEqual(res.status, 500);
+    assert.match(res.body.error, /Send to Kindle/);
+    assert.doesNotMatch(res.body.error, /turn off/i);
+  });
+
   it('still honours the tool-named fields sent by older clients', async () => {
     const { app, key } = await generateKey('Kobo/1.0 Test');
     const res = await withoutConverters(async () =>

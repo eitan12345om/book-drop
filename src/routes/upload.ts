@@ -131,7 +131,7 @@ const FILE_TOO_LARGE = `File too large — the limit is ${formatLimit(MAX_FILE_S
 const CONVERSION_GUIDANCE: Record<ConversionIntent, string> = {
   kobo: 'Could not convert this EPUB to the Kobo format. Turn off the "Kobo format" option and send it again — Kobo readers open standard EPUBs fine, just without the kepub enhancements.',
   kindle:
-    'Could not convert this EPUB to the Kindle format. Turn off the "Kindle format" option to send the original EPUB instead.',
+    "Could not convert this EPUB to the Kindle format, and Kindles can't open EPUB files directly. Convert it on your computer (for example with calibre) and send the AZW3 or MOBI file, or use Amazon's Send to Kindle, which accepts EPUB.",
   pdfcrop: 'Could not crop this PDF. Turn off "Crop PDF margins" to send the original PDF.',
 };
 
