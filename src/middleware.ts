@@ -49,6 +49,15 @@ export async function serveHtml(
   }
 }
 
+/**
+ * Labels the route's string responses as plain text; res.send() would otherwise call them
+ * HTML, and the upload page treats an HTML response as a proxy's error page.
+ */
+export const plainTextResponses: express.RequestHandler = (_req, res, next) => {
+  res.type('text/plain');
+  next();
+};
+
 /** Rejects requests that lack the X-Requested-With: XMLHttpRequest header (CSRF protection). */
 export const requireXhr: express.RequestHandler = (req, res, next) => {
   if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {

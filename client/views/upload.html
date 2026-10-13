@@ -15,6 +15,7 @@
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#1c1917" />
+    <meta name="max-file-size" content="MAX_FILE_SIZE_PLACEHOLDER" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -190,6 +191,9 @@
               <div class="zone-icon" aria-hidden="true">📚</div>
               <p class="zone-label"><strong>Choose files</strong> or drag &amp; drop</p>
               <p class="zone-formats">EPUB · MOBI · AZW3 · PDF · TXT · CBZ · CBR · PNG · JPG</p>
+              <p class="zone-formats" id="zone-limit">
+                Up to MAX_FILE_SIZE_LABEL_PLACEHOLDER per file
+              </p>
             </div>
             <div id="zone-selected" class="hidden" aria-live="polite">
               <p class="zone-file-info">

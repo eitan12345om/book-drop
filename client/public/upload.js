@@ -49,6 +49,10 @@ const progressFill = document.getElementById('progress-fill');
 const pageUrlLink = document.getElementById('page-url');
 const optionsNote = document.getElementById('options-note');
 
+/** Per-file upload limit in bytes, carried in a meta tag because it is a server-side setting; 0 if absent. */
+const MAX_FILE_SIZE =
+  parseInt(document.querySelector('meta[name="max-file-size"]')?.content, 10) || 0;
+
 const receiveUrl = `${window.location.origin}/receive`;
 pageUrlLink.href = receiveUrl;
 pageUrlLink.textContent = receiveUrl;
@@ -263,6 +267,13 @@ function formatSize(bytes) {
     : `${Math.ceil(bytes / 1024)} KB`;
 }
 
+/** Returns the upload limit as a round figure, e.g. "100 MB"; mirrors formatLimit() in src/utils.ts. */
+function formatLimit(bytes) {
+  return bytes >= 1024 * 1024
+    ? `${+(bytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${Math.ceil(bytes / 1024)} KB`;
+}
+
 /** Enables the submit button when one or more files are selected or a URL is entered. */
 function updateSubmitState() {
   submitBtn.disabled = selectedFiles.length === 0 && !urlInput.value.trim();
@@ -435,13 +446,20 @@ function renderHistory() {
   historySection.classList.remove('hidden');
 }
 
-/** Returns true if the file's extension is in ACCEPTED_EXTENSIONS, showing an error otherwise. */
+/** Returns true if the file has an accepted extension and fits the upload limit, showing an error otherwise. */
 function validateFile(file) {
   const ext = `.${file.name.split('.').pop().toLowerCase()}`;
   if (!ACCEPTED_EXTENSIONS.includes(ext)) {
     showStatus(
       'error',
       `Unsupported format: ${file.name}\nAllowed: ${ACCEPTED_EXTENSIONS.join(', ')}`
+    );
+    return false;
+  }
+  if (MAX_FILE_SIZE && file.size > MAX_FILE_SIZE) {
+    showStatus(
+      'error',
+      `\u201c${file.name}\u201d is ${formatSize(file.size)} \u2014 the limit is ${formatLimit(MAX_FILE_SIZE)} per file.`
     );
     return false;
   }
@@ -595,6 +613,24 @@ function formatSuccessMessages(messages) {
   return lines.join('\n');
 }
 
+/**
+ * Returns the error to show for a failed upload response. The server answers in plain text,
+ * but a proxy in front of it (e.g. Cloudflare rejecting an oversized body) answers with an
+ * HTML page, which must not be shown verbatim.
+ */
+function uploadErrorMessage(xhr, fallback) {
+  const contentType = xhr.getResponseHeader('Content-Type') || '';
+  if (!contentType.includes('text/html')) {
+    return xhr.responseText || fallback;
+  }
+  if (xhr.status === 413) {
+    return MAX_FILE_SIZE
+      ? `File too large \u2014 the limit is ${formatLimit(MAX_FILE_SIZE)} per file.`
+      : 'File too large.';
+  }
+  return `${fallback} (HTTP ${xhr.status}) Please try again in a moment.`;
+}
+
 function attemptUpload(formData, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -710,7 +746,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     if (urlXhr.status < 200 || urlXhr.status >= 300) {
       submitBtn.disabled = false;
       setProgress(0, false);
-      showStatus('error', urlXhr.responseText || 'Failed to stage URL.');
+      showStatus('error', uploadErrorMessage(urlXhr, 'Failed to stage URL.'));
       return;
     }
     successMessages.push(urlXhr.responseText);
@@ -742,7 +778,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       urlInput.value = '';
       updateSubmitState();
     } else {
-      showStatus('error', xhr.responseText || 'Upload failed.');
+      showStatus('error', uploadErrorMessage(xhr, 'Upload failed.'));
     }
     return;
   }
@@ -835,7 +871,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
         urlInput.value = '';
         updateSubmitState();
       }
-      showStatus('error', xhr.responseText || 'Upload failed.');
+      showStatus('error', uploadErrorMessage(xhr, 'Upload failed.'));
       return;
     }
 

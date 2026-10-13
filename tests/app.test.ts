@@ -291,6 +291,25 @@ describe('POST /upload', () => {
     assert.strictEqual(res.status, 400);
   });
 
+  it('sends its messages as plain text, so the page does not mistake them for a proxy error page', async () => {
+    const { app, key } = await generateKey();
+    const rejected = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', 'ZZZZ')
+      .attach('file', Buffer.from('hello'), { filename: 'test.txt', contentType: 'text/plain' });
+    assert.strictEqual(rejected.status, 400);
+    assert.match(rejected.headers['content-type'], /^text\/plain/);
+
+    const accepted = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', Buffer.from('hello'), { filename: 'test.txt', contentType: 'text/plain' });
+    assert.strictEqual(accepted.status, 200);
+    assert.match(accepted.headers['content-type'], /^text\/plain/);
+  });
+
   it('rejects an empty file', async () => {
     const { app, key } = await generateKey();
     const res = await request(app)
@@ -556,6 +575,17 @@ describe('GET /', () => {
     assert.strictEqual(res.status, 200);
     assert.ok(res.text.includes('upload'));
     assert.ok(!res.text.includes('NONCE_PLACEHOLDER'), 'nonce placeholder must be replaced');
+  });
+
+  it('tells the page the upload size limit', async () => {
+    const { app } = createApp({
+      staticDir: STATIC_DIR,
+      viewsDir: path.join(__dirname, '../client/views'),
+    });
+    const res = await request(app).get('/').set('User-Agent', 'Mozilla/5.0 Chrome/120');
+    assert.strictEqual(res.status, 200);
+    assert.match(res.text, /<meta name="max-file-size" content="104857600"/);
+    assert.match(res.text, /Up to 100 MB per file/);
   });
 
   it('serves the download page for a Kobo device', async () => {

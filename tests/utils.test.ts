@@ -14,6 +14,7 @@ import {
   doTransliterate,
   deleteFile,
   extractSharedUrl,
+  formatLimit,
   readEpubMetadata,
   writeEpubMetadata,
   fetchGoogleBooksMetadata,
@@ -261,6 +262,20 @@ describe('isValidKey', () => {
 
   it('rejects lowercase', () => {
     assert.strictEqual(isValidKey('acdf'), false);
+  });
+});
+
+describe('formatLimit', () => {
+  it('shows whole megabytes without a decimal', () => {
+    assert.strictEqual(formatLimit(100 * 1024 * 1024), '100 MB');
+  });
+
+  it('keeps one decimal place for fractional megabytes', () => {
+    assert.strictEqual(formatLimit(2.5 * 1024 * 1024), '2.5 MB');
+  });
+
+  it('falls back to kilobytes below one megabyte', () => {
+    assert.strictEqual(formatLimit(1024), '1 KB');
   });
 });
 

@@ -30,6 +30,7 @@ import {
   isValidKey,
   isValidUrl,
   deleteFile,
+  formatLimit,
   clientIp,
   doTransliterate,
   updateEpubMetadata,
@@ -37,7 +38,7 @@ import {
   ALLOWED_TYPES,
   ALLOWED_EXTENSIONS,
 } from '../utils.js';
-import { makeLimiter, requireXhr } from '../middleware.js';
+import { makeLimiter, plainTextResponses, requireXhr } from '../middleware.js';
 
 async function detectMimetype(
   filePath: string,
@@ -99,6 +100,8 @@ function uniqueFilename(name: string, existingNames: string[]): string {
   } while (existingNames.includes(candidate));
   return candidate;
 }
+
+const FILE_TOO_LARGE = `File too large — the limit is ${formatLimit(MAX_FILE_SIZE)} per file.`;
 
 async function runConversion(
   filePath: string,
@@ -204,7 +207,7 @@ export function makeUploadRouter(
     fileFilter,
   });
 
-  router.post('/upload', requireXhr, uploadLimiter, (req, res) => {
+  router.post('/upload', plainTextResponses, requireXhr, uploadLimiter, (req, res) => {
     upload.single('file')(req, res, async (err) => {
       if (err) {
         // LIMIT_FILE_SIZE leaves a partial file on disk; clean it up before responding.
@@ -214,7 +217,7 @@ export function makeUploadRouter(
         }
         logger.warn({ err }, 'Upload rejected');
         if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-          res.status(413).send(err.message);
+          res.status(413).send(FILE_TOO_LARGE);
         } else {
           res.status(400).send((err as Error).message);
         }
