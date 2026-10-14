@@ -41,6 +41,70 @@ test('upload a text file and see success message', async ({ page }) => {
   await expect(page.locator('.toast')).toContainText('Sent to', { timeout: 10_000 });
 });
 
+test('success message names the conversion tool and a failed metadata lookup', async ({ page }) => {
+  await page.route('/upload', (route) =>
+    route.fulfill({
+      json: {
+        device: 'Kobo',
+        filename: 'book.kepub.epub',
+        conversionTool: 'Kepubify',
+        url: null,
+        metadataFailed: true,
+      },
+    })
+  );
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#file-input').setInputFiles({
+    name: 'book.epub',
+    mimeType: 'application/epub+zip',
+    buffer: Buffer.from('fake epub'),
+  });
+  await page.locator('#submit-btn').click();
+
+  const toast = page.locator('.toast');
+  await expect(toast).toContainText('Sent to Kobo (converted with Kepubify)');
+  await expect(toast).toContainText('\u2022 book.kepub.epub');
+  await expect(toast).toContainText('(Metadata lookup failed \u2014 original metadata kept.)');
+});
+
+test('success message lists a URL sent along with a file', async ({ page }) => {
+  await page.route('/upload', (route) => {
+    const isFile = (route.request().postData() ?? '').includes('name="file"');
+    return route.fulfill({
+      json: isFile
+        ? { device: 'Kobo', filename: 'test.txt', conversionTool: null, url: null }
+        : { url: 'https://example.com/book' },
+    });
+  });
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#urlinput').fill('https://example.com/book');
+  await page.locator('#file-input').setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hello ebook'),
+  });
+  await page.locator('#submit-btn').click();
+
+  const toast = page.locator('.toast');
+  await expect(toast).toContainText('Sent to Kobo');
+  await expect(toast).toContainText('\u2022 test.txt');
+  await expect(toast).toContainText('URL added: https://example.com/book');
+});
+
+test('success message for a URL on its own', async ({ page }) => {
+  await page.route('/upload', (route) =>
+    route.fulfill({ json: { url: 'https://example.com/book' } })
+  );
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#urlinput').fill('https://example.com/book');
+  await page.locator('#submit-btn').click();
+
+  await expect(page.locator('.toast')).toHaveText('URL added: https://example.com/book');
+});
+
 test('autoselects kindlegen when key belongs to a Kindle device', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
     headers: {
