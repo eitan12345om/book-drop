@@ -38,7 +38,7 @@ import {
   ALLOWED_TYPES,
   ALLOWED_EXTENSIONS,
 } from '../utils.js';
-import { makeLimiter, plainTextResponses, requireXhr } from '../middleware.js';
+import { makeLimiter, requireXhr } from '../middleware.js';
 
 async function detectMimetype(
   filePath: string,
@@ -143,33 +143,15 @@ function deviceLabel(agent: string): string {
   return agent.includes('Kobo') ? 'Kobo' : agent.includes('Kindle') ? 'Kindle' : 'your device';
 }
 
-export function buildSuccessMessage(
-  device: string,
-  conversionTool: string | null,
-  filename: string,
-  submittedUrl: string | null,
-  metadataFailed?: boolean
-): string {
-  const parts = [
-    conversionTool ? `Sent to ${device} (converted with ${conversionTool})` : `Sent to ${device}`,
-    `Filename: ${filename}`,
-  ];
-  if (submittedUrl) {
-    parts.push(`URL added: ${submittedUrl}`);
-  }
-  if (metadataFailed) {
-    parts.push('(Metadata lookup failed — original metadata kept.)');
-  }
-  return parts.join('\n');
-}
-
 export function makeUploadRouter(
   keys: Map<string, KeyInfo>,
   notifySSE: (key: string, info: KeyInfo) => void
 ): express.Router {
   const router = express.Router();
 
-  const uploadLimiter = makeLimiter(UPLOAD_RATE_LIMIT_MAX);
+  const uploadLimiter = makeLimiter(UPLOAD_RATE_LIMIT_MAX, {
+    message: { error: 'Too many uploads. Please try again in a few minutes.' },
+  });
 
   const storage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
@@ -207,7 +189,7 @@ export function makeUploadRouter(
     fileFilter,
   });
 
-  router.post('/upload', plainTextResponses, requireXhr, uploadLimiter, (req, res) => {
+  router.post('/upload', requireXhr, uploadLimiter, (req, res) => {
     upload.single('file')(req, res, async (err) => {
       if (err) {
         // LIMIT_FILE_SIZE leaves a partial file on disk; clean it up before responding.
@@ -217,23 +199,23 @@ export function makeUploadRouter(
         }
         logger.warn({ err }, 'Upload rejected');
         if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-          res.status(413).send(FILE_TOO_LARGE);
+          res.status(413).json({ error: FILE_TOO_LARGE });
         } else {
-          res.status(400).send((err as Error).message);
+          res.status(400).json({ error: (err as Error).message });
         }
         return;
       }
 
       const key = ((req.body?.key as string) ?? '').toUpperCase();
       if (!isValidKey(key)) {
-        res.status(400).send('Invalid key format');
+        res.status(400).json({ error: 'Invalid key format' });
         if (req.file) {
           deleteFile(req.file.path);
         }
         return;
       }
       if (!keys.has(key)) {
-        res.status(400).send(`Unknown key: ${key}`);
+        res.status(400).json({ error: `Unknown key: ${key}` });
         if (req.file) {
           deleteFile(req.file.path);
         }
@@ -247,21 +229,21 @@ export function makeUploadRouter(
       const rawUrl = ((req.body?.url as string) ?? '').trim();
       if (rawUrl) {
         if (rawUrl.length > 2048) {
-          res.status(400).send('URL too long');
+          res.status(400).json({ error: 'URL too long' });
           if (req.file) {
             deleteFile(req.file.path);
           }
           return;
         }
         if (!isValidUrl(rawUrl)) {
-          res.status(400).send('Invalid URL: only http and https are allowed');
+          res.status(400).json({ error: 'Invalid URL: only http and https are allowed' });
           if (req.file) {
             deleteFile(req.file.path);
           }
           return;
         }
         if (info.urls.length >= MAX_URLS_PER_KEY) {
-          res.status(400).send('URL limit reached');
+          res.status(400).json({ error: 'URL limit reached' });
           if (req.file) {
             deleteFile(req.file.path);
           }
@@ -275,13 +257,13 @@ export function makeUploadRouter(
       }
 
       if (!req.file && !submittedUrl) {
-        res.status(400).send('No file or URL provided');
+        res.status(400).json({ error: 'No file or URL provided' });
         return;
       }
 
       if (req.file) {
         if (req.file.size === 0) {
-          res.status(400).send('Invalid file submitted (empty file)');
+          res.status(400).json({ error: 'Invalid file submitted (empty file)' });
           deleteFile(req.file.path);
           return;
         }
@@ -291,17 +273,17 @@ export function makeUploadRouter(
         if (!ALLOWED_TYPES.has(mimetype) && !(detectedMime && ALLOWED_TYPES.has(detectedMime))) {
           const ext = path.extname(req.file.originalname).substring(1);
           logger.warn({ key, mimetype, ext }, 'Upload rejected: unsupported type');
-          res
-            .status(400)
-            .send(`Unsupported file type: ${req.file.originalname} (${detectedMime ?? mimetype})`);
+          res.status(400).json({
+            error: `Unsupported file type: ${req.file.originalname} (${detectedMime ?? mimetype})`,
+          });
           deleteFile(req.file.path);
           return;
         }
 
         if (info.files.length + info.pendingUploads >= MAX_FILES_PER_KEY) {
-          res
-            .status(400)
-            .send(`File limit reached - this session supports up to ${MAX_FILES_PER_KEY} files`);
+          res.status(400).json({
+            error: `File limit reached - this session supports up to ${MAX_FILES_PER_KEY} files`,
+          });
           deleteFile(req.file.path);
           return;
         }
@@ -348,7 +330,7 @@ export function makeUploadRouter(
           } catch (convErr) {
             logger.error({ err: convErr, key }, 'Conversion failed');
             deleteFile(req.file.path);
-            res.status(500).send('Conversion failed');
+            res.status(500).json({ error: 'Conversion failed' });
             return;
           }
 
@@ -356,7 +338,7 @@ export function makeUploadRouter(
           if (convertedSize > MAX_FILE_SIZE) {
             deleteFile(convertedPath);
             logger.warn({ key, convertedSize }, 'Upload rejected: converted file too large');
-            res.status(413).send('Converted file too large');
+            res.status(413).json({ error: 'Converted file too large' });
             return;
           }
 
@@ -366,7 +348,7 @@ export function makeUploadRouter(
               { key, convertedSize, diskUsage: getEffectiveDiskUsage() },
               'Upload rejected: disk limit reached'
             );
-            res.status(507).send('Insufficient storage');
+            res.status(507).json({ error: 'Insufficient storage' });
             return;
           }
 
@@ -408,15 +390,13 @@ export function makeUploadRouter(
           );
           notifySSE(key, info);
 
-          res.send(
-            buildSuccessMessage(
-              deviceLabel(info.agent),
-              conversionTool,
-              finalName,
-              submittedUrl,
-              metadataFailed
-            )
-          );
+          res.json({
+            device: deviceLabel(info.agent),
+            filename: finalName,
+            conversionTool,
+            url: submittedUrl,
+            metadataFailed,
+          });
         } finally {
           info.pendingUploads--;
           info.pendingFilenames = info.pendingFilenames.filter((n) => n !== finalName);
@@ -426,7 +406,7 @@ export function makeUploadRouter(
       }
 
       notifySSE(key, info);
-      res.send(`URL added: ${submittedUrl}`);
+      res.json({ url: submittedUrl });
     });
   });
 

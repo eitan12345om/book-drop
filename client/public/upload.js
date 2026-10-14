@@ -378,16 +378,13 @@ const HISTORY_KEY = 'bookdrop-sent';
 const HISTORY_MAX = 5;
 const HISTORY_TTL_MS = 60 * 60 * 1000;
 
-/** Adds filenames from successful upload response texts to session history. */
-function addToHistory(responseTexts) {
+/** Adds filenames from successful upload results to session history. */
+function addToHistory(results) {
   const existing = readHistory();
   const now = Date.now();
-  const newEntries = responseTexts
-    .map((text) => {
-      const match = text.match(/^Filename: (.+)$/m);
-      return match ? { name: match[1].trim(), sentAt: now } : null;
-    })
-    .filter(Boolean);
+  const newEntries = results
+    .filter((r) => r.filename)
+    .map((r) => ({ name: r.filename, sentAt: now }));
   if (newEntries.length === 0) {
     return;
   }
@@ -514,12 +511,9 @@ fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 urlInput.addEventListener('input', updateSubmitState);
 
 /** Builds a brief success summary string suitable for a toast. */
-function buildSuccessToast(messages) {
-  const deviceMatch = messages
-    .find((m) => /^Sent to /m.test(m))
-    ?.match(/^Sent to ([^(\n]+?)(?:\s*\(|$)/m);
-  const device = deviceMatch ? deviceMatch[1].trim() : 'your device';
-  const count = messages.length;
+function buildSuccessToast(results) {
+  const device = results.find((r) => r.device)?.device ?? 'your device';
+  const count = results.length;
   return count === 1 ? `1 file sent to ${device}` : `${count} files sent to ${device}`;
 }
 
@@ -562,66 +556,76 @@ function setProgress(value, visible) {
  * Rejects on network-level error.
  */
 /**
- * Turns the raw array of per-request server responses into a single human-friendly string.
+ * Turns the per-request upload results into a single human-friendly string.
  *
- * Single file:  "Sent to Kobo\nbook.epub"  (strips redundant "Filename: " label)
- * Multi-file:   "3 files sent to Kobo\n• book1.epub\n• book2.epub (converted with Kepubify)"
- * URL messages  ("URL added: …") are appended as-is after the file summary.
+ * Single file:  "Sent to Kobo\n• book.epub"
+ * Multi-file:   "3 files sent to Kobo\n• book1.epub\n• book2.epub — converted with Kepubify"
+ * URL-only results ("URL added: …") are appended after the file summary.
  */
-function formatSuccessMessages(messages) {
-  const fileMessages = [];
-  const urlMessages = [];
-  for (let i = 0; i < messages.length; i++) {
-    if (/^Sent to /m.test(messages[i])) {
-      fileMessages.push(messages[i]);
-    } else {
-      urlMessages.push(messages[i]);
-    }
-  }
+function formatSuccessMessages(results) {
+  const fileResults = results.filter((r) => r.filename);
+  const urlResults = results.filter((r) => !r.filename && r.url);
 
   const lines = [];
 
-  if (fileMessages.length === 1) {
-    // Single file: keep the "Sent to …" header and prefix the filename with a bullet.
-    lines.push(fileMessages[0].replace(/^Filename: /m, '\u2022 '));
-  } else if (fileMessages.length > 1) {
-    // Multiple files: one summary header, then a bulleted filename list.
-    const deviceMatch = fileMessages[0].match(/^Sent to ([^(\n]+?)(?:\s*\(|$)/m);
-    const device = deviceMatch ? deviceMatch[1].trim() : 'your device';
-    lines.push(`${fileMessages.length} files sent to ${device}`);
-    for (let j = 0; j < fileMessages.length; j++) {
-      const filenameMatch = fileMessages[j].match(/^Filename: (.+)$/m);
-      if (!filenameMatch) {
-        continue;
+  if (fileResults.length === 1) {
+    const r = fileResults[0];
+    lines.push(
+      r.conversionTool
+        ? `Sent to ${r.device} (converted with ${r.conversionTool})`
+        : `Sent to ${r.device}`
+    );
+    lines.push(`\u2022 ${r.filename}`);
+    if (r.url) {
+      lines.push(`URL added: ${r.url}`);
+    }
+    if (r.metadataFailed) {
+      lines.push('(Metadata lookup failed \u2014 original metadata kept.)');
+    }
+  } else if (fileResults.length > 1) {
+    lines.push(`${fileResults.length} files sent to ${fileResults[0].device}`);
+    for (const r of fileResults) {
+      let entry = `\u2022 ${r.filename}`;
+      if (r.conversionTool) {
+        entry += ` \u2014 converted with ${r.conversionTool}`;
       }
-      let entry = `\u2022 ${filenameMatch[1]}`;
-      const convMatch = fileMessages[j].match(/converted with ([^)]+)\)/);
-      if (convMatch) {
-        entry += ` \u2014 converted with ${convMatch[1]}`;
-      }
-      if (/Metadata lookup failed/.test(fileMessages[j])) {
+      if (r.metadataFailed) {
         entry += ' \u2014 metadata unchanged';
       }
       lines.push(entry);
     }
   }
 
-  for (let k = 0; k < urlMessages.length; k++) {
-    lines.push(urlMessages[k]);
+  for (const r of urlResults) {
+    lines.push(`URL added: ${r.url}`);
   }
 
   return lines.join('\n');
 }
 
+/** Parses a JSON response body, or returns null if it isn't JSON. */
+function readJson(xhr) {
+  try {
+    return JSON.parse(xhr.responseText);
+  } catch {
+    return null;
+  }
+}
+
+/** Returns the parsed result of a successful upload response. */
+function readResult(xhr) {
+  return readJson(xhr) ?? {};
+}
+
 /**
- * Returns the error to show for a failed upload response. The server answers in plain text,
- * but a proxy in front of it (e.g. Cloudflare rejecting an oversized body) answers with an
- * HTML page, which must not be shown verbatim.
+ * Returns the error to show for a failed upload response. The server answers with JSON
+ * ({ error }), but a proxy in front of it (e.g. Cloudflare rejecting an oversized body)
+ * answers with an HTML page, which must not be shown verbatim.
  */
 function uploadErrorMessage(xhr, fallback) {
-  const contentType = xhr.getResponseHeader('Content-Type') || '';
-  if (!contentType.includes('text/html')) {
-    return xhr.responseText || fallback;
+  const body = readJson(xhr);
+  if (typeof body?.error === 'string') {
+    return body.error;
   }
   if (xhr.status === 413) {
     return MAX_FILE_SIZE
@@ -723,7 +727,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   submitBtn.disabled = true;
 
   const filesToUpload = selectedFiles.slice(); // capture before any async gaps
-  const successMessages = [];
+  const successResults = [];
 
   if (urlVal && filesToUpload.length > 0) {
     setProgress(0, true);
@@ -749,7 +753,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       showStatus('error', uploadErrorMessage(urlXhr, 'Failed to stage URL.'));
       return;
     }
-    successMessages.push(urlXhr.responseText);
+    successResults.push(readResult(urlXhr));
   }
 
   if (filesToUpload.length === 0) {
@@ -774,7 +778,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     setProgress(0, false);
     if (xhr.status >= 200 && xhr.status < 300) {
       hideStatus();
-      showToast(xhr.responseText);
+      showToast(formatSuccessMessages([readResult(xhr)]));
       urlInput.value = '';
       updateSubmitState();
     } else {
@@ -830,10 +834,10 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       }
       submitBtn.disabled = false;
       setProgress(0, false);
-      if (successMessages.length > 0) {
-        addToHistory(successMessages);
+      if (successResults.length > 0) {
+        addToHistory(successResults);
         renderHistory();
-        showToast(buildSuccessToast(successMessages));
+        showToast(buildSuccessToast(successResults));
         resetFormAfterUpload();
         urlInput.value = '';
         updateSubmitState();
@@ -863,10 +867,10 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       }
       submitBtn.disabled = false;
       setProgress(0, false);
-      if (successMessages.length > 0) {
-        addToHistory(successMessages);
+      if (successResults.length > 0) {
+        addToHistory(successResults);
         renderHistory();
-        showToast(buildSuccessToast(successMessages));
+        showToast(buildSuccessToast(successResults));
         resetFormAfterUpload();
         urlInput.value = '';
         updateSubmitState();
@@ -878,7 +882,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     if (total > 1) {
       setFileQueueStatus(i, '\u2713 done', 'done');
     }
-    successMessages.push(xhr.responseText);
+    successResults.push(readResult(xhr));
   }
 
   if (uploadId !== currentUploadId) {
@@ -886,15 +890,15 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   }
   submitBtn.disabled = false;
   setProgress(0, false);
-  addToHistory(successMessages);
+  addToHistory(successResults);
   renderHistory();
   hideStatus();
   if (total > 1) {
     // Queue rows already show ✓ done — just show a brief summary, keep queue visible.
-    showToast(buildSuccessToast(successMessages));
+    showToast(buildSuccessToast(successResults));
     resetFormAfterUpload();
   } else {
-    showToast(formatSuccessMessages(successMessages));
+    showToast(formatSuccessMessages(successResults));
     setFiles([]);
   }
   urlInput.value = '';

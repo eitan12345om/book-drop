@@ -41,6 +41,70 @@ test('upload a text file and see success message', async ({ page }) => {
   await expect(page.locator('.toast')).toContainText('Sent to', { timeout: 10_000 });
 });
 
+test('success message names the conversion tool and a failed metadata lookup', async ({ page }) => {
+  await page.route('/upload', (route) =>
+    route.fulfill({
+      json: {
+        device: 'Kobo',
+        filename: 'book.kepub.epub',
+        conversionTool: 'Kepubify',
+        url: null,
+        metadataFailed: true,
+      },
+    })
+  );
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#file-input').setInputFiles({
+    name: 'book.epub',
+    mimeType: 'application/epub+zip',
+    buffer: Buffer.from('fake epub'),
+  });
+  await page.locator('#submit-btn').click();
+
+  const toast = page.locator('.toast');
+  await expect(toast).toContainText('Sent to Kobo (converted with Kepubify)');
+  await expect(toast).toContainText('\u2022 book.kepub.epub');
+  await expect(toast).toContainText('(Metadata lookup failed \u2014 original metadata kept.)');
+});
+
+test('success message lists a URL sent along with a file', async ({ page }) => {
+  await page.route('/upload', (route) => {
+    const isFile = (route.request().postData() ?? '').includes('name="file"');
+    return route.fulfill({
+      json: isFile
+        ? { device: 'Kobo', filename: 'test.txt', conversionTool: null, url: null }
+        : { url: 'https://example.com/book' },
+    });
+  });
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#urlinput').fill('https://example.com/book');
+  await page.locator('#file-input').setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hello ebook'),
+  });
+  await page.locator('#submit-btn').click();
+
+  const toast = page.locator('.toast');
+  await expect(toast).toContainText('Sent to Kobo');
+  await expect(toast).toContainText('\u2022 test.txt');
+  await expect(toast).toContainText('URL added: https://example.com/book');
+});
+
+test('success message for a URL on its own', async ({ page }) => {
+  await page.route('/upload', (route) =>
+    route.fulfill({ json: { url: 'https://example.com/book' } })
+  );
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#urlinput').fill('https://example.com/book');
+  await page.locator('#submit-btn').click();
+
+  await expect(page.locator('.toast')).toHaveText('URL added: https://example.com/book');
+});
+
 test('autoselects kindlegen when key belongs to a Kindle device', async ({ page }) => {
   const apiRes = await page.request.post('/generate', {
     headers: {
@@ -269,8 +333,7 @@ test('conversion option propagates to every request in multi-file upload', async
     seen.push(body);
     await route.fulfill({
       status: 200,
-      contentType: 'text/plain',
-      body: 'Sent to Kobo\nFilename: out.epub',
+      json: { device: 'Kobo', filename: 'out.epub', conversionTool: null, url: null },
     });
   });
 
@@ -307,8 +370,7 @@ test('shows animated processing state while server processes upload', async ({ p
     await new Promise((r) => setTimeout(r, 2_000));
     await route.fulfill({
       status: 200,
-      contentType: 'text/plain',
-      body: 'Sent to Kobo\nFilename: test.txt',
+      json: { device: 'Kobo', filename: 'test.txt', conversionTool: null, url: null },
     });
   });
   await page.locator('#submit-btn').click();
@@ -416,6 +478,28 @@ test('shows a plain message when a proxy rejects an upload with an HTML page', a
 
   await expect(page.locator('#status-msg')).toHaveText(
     'File too large — the limit is 100 MB per file.'
+  );
+});
+
+test('shows a retry hint when a proxy times out the upload', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#file-input').setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hello ebook'),
+  });
+  await page.route('/upload', (route) =>
+    route.fulfill({
+      status: 524,
+      contentType: 'text/html',
+      body: '<html><head><title>A timeout occurred</title></head><body>cloudflare</body></html>',
+    })
+  );
+  await page.locator('#submit-btn').click();
+
+  await expect(page.locator('#status-msg')).toHaveText(
+    'Upload failed. (HTTP 524) Please try again in a moment.'
   );
 });
 
@@ -563,12 +647,12 @@ test('shows toast for successes and inline error on partial failure', async ({ p
     if (uploadCount === 1) {
       await route.fulfill({
         status: 200,
-        body: 'Sent to Kobo (test.txt)',
+        json: { device: 'Kobo', filename: 'first.txt', conversionTool: null, url: null },
       });
     } else {
       await route.fulfill({
-        status: 429,
-        body: 'File limit reached - this session supports up to 5 files',
+        status: 400,
+        json: { error: 'File limit reached - this session supports up to 5 files' },
       });
     }
   });
