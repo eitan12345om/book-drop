@@ -17,9 +17,9 @@ import {
   MAX_FILES_PER_KEY,
   MAX_URLS_PER_KEY,
   FILE_DELETE_DELAY_MS,
+  UPLOAD_RATE_LIMIT_MAX,
 } from '../src/config.js';
 import { addDiskUsage, subtractDiskUsage, getDiskUsage } from '../src/keyStore.js';
-import { buildSuccessMessage } from '../src/routes/upload.js';
 import type { KeyInfo } from '../src/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -322,7 +322,7 @@ describe('POST /upload', () => {
     assert.strictEqual(res.status, 400);
   });
 
-  it('sends its messages as plain text, so the page does not mistake them for a proxy error page', async () => {
+  it('answers with JSON, so the page can tell its responses from a proxy error page', async () => {
     const { app, key } = await generateKey();
     const rejected = await request(app)
       .post('/upload')
@@ -330,7 +330,8 @@ describe('POST /upload', () => {
       .field('key', 'ZZZZ')
       .attach('file', Buffer.from('hello'), { filename: 'test.txt', contentType: 'text/plain' });
     assert.strictEqual(rejected.status, 400);
-    assert.match(rejected.headers['content-type'], /^text\/plain/);
+    assert.match(rejected.headers['content-type'], /^application\/json/);
+    assert.deepStrictEqual(rejected.body, { error: 'Unknown key: ZZZZ' });
 
     const accepted = await request(app)
       .post('/upload')
@@ -338,7 +339,38 @@ describe('POST /upload', () => {
       .field('key', key)
       .attach('file', Buffer.from('hello'), { filename: 'test.txt', contentType: 'text/plain' });
     assert.strictEqual(accepted.status, 200);
-    assert.match(accepted.headers['content-type'], /^text\/plain/);
+    assert.match(accepted.headers['content-type'], /^application\/json/);
+    assert.deepStrictEqual(accepted.body, {
+      device: 'your device',
+      filename: 'test.txt',
+      conversionTool: null,
+      url: null,
+      metadataFailed: false,
+    });
+  });
+
+  it('answers with a JSON error when uploads are rate limited', async () => {
+    const { app } = createApp();
+    let res;
+    for (let i = 0; i <= UPLOAD_RATE_LIMIT_MAX; i++) {
+      res = await request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .field('key', 'ZZZZ');
+    }
+    assert.strictEqual(res!.status, 429);
+    assert.match(res!.body.error, /Too many uploads/);
+  });
+
+  it('answers a URL-only submission with the staged URL', async () => {
+    const { app, key } = await generateKey();
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .field('url', 'https://example.com/book');
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(res.body, { url: 'https://example.com/book' });
   });
 
   it('rejects an empty file', async () => {
@@ -349,7 +381,7 @@ describe('POST /upload', () => {
       .field('key', key)
       .attach('file', Buffer.alloc(0), { filename: 'empty.txt', contentType: 'text/plain' });
     assert.strictEqual(res.status, 400);
-    assert.match(res.text, /empty/i);
+    assert.match(res.body.error, /empty/i);
   });
 
   it('accepts a plain text file (no conversion needed)', async () => {
@@ -363,7 +395,7 @@ describe('POST /upload', () => {
         contentType: 'text/plain',
       });
     assert.strictEqual(res.status, 200);
-    assert.match(res.text, /Sent to/i);
+    assert.strictEqual(res.body.device, 'your device');
   });
 
   it('accepts a PNG image (no conversion needed)', async () => {
@@ -379,7 +411,7 @@ describe('POST /upload', () => {
       .field('key', key)
       .attach('file', png, { filename: 'cover.png', contentType: 'image/png' });
     assert.strictEqual(res.status, 200);
-    assert.match(res.text, /Sent to/i);
+    assert.strictEqual(res.body.device, 'your device');
     assert.strictEqual(keys.get(key)!.files[0].name, 'cover.png');
   });
 
@@ -396,7 +428,7 @@ describe('POST /upload', () => {
       .field('key', key)
       .attach('file', jpeg, { filename: 'scan.jpeg', contentType: 'image/jpeg' });
     assert.strictEqual(res.status, 200);
-    assert.match(res.text, /Sent to/i);
+    assert.strictEqual(res.body.device, 'your device');
     assert.strictEqual(keys.get(key)!.files[0].name, 'scan.jpeg');
   });
 
@@ -433,7 +465,7 @@ describe('POST /upload', () => {
       .set('X-Requested-With', 'XMLHttpRequest')
       .field('key', key);
     assert.strictEqual(res.status, 400);
-    assert.match(res.text, /No file or URL/i);
+    assert.match(res.body.error, /No file or URL/i);
   });
 
   it('rejects an invalid URL', async () => {
@@ -444,7 +476,7 @@ describe('POST /upload', () => {
       .field('key', key)
       .field('url', 'javascript:alert(1)');
     assert.strictEqual(res.status, 400);
-    assert.match(res.text, /Invalid URL/i);
+    assert.match(res.body.error, /Invalid URL/i);
   });
 
   it('returns 400 when MAX_FILES_PER_KEY is reached', async () => {
@@ -468,7 +500,7 @@ describe('POST /upload', () => {
         contentType: 'text/plain',
       });
     assert.strictEqual(res.status, 400);
-    assert.match(res.text, /File limit/i);
+    assert.match(res.body.error, /File limit/i);
   });
 
   it('returns 400 when pendingUploads already fills the slot (TOCTOU guard)', async () => {
@@ -485,7 +517,7 @@ describe('POST /upload', () => {
         contentType: 'text/plain',
       });
     assert.strictEqual(res.status, 400);
-    assert.match(res.text, /File limit/i);
+    assert.match(res.body.error, /File limit/i);
   });
 
   it('accumulates disk usage across multiple files for the same key', async () => {
@@ -576,7 +608,7 @@ describe('POST /upload', () => {
       .field('key', key)
       .field('url', 'https://example.com/overflow');
     assert.strictEqual(res.status, 400);
-    assert.match(res.text, /URL limit/i);
+    assert.match(res.body.error, /URL limit/i);
   });
 
   it('returns 500 with a generic message when conversion fails', async () => {
@@ -594,7 +626,7 @@ describe('POST /upload', () => {
         contentType: 'application/epub+zip',
       });
     assert.strictEqual(res.status, 500);
-    assert.strictEqual(res.text, 'Conversion failed');
+    assert.deepStrictEqual(res.body, { error: 'Conversion failed' });
   });
 });
 
@@ -1042,37 +1074,6 @@ describe('POST /generate — 503 body', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('buildSuccessMessage', () => {
-  it('returns basic success message without optional fields', () => {
-    const msg = buildSuccessMessage('your device', null, 'book.epub', null);
-    assert.ok(msg.includes('Sent to your device'));
-    assert.ok(msg.includes('Filename: book.epub'));
-    assert.ok(!msg.includes('Metadata lookup failed'));
-  });
-
-  it('includes conversion tool when provided', () => {
-    const msg = buildSuccessMessage('Kindle', 'KindleGen', 'book.mobi', null);
-    assert.ok(msg.includes('converted with KindleGen'));
-  });
-
-  it('includes URL when provided', () => {
-    const msg = buildSuccessMessage('your device', null, 'book.epub', 'https://example.com');
-    assert.ok(msg.includes('URL added: https://example.com'));
-  });
-
-  it('appends metadata failure note when metadataFailed is true', () => {
-    const msg = buildSuccessMessage('your device', null, 'book.epub', null, true);
-    assert.ok(msg.includes('Metadata lookup failed'));
-    assert.ok(msg.includes('original metadata kept'));
-  });
-
-  it('does not append metadata failure note when metadataFailed is false', () => {
-    const msg = buildSuccessMessage('your device', null, 'book.epub', null, false);
-    assert.ok(!msg.includes('Metadata lookup failed'));
-  });
-});
-
-// ---------------------------------------------------------------------------
 describe('POST /upload — metadata failure feedback', () => {
   let originalFetch: typeof global.fetch;
 
@@ -1088,7 +1089,7 @@ describe('POST /upload — metadata failure feedback', () => {
     global.fetch = originalFetch;
   });
 
-  it('includes metadata failure note in response when fetchmetadata is set and EPUB parsing fails', async () => {
+  it('reports the metadata failure when fetchmetadata is set and EPUB parsing fails', async () => {
     const { app, key } = await generateKey();
     // Not a valid ZIP — JSZip throws immediately, so fetchGoogleBooksMetadata is never called.
     const fakeEpub = Buffer.from('not a real epub file');
@@ -1099,8 +1100,8 @@ describe('POST /upload — metadata failure feedback', () => {
       .field('fetchmetadata', '1')
       .attach('file', fakeEpub, { filename: 'book.epub', contentType: 'application/epub+zip' });
     assert.strictEqual(res.status, 200);
-    assert.match(res.text, /Sent to/i);
-    assert.match(res.text, /Metadata lookup failed/i);
+    assert.strictEqual(res.body.filename, 'book.epub');
+    assert.strictEqual(res.body.metadataFailed, true);
   });
 });
 
