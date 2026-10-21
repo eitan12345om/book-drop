@@ -24,12 +24,39 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = path.join(__dirname, '../static');
 const VIEWS_DIR = path.join(__dirname, '../static-views');
 
+// Every request goes through one server bound to 127.0.0.1, which routes it to the app
+// named in its X-Test-App header. Given an app, supertest would listen on `::` instead,
+// and macOS can hand that socket a port another process already holds on 127.0.0.1
+// alone; supertest then sends the request to 127.0.0.1 and reaches that process.
+const TEST_APP_HEADER = 'x-test-app';
+const appIds = new Map<Application, string>();
+const appsById = new Map<string, Application>();
+const testServer = http.createServer((req, res) => {
+  const app = appsById.get(req.headers[TEST_APP_HEADER] as string);
+  if (!app) {
+    res.writeHead(500).end('Unknown test app');
+    return;
+  }
+  app(req, res);
+});
+
+const connect = (app: Application) => {
+  let id = appIds.get(app);
+  if (!id) {
+    id = String(appIds.size);
+    appIds.set(app, id);
+    appsById.set(id, app);
+  }
+  return supertest.agent(testServer).set(TEST_APP_HEADER, id);
+};
+
 // Pre-sets `X-Forwarded-Proto: https` so requests pass the HSTS gate.
 // Mirrors production, where a TLS-terminating proxy sets this header and
 // `app.set('trust proxy', 1)` makes `req.secure === true`.
-const request = (app: Application) => supertest.agent(app).set('X-Forwarded-Proto', 'https');
+const request = (app: Application) => connect(app).set('X-Forwarded-Proto', 'https');
 
 before(async () => {
+  await new Promise<void>((resolve) => testServer.listen(0, '127.0.0.1', resolve));
   await fs.mkdir('uploads', { recursive: true });
   // Create minimal stub HTML files so the route tests don't depend on a build
   await fs.mkdir(STATIC_DIR, { recursive: true });
@@ -45,6 +72,8 @@ before(async () => {
 });
 
 after(async () => {
+  testServer.closeAllConnections();
+  await new Promise<void>((resolve) => testServer.close(() => resolve()));
   await fs.rm('uploads', { recursive: true, force: true });
   await fs.rm(VIEWS_DIR, { recursive: true, force: true });
 });
@@ -1154,11 +1183,11 @@ describe('GET /events/:key', () => {
 
   it('opens SSE stream with correct headers and sends initial state', async () => {
     await new Promise<void>((resolve, reject) => {
-      const server = app.listen(0, () => {
+      const server = app.listen(0, '127.0.0.1', () => {
         const { port } = server.address() as AddressInfo;
         const req = http.request(
           {
-            hostname: 'localhost',
+            hostname: '127.0.0.1',
             port,
             path: `/events/${encodeURIComponent(key)}`,
             headers: { 'User-Agent': agent, 'X-Forwarded-Proto': 'https' },
@@ -1208,11 +1237,11 @@ describe('GET /events/:key', () => {
     const aliceBefore = keys.get(key)!.alive.getTime();
     await new Promise<void>((resolve) => setTimeout(resolve, 5));
     await new Promise<void>((resolve, reject) => {
-      const server = app.listen(0, () => {
+      const server = app.listen(0, '127.0.0.1', () => {
         const { port } = server.address() as AddressInfo;
         const req = http.request(
           {
-            hostname: 'localhost',
+            hostname: '127.0.0.1',
             port,
             path: `/events/${encodeURIComponent(key)}`,
             headers: { 'User-Agent': agent, 'X-Forwarded-Proto': 'https' },
@@ -1253,14 +1282,14 @@ describe('HSTS', () => {
 
   it('rejects plain HTTP requests with 400', async () => {
     const { app } = createApp();
-    const res = await supertest(app).get('/');
+    const res = await connect(app).get('/');
     assert.strictEqual(res.status, 400);
     assert.match(res.text, /HSTS/);
   });
 
   it('still serves /health over plain HTTP', async () => {
     const { app } = createApp();
-    const res = await supertest(app).get('/health');
+    const res = await connect(app).get('/health');
     assert.strictEqual(res.status, 200);
   });
 });
