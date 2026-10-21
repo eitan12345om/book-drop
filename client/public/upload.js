@@ -556,43 +556,28 @@ function setProgress(value, visible) {
  * Rejects on network-level error.
  */
 /**
- * Turns the per-request upload results into a single human-friendly string.
- *
- * Single file:  "Sent to Kobo\n• book.epub"
- * Multi-file:   "3 files sent to Kobo\n• book1.epub\n• book2.epub — converted with Kepubify"
- * URL-only results ("URL added: …") are appended after the file summary.
+ * Turns the results of a single-file upload (and any URL staged with it) into one
+ * human-friendly string: "Sent to Kobo\n• book.epub", then any "URL added: …" lines.
+ * Multi-file uploads are summarised by buildSuccessToast instead.
  */
 function formatSuccessMessages(results) {
-  const fileResults = results.filter((r) => r.filename);
+  const fileResult = results.find((r) => r.filename);
   const urlResults = results.filter((r) => !r.filename && r.url);
 
   const lines = [];
 
-  if (fileResults.length === 1) {
-    const r = fileResults[0];
+  if (fileResult) {
     lines.push(
-      r.conversionTool
-        ? `Sent to ${r.device} (converted with ${r.conversionTool})`
-        : `Sent to ${r.device}`
+      fileResult.conversionTool
+        ? `Sent to ${fileResult.device} (converted with ${fileResult.conversionTool})`
+        : `Sent to ${fileResult.device}`
     );
-    lines.push(`\u2022 ${r.filename}`);
-    if (r.url) {
-      lines.push(`URL added: ${r.url}`);
+    lines.push(`\u2022 ${fileResult.filename}`);
+    if (fileResult.url) {
+      lines.push(`URL added: ${fileResult.url}`);
     }
-    if (r.metadataFailed) {
+    if (fileResult.metadataFailed) {
       lines.push('(Metadata lookup failed \u2014 original metadata kept.)');
-    }
-  } else if (fileResults.length > 1) {
-    lines.push(`${fileResults.length} files sent to ${fileResults[0].device}`);
-    for (const r of fileResults) {
-      let entry = `\u2022 ${r.filename}`;
-      if (r.conversionTool) {
-        entry += ` \u2014 converted with ${r.conversionTool}`;
-      }
-      if (r.metadataFailed) {
-        entry += ' \u2014 metadata unchanged';
-      }
-      lines.push(entry);
     }
   }
 
