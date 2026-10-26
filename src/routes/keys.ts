@@ -291,7 +291,14 @@ export function makeKeysRouter(
     });
 
     // absPath is server-generated, so a dot-directory in UPLOAD_DIR is not a hidden file
-    res.download(absPath, filename, { dotfiles: 'allow' });
+    const sendOptions = { dotfiles: 'allow' } as const;
+    if (/^[\x20-\x7e]*$/.test(filename)) {
+      res.download(absPath, filename, sendOptions);
+    } else {
+      // Kobo ignores filename* and would save the lossy "??" fallback; it names the file from the URL
+      res.attachment();
+      res.sendFile(absPath, sendOptions);
+    }
   });
 
   return router;
