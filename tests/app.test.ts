@@ -20,6 +20,7 @@ import {
   UPLOAD_RATE_LIMIT_MAX,
 } from '../src/config.js';
 import { addDiskUsage, subtractDiskUsage, getDiskUsage } from '../src/keyStore.js';
+import { sanitiseFilename } from '../src/routes/upload.js';
 import type { KeyInfo } from '../src/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -307,6 +308,36 @@ describe('DELETE /file/:key/:filename', () => {
 
     const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
     assert.deepStrictEqual(status.body.files, []);
+  });
+
+  it('removes a file whose name contains a percent sign', async () => {
+    const agent = 'TestBrowser/1.0';
+    const { app, keys, key } = await generateKey(agent);
+    keys.get(key)!.files = [
+      {
+        name: '100% true.epub',
+        path: '/tmp/nonexistent.epub',
+        size: 0,
+        uploaded: new Date(),
+        downloadTimer: null,
+      },
+    ];
+
+    const del = await request(app)
+      .delete(`/file/${key}/${encodeURIComponent('100% true.epub')}`)
+      .set('X-Requested-With', 'XMLHttpRequest');
+    assert.strictEqual(del.status, 200);
+
+    const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
+    assert.deepStrictEqual(status.body.files, []);
+  });
+
+  it('returns 400 for invalid UTF-8 percent-encoding in the filename', async () => {
+    const { app, key } = await generateKey();
+    const res = await request(app)
+      .delete(`/file/${key}/%c0.epub`)
+      .set('X-Requested-With', 'XMLHttpRequest');
+    assert.strictEqual(res.status, 400);
   });
 });
 
@@ -770,9 +801,9 @@ describe('GET /:filename', () => {
     const res = await request(app).get(`/mybook.txt?key=${key}`).set('User-Agent', agent);
     assert.strictEqual(res.status, 200);
     assert.ok(res.text.includes('ebook content here'));
-    assert.match(
-      res.headers['content-disposition'] ?? '',
-      /attachment.*mybook\.txt/i,
+    assert.strictEqual(
+      res.headers['content-disposition'],
+      'attachment; filename="mybook.txt"',
       'should force a download prompt for all file types'
     );
 
@@ -790,11 +821,69 @@ describe('GET /:filename', () => {
 
     const res = await request(app).get(`/cover.png?key=${key}`).set('User-Agent', agent);
     assert.strictEqual(res.status, 200);
-    assert.match(
-      res.headers['content-disposition'] ?? '',
-      /attachment.*cover\.png/i,
+    assert.strictEqual(res.headers['content-type'], 'image/png');
+    assert.strictEqual(
+      res.headers['content-disposition'],
+      'attachment; filename="cover.png"',
       'images must not be served inline without a download prompt'
     );
+
+    await fs.rm(tmpFile, { force: true });
+  });
+
+  it('serves a staged file when UPLOAD_DIR is inside a dot-directory', async () => {
+    const agent = 'TestBrowser/1.0';
+    const { app, keys, key } = await generateKey(agent);
+    const dir = path.join('uploads', '.hidden');
+    await fs.mkdir(dir, { recursive: true });
+    const tmpFile = path.join(dir, `test-serve-dotdir-${Date.now()}.txt`);
+    await fs.writeFile(tmpFile, 'ebook in a dot-directory');
+    keys.get(key)!.files = [
+      { name: 'dotdir.txt', path: tmpFile, size: 24, uploaded: new Date(), downloadTimer: null },
+    ];
+
+    const res = await request(app).get(`/dotdir.txt?key=${key}`).set('User-Agent', agent);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.text, 'ebook in a dot-directory');
+
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it('serves a non-ASCII name with a bare attachment so Kobo names it from the URL', async () => {
+    const agent = 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36';
+    const { app, keys, key } = await generateKey(agent);
+    const tmpFile = path.join('uploads', `test-serve-cjk-${Date.now()}.epub`);
+    await fs.writeFile(tmpFile, 'chinese ebook');
+    keys.get(key)!.files = [
+      { name: '三体.epub', path: tmpFile, size: 13, uploaded: new Date(), downloadTimer: null },
+    ];
+
+    const res = await request(app)
+      .get(`/${encodeURIComponent('三体.epub')}?key=${key}`)
+      .set('User-Agent', agent)
+      .responseType('blob');
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.headers['content-type'], 'application/epub+zip');
+    assert.strictEqual(res.headers['content-disposition'], 'attachment');
+    assert.strictEqual(res.body.toString(), 'chinese ebook');
+
+    await fs.rm(tmpFile, { force: true });
+  });
+
+  it('serves a staged file whose name contains a percent sign', async () => {
+    const agent = 'TestBrowser/1.0';
+    const { app, keys, key } = await generateKey(agent);
+    const tmpFile = path.join('uploads', `test-serve-percent-${Date.now()}.txt`);
+    await fs.writeFile(tmpFile, 'percent content');
+    keys.get(key)!.files = [
+      { name: '100% true.txt', path: tmpFile, size: 15, uploaded: new Date(), downloadTimer: null },
+    ];
+
+    const res = await request(app)
+      .get(`/${encodeURIComponent('100% true.txt')}?key=${key}`)
+      .set('User-Agent', agent);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.text, 'percent content');
 
     await fs.rm(tmpFile, { force: true });
   });
@@ -884,6 +973,17 @@ describe('GET /:filename — download timer', () => {
     assert.strictEqual(keys.get(key)!.files.length, 0, 'file should be removed after delay');
 
     await fs.rm(tmpFile, { force: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('sanitiseFilename', () => {
+  it('reduces Kindle filenames to ASCII, so downloads to Kindle keep their named attachment', () => {
+    const name = sanitiseFilename('三体 – Liu Cixin.epub', {
+      transliterate: false,
+      isKindle: true,
+    });
+    assert.match(name, /^[\x20-\x7e]+\.epub$/);
   });
 });
 

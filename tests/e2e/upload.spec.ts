@@ -260,6 +260,41 @@ test('uploads multiple files sequentially and both appear on download page', asy
   await koboCtx.close();
 });
 
+test('downloads a Chinese-named EPUB under its original name on Kobo', async ({ browser }) => {
+  const baseURL = `http://localhost:${process.env.E2E_PORT ?? '3001'}`;
+  const koboCtx = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36',
+    baseURL,
+  });
+  const koboPage = await koboCtx.newPage();
+  await koboPage.goto('/');
+  await expect(koboPage.locator('#key-display')).not.toHaveText('\u2013\u2013\u2013\u2013', {
+    timeout: 5_000,
+  });
+  const key = (await koboPage.locator('#key-display').textContent())?.trim() as string;
+
+  const uploadCtx = await browser.newContext({ baseURL, storageState: SUPPRESS_HOWTO_STORAGE });
+  const uploadPage = await uploadCtx.newPage();
+  await uploadPage.goto('/');
+  await uploadPage.locator('#keyinput').fill(key);
+  await expect(uploadPage.locator('#kepubify')).toBeChecked({ timeout: 5_000 });
+  await uploadPage.locator('#kepubify').uncheck();
+  await uploadPage.locator('#file-input').setInputFiles({
+    name: '三体.epub',
+    mimeType: 'application/epub+zip',
+    buffer: Buffer.from('fake epub'),
+  });
+  await uploadPage.locator('#submit-btn').click();
+  await expect(uploadPage.locator('.toast')).toContainText('Sent to', { timeout: 10_000 });
+  await uploadCtx.close();
+
+  const link = koboPage.locator('#download-list a', { hasText: '三体.epub' });
+  await expect(link).toBeVisible({ timeout: 10_000 });
+  const [download] = await Promise.all([koboPage.waitForEvent('download'), link.click()]);
+  expect(download.suggestedFilename()).toBe('三体.epub');
+  await koboCtx.close();
+});
+
 test('enables conversion options when multiple files of the same type are selected', async ({
   page,
 }) => {
