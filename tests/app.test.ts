@@ -803,7 +803,7 @@ describe('GET /:filename', () => {
     assert.ok(res.text.includes('ebook content here'));
     assert.strictEqual(
       res.headers['content-disposition'],
-      'attachment; filename="mybook.txt"',
+      'attachment; filename=mybook.txt',
       'should force a download prompt for all file types'
     );
 
@@ -824,7 +824,7 @@ describe('GET /:filename', () => {
     assert.strictEqual(res.headers['content-type'], 'image/png');
     assert.strictEqual(
       res.headers['content-disposition'],
-      'attachment; filename="cover.png"',
+      'attachment; filename=cover.png',
       'images must not be served inline without a download prompt'
     );
 
