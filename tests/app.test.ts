@@ -799,6 +799,24 @@ describe('GET /:filename', () => {
     await fs.rm(tmpFile, { force: true });
   });
 
+  it('serves a staged file when UPLOAD_DIR is inside a dot-directory', async () => {
+    const agent = 'TestBrowser/1.0';
+    const { app, keys, key } = await generateKey(agent);
+    const dir = path.join('uploads', '.hidden');
+    await fs.mkdir(dir, { recursive: true });
+    const tmpFile = path.join(dir, `test-serve-dotdir-${Date.now()}.txt`);
+    await fs.writeFile(tmpFile, 'ebook in a dot-directory');
+    keys.get(key)!.files = [
+      { name: 'dotdir.txt', path: tmpFile, size: 24, uploaded: new Date(), downloadTimer: null },
+    ];
+
+    const res = await request(app).get(`/dotdir.txt?key=${key}`).set('User-Agent', agent);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.text, 'ebook in a dot-directory');
+
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
   it('falls through (404) when the filename does not match any staged file', async () => {
     const agent = 'TestBrowser/1.0';
     const { app, keys, key } = await generateKey(agent);

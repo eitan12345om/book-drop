@@ -290,7 +290,8 @@ export function makeKeysRouter(
       }
     });
 
-    res.download(absPath, filename);
+    // absPath is server-generated, so a dot-directory in UPLOAD_DIR is not a hidden file
+    res.download(absPath, filename, { dotfiles: 'allow' });
   });
 
   return router;
