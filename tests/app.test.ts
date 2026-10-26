@@ -309,6 +309,36 @@ describe('DELETE /file/:key/:filename', () => {
     const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
     assert.deepStrictEqual(status.body.files, []);
   });
+
+  it('removes a file whose name contains a percent sign', async () => {
+    const agent = 'TestBrowser/1.0';
+    const { app, keys, key } = await generateKey(agent);
+    keys.get(key)!.files = [
+      {
+        name: '100% true.epub',
+        path: '/tmp/nonexistent.epub',
+        size: 0,
+        uploaded: new Date(),
+        downloadTimer: null,
+      },
+    ];
+
+    const del = await request(app)
+      .delete(`/file/${key}/${encodeURIComponent('100% true.epub')}`)
+      .set('X-Requested-With', 'XMLHttpRequest');
+    assert.strictEqual(del.status, 200);
+
+    const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
+    assert.deepStrictEqual(status.body.files, []);
+  });
+
+  it('returns 400 for invalid UTF-8 percent-encoding in the filename', async () => {
+    const { app, key } = await generateKey();
+    const res = await request(app)
+      .delete(`/file/${key}/%c0.epub`)
+      .set('X-Requested-With', 'XMLHttpRequest');
+    assert.strictEqual(res.status, 400);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -836,6 +866,24 @@ describe('GET /:filename', () => {
     assert.strictEqual(res.headers['content-type'], 'application/epub+zip');
     assert.strictEqual(res.headers['content-disposition'], 'attachment');
     assert.strictEqual(res.body.toString(), 'chinese ebook');
+
+    await fs.rm(tmpFile, { force: true });
+  });
+
+  it('serves a staged file whose name contains a percent sign', async () => {
+    const agent = 'TestBrowser/1.0';
+    const { app, keys, key } = await generateKey(agent);
+    const tmpFile = path.join('uploads', `test-serve-percent-${Date.now()}.txt`);
+    await fs.writeFile(tmpFile, 'percent content');
+    keys.get(key)!.files = [
+      { name: '100% true.txt', path: tmpFile, size: 15, uploaded: new Date(), downloadTimer: null },
+    ];
+
+    const res = await request(app)
+      .get(`/${encodeURIComponent('100% true.txt')}?key=${key}`)
+      .set('User-Agent', agent);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.text, 'percent content');
 
     await fs.rm(tmpFile, { force: true });
   });

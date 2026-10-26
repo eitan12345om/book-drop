@@ -209,13 +209,7 @@ export function makeKeysRouter(
       res.status(404).send('Unknown key');
       return;
     }
-    let filename: string;
-    try {
-      filename = decodeURIComponent(req.params.filename as string);
-    } catch {
-      res.status(400).send('Bad filename');
-      return;
-    }
+    const filename = req.params.filename as string;
     const idx = info.files.findIndex((f) => f.name === filename);
     if (idx === -1) {
       res.status(404).send('File not found');
@@ -259,7 +253,7 @@ export function makeKeysRouter(
       return next();
     }
 
-    const filename = decodeURIComponent(req.params.filename as string);
+    const filename = req.params.filename as string;
     const info = keys.get(key);
     if (!info) {
       return next();
