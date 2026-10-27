@@ -1,30 +1,101 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+const epub = (name: string) => ({
+  name,
+  mimeType: 'application/epub+zip',
+  buffer: Buffer.from('fake'),
+});
+
+const uploadPageStates: [string, (page: Page) => Promise<void>][] = [
+  ['with nothing selected', async () => {}],
+  [
+    'with one file selected',
+    async (page) => {
+      await page.locator('#file-input').setInputFiles(epub('test.epub'));
+      await expect(page.locator('#zone-selected')).toBeVisible();
+    },
+  ],
+  [
+    'with several files selected',
+    async (page) => {
+      await page.locator('#file-input').setInputFiles([epub('a.epub'), epub('b.epub')]);
+      await expect(page.locator('#zone-file-name')).toHaveText('2 files selected');
+    },
+  ],
+  [
+    'after sending several files',
+    async (page) => {
+      await page.route('/upload', (route) =>
+        route.fulfill({
+          json: {
+            device: 'Kobo',
+            filename: 'a.epub',
+            conversionTool: null,
+            url: null,
+            metadataFailed: false,
+          },
+        })
+      );
+      await page.locator('#keyinput').fill('ABCD');
+      await page.locator('#file-input').setInputFiles([epub('a.epub'), epub('b.epub')]);
+      await page.locator('#submit-btn').click();
+      await expect(page.locator('.toast')).toContainText('2 files sent to Kobo');
+      await expect(page.locator('#zone-empty')).toBeVisible();
+    },
+  ],
+];
+
 test.describe('Upload page (desktop)', () => {
-  test('passes axe accessibility scan', async ({ page }) => {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    for (const [state, setUp] of uploadPageStates) {
+      test(`passes axe accessibility scan ${state} (${colorScheme})`, async ({ page }) => {
+        await page.emulateMedia({ colorScheme });
+        await page.goto('/');
+        await setUp(page);
+        const results = await new AxeBuilder({ page }).analyze();
+        expect(results.violations).toEqual([]);
+      });
+    }
+  }
+
+  for (const key of ['Enter', 'Space']) {
+    test(`${key} on the file picker button opens the file chooser`, async ({ page }) => {
+      await page.goto('/');
+      await page.locator('#zone-pick').focus();
+      const [chooser] = await Promise.all([
+        page.waitForEvent('filechooser'),
+        page.keyboard.press(key),
+      ]);
+      expect(chooser.isMultiple()).toBe(true);
+    });
+  }
+
+  test('clicking anywhere in the drop zone opens the file chooser', async ({ page }) => {
     await page.goto('/');
-    const results = await new AxeBuilder({ page }).analyze();
-    expect(results.violations).toEqual([]);
+    await Promise.all([page.waitForEvent('filechooser'), page.locator('#zone-limit').click()]);
   });
 
-  test('passes axe accessibility scan after clearing a selection', async ({ page }) => {
+  test('Clear empties the selection without opening the file chooser', async ({ page }) => {
     await page.goto('/');
-    await page.locator('#file-input').setInputFiles({
-      name: 'test.epub',
-      mimeType: 'application/epub+zip',
-      buffer: Buffer.from('fake'),
-    });
+    await page.locator('#file-input').setInputFiles(epub('test.epub'));
+    let choosers = 0;
+    page.on('filechooser', () => choosers++);
     await page.locator('#zone-clear-btn').click();
     await expect(page.locator('#zone-empty')).toBeVisible();
-    const results = await new AxeBuilder({ page }).analyze();
-    expect(results.violations).toEqual([]);
+    await expect(page.locator('#zone-pick')).toBeFocused();
+    expect(choosers).toBe(0);
   });
 
-  test('drop zone is keyboard focusable', async ({ page }) => {
+  test('dropping a file onto the drop zone selects it', async ({ page }) => {
     await page.goto('/');
-    await page.locator('#drop-zone').focus();
-    await expect(page.locator('#drop-zone')).toBeFocused();
+    const dataTransfer = await page.evaluateHandle(() => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(['fake'], 'dropped.epub', { type: 'application/epub+zip' }));
+      return dt;
+    });
+    await page.dispatchEvent('#drop-zone', 'drop', { dataTransfer });
+    await expect(page.locator('#zone-file-name')).toHaveText('dropped.epub');
   });
 
   test('focuses status message after validation error', async ({ page }) => {

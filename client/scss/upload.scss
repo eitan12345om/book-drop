@@ -68,8 +68,15 @@
     background t.$duration;
   user-select: none;
 
-  &:focus-visible {
-    @include m.focus-ring;
+  // Browsers without :has() keep the ring on .zone-pick itself
+  @supports selector(:has(*)) {
+    &:has(.zone-pick:focus-visible) {
+      @include m.focus-ring;
+    }
+
+    .zone-pick:focus-visible {
+      outline: none;
+    }
   }
 
   &:hover,
@@ -81,16 +88,37 @@
   &.has-file {
     @include m.theme-prop(border-color, 'success-border');
     @include m.theme-prop(background, 'success-bg');
+
+    .zone-formats {
+      display: none;
+    }
+  }
+
+  &:not(.has-file) .zone-clear-btn {
+    display: none;
   }
 }
 
+.zone-pick {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
 .zone-icon {
+  display: block;
   font-size: 2rem;
   opacity: 0.4;
   margin-bottom: 0.4rem;
 }
 
 .zone-label {
+  display: block;
   font-size: 0.9rem;
   @include m.theme-prop(color, 'text-muted');
   margin: 0;
@@ -122,7 +150,6 @@
 .zone-file-size {
   font-size: t.$font-sm;
   @include m.theme-prop(color, 'success-text');
-  opacity: 0.8;
 }
 
 .zone-clear-btn {
@@ -254,7 +281,7 @@
   display: block;
   width: 100%;
   padding: 0.8rem 1.5rem;
-  @include m.theme-prop(background, 'accent');
+  @include m.theme-prop(background, 'button-bg');
   color: #fff;
   border: none;
   border-radius: t.$radius;
@@ -264,7 +291,7 @@
   line-height: 1;
 
   &:hover:not(:disabled) {
-    @include m.theme-prop(background, 'accent-hover');
+    @include m.theme-prop(background, 'button-bg-hover');
   }
 
   &:active:not(:disabled) {
@@ -364,7 +391,7 @@
   border-radius: 999px;
   white-space: nowrap;
   @include m.theme-prop(background, 'border');
-  @include m.theme-prop(color, 'text-muted');
+  @include m.theme-prop(color, 'text');
 
   &.fq-uploading {
     @include m.theme-prop(background, 'surface');
