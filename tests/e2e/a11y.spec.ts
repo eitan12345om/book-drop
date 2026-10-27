@@ -8,6 +8,19 @@ test.describe('Upload page (desktop)', () => {
     expect(results.violations).toEqual([]);
   });
 
+  test('passes axe accessibility scan after clearing a selection', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#file-input').setInputFiles({
+      name: 'test.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('fake'),
+    });
+    await page.locator('#zone-clear-btn').click();
+    await expect(page.locator('#zone-empty')).toBeVisible();
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(results.violations).toEqual([]);
+  });
+
   test('drop zone is keyboard focusable', async ({ page }) => {
     await page.goto('/');
     await page.locator('#drop-zone').focus();

@@ -287,7 +287,7 @@ function setFiles(files) {
     zoneEmpty.classList.remove('hidden');
     zoneSelected.classList.add('hidden');
     dropZone.classList.remove('has-file');
-    dropZone.setAttribute('aria-label', 'Choose or drop ebook files');
+    dropZone.removeAttribute('aria-label');
     fileInput.value = '';
     fileQueue.innerHTML = '';
     fileQueue.classList.add('hidden');
@@ -369,7 +369,7 @@ function resetFormAfterUpload() {
   zoneEmpty.classList.remove('hidden');
   zoneSelected.classList.add('hidden');
   dropZone.classList.remove('has-file');
-  dropZone.setAttribute('aria-label', 'Choose or drop ebook files');
+  dropZone.removeAttribute('aria-label');
   fileInput.value = '';
   updateOptionAvailability([]);
 }
