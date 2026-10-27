@@ -62,18 +62,18 @@ test.describe('Upload page (desktop)', () => {
   for (const key of ['Enter', 'Space']) {
     test(`${key} on the file picker button opens the file chooser`, async ({ page }) => {
       await page.goto('/');
+      const chooserPromise = page.waitForEvent('filechooser');
       await page.locator('#zone-pick').focus();
-      const [chooser] = await Promise.all([
-        page.waitForEvent('filechooser'),
-        page.keyboard.press(key),
-      ]);
-      expect(chooser.isMultiple()).toBe(true);
+      await page.keyboard.press(key);
+      expect((await chooserPromise).isMultiple()).toBe(true);
     });
   }
 
   test('clicking anywhere in the drop zone opens the file chooser', async ({ page }) => {
     await page.goto('/');
-    await Promise.all([page.waitForEvent('filechooser'), page.locator('#zone-limit').click()]);
+    const chooserPromise = page.waitForEvent('filechooser');
+    await page.locator('#zone-limit').click();
+    await chooserPromise;
   });
 
   test('Clear empties the selection without opening the file chooser', async ({ page }) => {
