@@ -3,6 +3,9 @@ import { spawn } from 'child_process';
 import { basename, dirname, join } from 'path';
 import { logger } from './logger.js';
 
+/** KindleGen is much slower than the other converters, so it gets its own cap. */
+const KINDLEGEN_TIMEOUT_MS = 100_000;
+
 /** Deletes a file, silently ignoring ENOENT. */
 async function deleteFile(filePath: string): Promise<void> {
   try {
@@ -75,7 +78,8 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
       [basename(inputPath), '-dont_append_source', '-c1', '-o', basename(outPath)],
       dirname(inputPath),
       // kindlegen uses exit code 1 for success with warnings
-      (code) => code === 0 || code === 1
+      (code) => code === 0 || code === 1,
+      KINDLEGEN_TIMEOUT_MS
     );
     return outPath;
   } catch (err) {
