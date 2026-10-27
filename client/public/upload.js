@@ -34,6 +34,8 @@ const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 const zoneEmpty = document.getElementById('zone-empty');
 const zoneSelected = document.getElementById('zone-selected');
+const zonePick = document.getElementById('zone-pick');
+const zoneAnnounce = document.getElementById('zone-announce');
 const zoneFileName = document.getElementById('zone-file-name');
 const zoneFileSize = document.getElementById('zone-file-size');
 const zoneClearBtn = document.getElementById('zone-clear-btn');
@@ -287,7 +289,7 @@ function setFiles(files) {
     zoneEmpty.classList.remove('hidden');
     zoneSelected.classList.add('hidden');
     dropZone.classList.remove('has-file');
-    dropZone.removeAttribute('aria-label');
+    zoneAnnounce.textContent = '';
     fileInput.value = '';
     fileQueue.innerHTML = '';
     fileQueue.classList.add('hidden');
@@ -297,7 +299,7 @@ function setFiles(files) {
     zoneFileName.textContent = files[0].name;
     zoneFileSize.textContent = formatSize(files[0].size);
     dropZone.classList.add('has-file');
-    dropZone.setAttribute('aria-label', `Selected: ${files[0].name}`);
+    zoneAnnounce.textContent = `Selected ${files[0].name}`;
     fileQueue.innerHTML = '';
     fileQueue.classList.add('hidden');
   } else {
@@ -307,7 +309,7 @@ function setFiles(files) {
     zoneFileName.textContent = `${files.length} files selected`;
     zoneFileSize.textContent = formatSize(totalSize);
     dropZone.classList.add('has-file');
-    dropZone.setAttribute('aria-label', `${files.length} files selected`);
+    zoneAnnounce.textContent = `${files.length} files selected`;
     fileQueue.innerHTML = '';
     files.forEach((f, idx) => {
       const li = document.createElement('li');
@@ -369,7 +371,7 @@ function resetFormAfterUpload() {
   zoneEmpty.classList.remove('hidden');
   zoneSelected.classList.add('hidden');
   dropZone.classList.remove('has-file');
-  dropZone.removeAttribute('aria-label');
+  zoneAnnounce.textContent = '';
   fileInput.value = '';
   updateOptionAvailability([]);
 }
@@ -484,19 +486,10 @@ zoneClearBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   setFiles([]);
   hideStatus();
-  dropZone.focus();
+  zonePick.focus();
 });
 
 dropZone.addEventListener('click', () => fileInput.click());
-dropZone.addEventListener('keydown', (e) => {
-  if (e.target !== dropZone) {
-    return;
-  }
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    fileInput.click();
-  }
-});
 dropZone.addEventListener('dragover', (e) => {
   e.preventDefault();
   dropZone.classList.add('dragging');

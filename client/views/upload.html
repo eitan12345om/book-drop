@@ -180,29 +180,40 @@
 
         <div class="card">
           <h2 class="card-title">Ebook files</h2>
-          <div id="drop-zone" class="zone" role="button" tabindex="0">
-            <div id="zone-empty">
-              <div class="zone-icon" aria-hidden="true">📚</div>
-              <p class="zone-label"><strong>Choose files</strong> or drag &amp; drop</p>
-              <p class="zone-formats">EPUB · MOBI · AZW3 · PDF · TXT · CBZ · CBR · PNG · JPG</p>
-              <p class="zone-formats" id="zone-limit">
-                Up to MAX_FILE_SIZE_LABEL_PLACEHOLDER per file
-              </p>
-            </div>
-            <div id="zone-selected" class="hidden" aria-live="polite">
-              <p class="zone-file-info">
-                <span class="zone-file-name" id="zone-file-name"></span>
-                <span class="zone-file-size" id="zone-file-size"></span>
-              </p>
-              <button
-                id="zone-clear-btn"
-                class="btn-secondary zone-clear-btn"
-                aria-label="Clear selection"
-                type="button"
-              >
-                Clear
-              </button>
-            </div>
+          <div id="drop-zone" class="zone">
+            <button
+              id="zone-pick"
+              class="zone-pick"
+              type="button"
+              aria-describedby="zone-formats zone-limit"
+            >
+              <span id="zone-empty">
+                <span class="zone-icon" aria-hidden="true">📚</span>
+                <span class="zone-label"><strong>Choose files</strong> or drag &amp; drop</span>
+              </span>
+              <span id="zone-selected" class="hidden">
+                <span class="zone-file-info">
+                  <span class="zone-file-name" id="zone-file-name"></span>
+                  <span class="zone-file-size" id="zone-file-size"></span>
+                </span>
+                <span class="visually-hidden">, choose different files</span>
+              </span>
+            </button>
+            <p class="zone-formats" id="zone-formats">
+              EPUB · MOBI · AZW3 · PDF · TXT · CBZ · CBR · PNG · JPG
+            </p>
+            <p class="zone-formats" id="zone-limit">
+              Up to MAX_FILE_SIZE_LABEL_PLACEHOLDER per file
+            </p>
+            <button
+              id="zone-clear-btn"
+              class="btn-secondary zone-clear-btn"
+              aria-label="Clear selection"
+              type="button"
+            >
+              Clear
+            </button>
+            <p id="zone-announce" class="visually-hidden" aria-live="polite"></p>
           </div>
           <ul id="file-queue" class="file-queue hidden" aria-label="Selected files"></ul>
         </div>
