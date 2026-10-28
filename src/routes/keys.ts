@@ -182,7 +182,9 @@ export function makeKeysRouter(
       res.write('event: expired\ndata: {}\n\n');
       (res as unknown as { flush?: () => void }).flush?.();
       res.end();
-      sseClients.delete(key);
+      if (sseClients.get(key) === res) {
+        sseClients.delete(key);
+      }
       logger.info({ key }, 'SSE connection reached max duration');
     }, SSE_MAX_DURATION_MS).unref();
 
@@ -194,7 +196,10 @@ export function makeKeysRouter(
     req.on('close', () => {
       clearTimeout(maxDurationTimer);
       clearInterval(heartbeat);
-      sseClients.delete(key);
+      // A newer connection may have replaced this one; only remove our own entry.
+      if (sseClients.get(key) === res) {
+        sseClients.delete(key);
+      }
     });
   });
 

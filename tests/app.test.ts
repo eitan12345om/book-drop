@@ -1443,6 +1443,44 @@ describe('GET /events/:key', () => {
       });
     });
   });
+
+  it('keeps pushing to a new SSE connection after the replaced one closes', async () => {
+    const { app: sseApp, key: sseKey } = await generateKey(agent);
+    const server = sseApp.listen(0, '127.0.0.1');
+    await new Promise<void>((resolve) => server.once('listening', resolve));
+    const { port } = server.address() as AddressInfo;
+    const open = () =>
+      fetch(`http://127.0.0.1:${port}/events/${encodeURIComponent(sseKey)}`, {
+        headers: { 'User-Agent': agent, 'X-Forwarded-Proto': 'https' },
+      }).then((res) => res.body!.getReader());
+    try {
+      const first = await open();
+      await first.read(); // initial snapshot
+      const second = await open();
+      await second.read(); // initial snapshot
+      // The server ends the first stream when the second connects; wait for it to close.
+      while (!(await first.read()).done) {
+        // drain
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+
+      await request(sseApp)
+        .delete(`/file/${sseKey}`)
+        .set('User-Agent', agent)
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .expect(200);
+
+      const update = await Promise.race([
+        second.read().then(({ value }) => new TextDecoder().decode(value)),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+      ]);
+      assert.ok(update?.startsWith('data:'), 'second connection received no update');
+      await second.cancel();
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
 });
 
 describe('HSTS', () => {
