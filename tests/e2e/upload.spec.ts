@@ -58,7 +58,7 @@ test('success message names the conversion tool and a failed metadata lookup', a
   await page.locator('#file-input').setInputFiles({
     name: 'book.epub',
     mimeType: 'application/epub+zip',
-    buffer: Buffer.from('fake epub'),
+    buffer: Buffer.from('PK\x03\x04fake epub'),
   });
   await page.locator('#submit-btn').click();
 
@@ -209,7 +209,7 @@ test('update metadata option is enabled for EPUB files', async ({ page }) => {
   await page.locator('#file-input').setInputFiles({
     name: 'test.epub',
     mimeType: 'application/epub+zip',
-    buffer: Buffer.from('fake epub'),
+    buffer: Buffer.from('PK\x03\x04fake epub'),
   });
   await expect(page.locator('#fetchmetadata')).toBeEnabled();
 });
@@ -282,7 +282,7 @@ test('downloads a Chinese-named EPUB under its original name on Kobo', async ({ 
   await uploadPage.locator('#file-input').setInputFiles({
     name: '三体.epub',
     mimeType: 'application/epub+zip',
-    buffer: Buffer.from('fake epub'),
+    buffer: Buffer.from('PK\x03\x04fake epub'),
   });
   await uploadPage.locator('#submit-btn').click();
   await expect(uploadPage.locator('.toast')).toContainText('Sent to', { timeout: 10_000 });
@@ -300,8 +300,16 @@ test('enables conversion options when multiple files of the same type are select
 }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([
-    { name: 'first.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 1') },
-    { name: 'second.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 2') },
+    {
+      name: 'first.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('PK\x03\x04fake epub 1'),
+    },
+    {
+      name: 'second.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('PK\x03\x04fake epub 2'),
+    },
   ]);
   await expect(page.locator('#kepubify')).toBeEnabled();
   await expect(page.locator('#kindlegen')).toBeEnabled();
@@ -314,7 +322,11 @@ test('enables conversion options when multiple files of the same type are select
 test('disables conversion options when multiple files have different formats', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([
-    { name: 'first.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub') },
+    {
+      name: 'first.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('PK\x03\x04fake epub'),
+    },
     { name: 'second.pdf', mimeType: 'application/pdf', buffer: Buffer.from('fake pdf') },
   ]);
   await expect(page.locator('#kepubify')).toBeDisabled();
@@ -328,8 +340,8 @@ test('disables conversion options when multiple files have different formats', a
 test('treats mixed-case extensions as same type', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([
-    { name: 'one.EPUB', mimeType: 'application/epub+zip', buffer: Buffer.from('fake 1') },
-    { name: 'two.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake 2') },
+    { name: 'one.EPUB', mimeType: 'application/epub+zip', buffer: Buffer.from('PK\x03\x04fake 1') },
+    { name: 'two.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('PK\x03\x04fake 2') },
   ]);
   await expect(page.locator('#kepubify')).toBeEnabled();
   await expect(page.locator('#kindlegen')).toBeEnabled();
@@ -338,7 +350,11 @@ test('treats mixed-case extensions as same type', async ({ page }) => {
 test('removing a file re-evaluates option availability', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([
-    { name: 'book.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub') },
+    {
+      name: 'book.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('PK\x03\x04fake epub'),
+    },
     { name: 'doc.pdf', mimeType: 'application/pdf', buffer: Buffer.from('fake pdf') },
   ]);
   await expect(page.locator('#kepubify')).toBeDisabled();
@@ -357,8 +373,16 @@ test('conversion option propagates to every request in multi-file upload', async
   await page.goto('/');
   await page.locator('#keyinput').fill(key);
   await page.locator('#file-input').setInputFiles([
-    { name: 'first.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 1') },
-    { name: 'second.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 2') },
+    {
+      name: 'first.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('PK\x03\x04fake epub 1'),
+    },
+    {
+      name: 'second.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('PK\x03\x04fake epub 2'),
+    },
   ]);
   await page.locator('#kepubify').check();
 
@@ -475,6 +499,121 @@ test('rejects a file over the size limit before uploading it', async ({ page }) 
   expect(uploads).toBe(0);
 });
 
+test('rejects an EPUB that is not a zip before uploading it', async ({ page }) => {
+  let uploads = 0;
+  await page.route('/upload', (route) => {
+    uploads++;
+    return route.abort();
+  });
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#file-input').setInputFiles({
+    name: 'book.epub',
+    mimeType: 'application/epub+zip',
+    buffer: Buffer.from('<html>Not found</html>'),
+  });
+
+  await expect(page.locator('#status-msg')).toHaveClass(/status-error/);
+  await expect(page.locator('#status-msg')).toHaveText(
+    '“book.epub” isn’t a valid EPUB file. It may be damaged or not fully downloaded. Try downloading it again.'
+  );
+  await expect(page.locator('#submit-btn')).toBeDisabled();
+  expect(uploads).toBe(0);
+});
+
+test('lists every file left out of a selection in one message', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'good.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('PK\x03\x04ok') },
+    { name: 'bad.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('<html>') },
+    { name: 'song.mp3', mimeType: 'audio/mpeg', buffer: Buffer.from('ID3') },
+  ]);
+
+  await expect(page.locator('#zone-file-name')).toHaveText('good.epub');
+  const status = page.locator('#status-msg');
+  await expect(status).toHaveClass(/status-error/);
+  await expect(status).toContainText('2 files weren’t added:');
+  await expect(status).toContainText('• “bad.epub” isn’t a valid EPUB file.');
+  await expect(status).toContainText('• “song.mp3” is an unsupported format.');
+  await expect(status).toContainText('Allowed: .epub');
+  await expect(status).toContainText('Invalid EPUB files may be damaged or not fully downloaded.');
+});
+
+test('keeps uploading the rest of the files after one is rejected', async ({ page }) => {
+  const sent: string[] = [];
+  await page.route('/upload', (route) => {
+    const body = route.request().postData() ?? '';
+    const name = body.match(/filename="([^"]+)"/)?.[1] ?? '';
+    sent.push(name);
+    return name === 'second.txt'
+      ? route.fulfill({ status: 500, json: { error: 'Conversion failed' } })
+      : route.fulfill({
+          json: { device: 'Kobo', filename: name, conversionTool: null, url: null },
+        });
+  });
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'first.txt', mimeType: 'text/plain', buffer: Buffer.from('a') },
+    { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('b') },
+    { name: 'third.txt', mimeType: 'text/plain', buffer: Buffer.from('c') },
+  ]);
+  await page.locator('#submit-btn').click();
+
+  await expect(page.locator('.toast')).toContainText('2 files sent to Kobo');
+  expect(sent).toEqual(['first.txt', 'second.txt', 'third.txt']);
+  await expect(page.locator('#status-msg')).toHaveText('“second.txt”: Conversion failed');
+  await expect(page.locator('#zone-file-name')).toHaveText('second.txt');
+});
+
+test('counts only files in the toast when a URL is sent with them', async ({ page }) => {
+  await page.route('/upload', (route) => {
+    const name = (route.request().postData() ?? '').match(/filename="([^"]+)"/)?.[1];
+    return route.fulfill({
+      json: name
+        ? { device: 'Kobo', filename: name, conversionTool: null, url: null }
+        : { url: 'https://example.com/book' },
+    });
+  });
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#urlinput').fill('https://example.com/book');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'first.txt', mimeType: 'text/plain', buffer: Buffer.from('a') },
+    { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('b') },
+  ]);
+  await page.locator('#submit-btn').click();
+
+  await expect(page.locator('.toast')).toHaveText('2 files sent to Kobo, URL added');
+});
+
+test('keeps the files selected when only the URL went through', async ({ page }) => {
+  await page.route('/upload', (route) => {
+    const isFile = (route.request().postData() ?? '').includes('filename="');
+    return isFile
+      ? route.fulfill({ status: 500, json: { error: 'Conversion failed' } })
+      : route.fulfill({ json: { url: 'https://example.com/book' } });
+  });
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await page.locator('#urlinput').fill('https://example.com/book');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'first.txt', mimeType: 'text/plain', buffer: Buffer.from('a') },
+    { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('b') },
+  ]);
+  await page.locator('#submit-btn').click();
+
+  await expect(page.locator('.toast')).toHaveText('URL added');
+  await expect(page.locator('#status-msg')).toContainText('2 files weren’t sent:');
+  await expect(page.locator('#zone-file-name')).toHaveText('2 files selected');
+  await expect(page.locator('#urlinput')).toHaveValue('');
+  await expect(page.locator('#submit-btn')).toBeEnabled();
+});
+
 test("shows the server's own message when it rejects an upload", async ({ page }) => {
   await page.goto('/');
   await page.locator('#keyinput').fill('ZZZZ');
@@ -541,8 +680,16 @@ test('shows a retry hint when a proxy times out the upload', async ({ page }) =>
 test('shows per-file queue list when multiple files are selected', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([
-    { name: 'first.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 1') },
-    { name: 'second.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 2') },
+    {
+      name: 'first.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('PK\x03\x04fake epub 1'),
+    },
+    {
+      name: 'second.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('PK\x03\x04fake epub 2'),
+    },
     { name: 'third.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') },
   ]);
 
@@ -559,7 +706,7 @@ test('queue list is hidden when a single file is selected', async ({ page }) => 
   await page.locator('#file-input').setInputFiles({
     name: 'solo.epub',
     mimeType: 'application/epub+zip',
-    buffer: Buffer.from('fake epub'),
+    buffer: Buffer.from('PK\x03\x04fake epub'),
   });
 
   await expect(page.locator('#file-queue')).toBeHidden();
@@ -568,8 +715,16 @@ test('queue list is hidden when a single file is selected', async ({ page }) => 
 test('remove button in queue removes file from selection', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([
-    { name: 'first.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 1') },
-    { name: 'second.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('fake epub 2') },
+    {
+      name: 'first.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('PK\x03\x04fake epub 1'),
+    },
+    {
+      name: 'second.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('PK\x03\x04fake epub 2'),
+    },
   ]);
 
   await expect(page.locator('#file-queue li')).toHaveCount(2);
@@ -695,12 +850,16 @@ test('shows toast for successes and inline error on partial failure', async ({ p
   await page.locator('#file-input').setInputFiles([
     { name: 'first.txt', mimeType: 'text/plain', buffer: Buffer.from('a') },
     { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('b') },
+    { name: 'third.txt', mimeType: 'text/plain', buffer: Buffer.from('c') },
   ]);
   await page.locator('#submit-btn').click();
 
   await expect(page.locator('.toast')).toContainText('1 file sent to Kobo', { timeout: 5_000 });
-  await expect(page.locator('#status-msg')).toContainText('File limit reached');
-  await expect(page.locator('#status-msg')).not.toContainText('1 of 2 files sent');
+  await expect(page.locator('#status-msg')).toHaveText(
+    '“second.txt”: File limit reached - this session supports up to 5 files\nNot sent: “third.txt”'
+  );
+  expect(uploadCount).toBe(2);
+  await expect(page.locator('#zone-file-name')).toHaveText('2 files selected');
 });
 
 test('restores saved conversion options from localStorage on reload', async ({ page }) => {
