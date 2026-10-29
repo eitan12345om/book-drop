@@ -34,6 +34,8 @@ import {
   clientIp,
   doTransliterate,
   updateEpubMetadata,
+  hasZipSignature,
+  invalidEpubMessage,
   TYPE_EPUB,
   ALLOWED_TYPES,
   ALLOWED_EXTENSIONS,
@@ -269,6 +271,18 @@ export function makeUploadRouter(
         }
 
         const { mimetype, detectedMime } = await detectMimetype(req.file.path, req.file.mimetype);
+
+        const isEpub =
+          mimetype === TYPE_EPUB || path.extname(req.file.originalname).toLowerCase() === '.epub';
+        if (isEpub && !(await hasZipSignature(req.file.path))) {
+          logger.warn(
+            { key, mimetype, detectedMime, size: req.file.size },
+            'Upload rejected: invalid EPUB'
+          );
+          res.status(422).json({ error: invalidEpubMessage(req.file.originalname) });
+          deleteFile(req.file.path);
+          return;
+        }
 
         if (!ALLOWED_TYPES.has(mimetype) && !(detectedMime && ALLOWED_TYPES.has(detectedMime))) {
           const ext = path.extname(req.file.originalname).substring(1);

@@ -4,7 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 const epub = (name: string) => ({
   name,
   mimeType: 'application/epub+zip',
-  buffer: Buffer.from('fake'),
+  buffer: Buffer.from('PK\x03\x04fake'),
 });
 
 const uploadPageStates: [string, (page: Page) => Promise<void>][] = [
@@ -91,7 +91,7 @@ test.describe('Upload page (desktop)', () => {
     await page.goto('/');
     const dataTransfer = await page.evaluateHandle(() => {
       const dt = new DataTransfer();
-      dt.items.add(new File(['fake'], 'dropped.epub', { type: 'application/epub+zip' }));
+      dt.items.add(new File(['PK\x03\x04fake'], 'dropped.epub', { type: 'application/epub+zip' }));
       return dt;
     });
     await page.dispatchEvent('#drop-zone', 'drop', { dataTransfer });
@@ -103,7 +103,7 @@ test.describe('Upload page (desktop)', () => {
     await page.locator('#file-input').setInputFiles({
       name: 'test.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('fake'),
+      buffer: Buffer.from('PK\x03\x04fake'),
     });
     await page.locator('#keyinput').fill('AB'); // invalid — not 4 chars
     await page.locator('#submit-btn').click();

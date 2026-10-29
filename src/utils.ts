@@ -47,6 +47,25 @@ export const ALLOWED_EXTENSIONS = new Set([
   'jpeg',
 ]);
 
+const ZIP_SIGNATURE = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+
+/** Returns true if the file starts with a zip local-file header, as every EPUB must. */
+export async function hasZipSignature(filePath: string): Promise<boolean> {
+  const handle = await fsp.open(filePath, 'r');
+  try {
+    const buf = Buffer.alloc(ZIP_SIGNATURE.length);
+    const { bytesRead } = await handle.read(buf, 0, buf.length, 0);
+    return bytesRead === buf.length && buf.equals(ZIP_SIGNATURE);
+  } finally {
+    await handle.close();
+  }
+}
+
+/** Returns the user-facing error for a file that claims to be an EPUB but isn't a zip. */
+export function invalidEpubMessage(filename: string): string {
+  return `\u201c${filename}\u201d isn\u2019t a valid EPUB file. It may be damaged or not fully downloaded. Try downloading it again.`;
+}
+
 /** Returns true if the user-agent string looks like an e-reader browser. */
 export function isEreaderAgent(agent: string): boolean {
   const lower = agent.toLowerCase();
