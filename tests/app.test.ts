@@ -19,7 +19,7 @@ import {
   FILE_DELETE_DELAY_MS,
   UPLOAD_RATE_LIMIT_MAX,
 } from '../src/config.js';
-import { addDiskUsage, subtractDiskUsage, getDiskUsage } from '../src/keyStore.js';
+import { addDiskUsage, subtractDiskUsage, getDiskUsage, removeKey } from '../src/keyStore.js';
 import { sanitiseFilename } from '../src/routes/upload.js';
 import type { KeyInfo } from '../src/types.js';
 
@@ -1271,6 +1271,64 @@ describe('POST /upload — metadata with Kindle conversion', () => {
       title: { before: 'Original Title', after: 'Fetched Title' },
     });
     assert.match(await fs.readFile(file.path, 'utf8'), /Fetched Title/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('POST /upload — session ends while the upload is processed', () => {
+  let originalFetch: typeof global.fetch;
+
+  before(() => {
+    originalFetch = global.fetch;
+  });
+
+  after(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('discards the file and leaves disk usage unchanged', async () => {
+    const { app, keys, key } = await generateKey();
+    // The e-reader taps refresh (or the key hard-expires) while metadata is being fetched
+    global.fetch = async () => {
+      removeKey(key, keys);
+      return Response.json({ items: [{ volumeInfo: { title: 'Fetched Title' } }] });
+    };
+    const zip = new JSZip();
+    zip.file(
+      'META-INF/container.xml',
+      `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`
+    );
+    zip.file(
+      'OEBPS/content.opf',
+      `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Original Title</dc:title>
+  </metadata>
+</package>`
+    );
+    const epub = await zip.generateAsync({ type: 'nodebuffer' });
+    const diskBefore = getDiskUsage();
+    const filesBefore = await fs.readdir('uploads');
+
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .field('fetchmetadata', '1')
+      .attach('file', epub, { filename: 'book.epub', contentType: 'application/epub+zip' });
+
+    assert.strictEqual(res.status, 410);
+    assert.strictEqual(keys.has(key), false);
+    assert.strictEqual(getDiskUsage(), diskBefore);
+    // deleteFile is fire-and-forget; give the unlink a moment to land
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.deepStrictEqual(await fs.readdir('uploads'), filesBefore);
   });
 });
 
