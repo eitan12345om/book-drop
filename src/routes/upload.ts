@@ -365,6 +365,15 @@ export function makeUploadRouter(
             return;
           }
 
+          if (keys.get(key) !== info) {
+            deleteFile(convertedPath);
+            logger.warn({ key }, 'Upload discarded: session ended during processing');
+            res.status(410).json({
+              error: 'This session has ended. Enter the new key from your e-reader and try again.',
+            });
+            return;
+          }
+
           addDiskUsage(convertedSize);
           info.files.push({
             name: finalName,
