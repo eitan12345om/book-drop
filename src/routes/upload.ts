@@ -347,15 +347,6 @@ export function makeUploadRouter(
             return;
           }
 
-          if (keys.get(key) !== info) {
-            deleteFile(convertedPath);
-            logger.warn({ key }, 'Upload discarded: session ended during processing');
-            res.status(410).json({
-              error: 'This session has ended. Enter the new key from your e-reader and try again.',
-            });
-            return;
-          }
-
           const { size: convertedSize } = await fs.promises.stat(convertedPath);
           if (convertedSize > MAX_FILE_SIZE) {
             deleteFile(convertedPath);
@@ -371,6 +362,15 @@ export function makeUploadRouter(
               'Upload rejected: disk limit reached'
             );
             res.status(507).json({ error: 'Insufficient storage' });
+            return;
+          }
+
+          if (keys.get(key) !== info) {
+            deleteFile(convertedPath);
+            logger.warn({ key }, 'Upload discarded: session ended during processing');
+            res.status(410).json({
+              error: 'This session has ended. Enter the new key from your e-reader and try again.',
+            });
             return;
           }
 
