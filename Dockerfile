@@ -3,9 +3,10 @@ FROM golang:alpine AS kepubify-builder
 RUN go install github.com/pgaskin/kepubify/v4/cmd/kepubify@v4.0.4
 
 # ── Stage 1: Builder ─────────────────────────────────────────────────────────
-FROM node:22-slim AS builder
+FROM node:26-slim AS builder
 
-RUN corepack enable pnpm
+# Node 25+ no longer bundles corepack.
+RUN npm install -g corepack@0.36.0 && corepack enable pnpm
 
 WORKDIR /build
 
@@ -19,7 +20,7 @@ COPY client ./client
 RUN pnpm build
 
 # ── Stage 2: Production ───────────────────────────────────────────────────────
-FROM node:22-slim
+FROM node:26-slim
 
 WORKDIR /usr/src/app
 
@@ -44,7 +45,7 @@ RUN dpkg --add-architecture i386 && \
     rm -rf /var/lib/apt/lists/*
 
 # ── Production dependencies ─────────────────────────────────────────────────
-RUN corepack enable pnpm
+RUN npm install -g corepack@0.36.0 && corepack enable pnpm
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts

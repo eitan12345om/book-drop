@@ -24,8 +24,8 @@ Optional conversions (requires external tools — see below):
 
 ### Prerequisites
 
-- Node.js 22 or later
-- pnpm (`npm install -g pnpm` or via [corepack](https://nodejs.org/api/corepack.html))
+- Node.js 26 or later
+- pnpm (`npm install -g pnpm`, or `npm install -g corepack && corepack enable pnpm`)
 - _(Optional)_ [kepubify](https://pgaskin.net/kepubify/) in `PATH`
 - _(Optional)_ [KindleGen](http://web.archive.org/web/*/http://kindlegen.s3.amazonaws.com/kindlegen*) in `PATH`
 - _(Optional)_ [pdfCropMargins](https://github.com/abarker/pdfCropMargins) (`pip install pdfCropMargins`)
