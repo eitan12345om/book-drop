@@ -20,6 +20,7 @@ import {
   fetchGoogleBooksMetadata,
   updateEpubMetadata,
   hasZipEndRecord,
+  readZipEntries,
 } from '../src/utils.js';
 
 async function makeTempEpub(metadata: Record<string, string>): Promise<string> {
@@ -257,6 +258,72 @@ describe('hasZipEndRecord', () => {
 
   it('rejects a file too short to hold an end record', async () => {
     assert.strictEqual(await check(Buffer.from('PK\x05\x06')), false);
+  });
+});
+
+describe('readZipEntries', () => {
+  async function read(buf: Buffer) {
+    const tmpPath = path.join(os.tmpdir(), `test-${Date.now()}-${Math.random()}.epub`);
+    await fsp.writeFile(tmpPath, buf);
+    try {
+      return await readZipEntries(tmpPath);
+    } finally {
+      await fsp.unlink(tmpPath).catch(() => {});
+    }
+  }
+
+  /** Offset of the end record, which JSZip writes last when there is no comment. */
+  const endOffset = (buf: Buffer) => buf.length - 22;
+
+  const twoEntries = () =>
+    new JSZip()
+      .file('mimetype', 'application/epub+zip', { compression: 'STORE' })
+      .file('OEBPS/chapter.xhtml', 'a'.repeat(10_000), {
+        compression: 'DEFLATE',
+        createFolders: false,
+      });
+
+  it('lists every entry with its compressed and uncompressed size', async () => {
+    const entries = await read(await twoEntries().generateAsync({ type: 'nodebuffer' }));
+    assert.deepStrictEqual(
+      entries.map((e) => e.name),
+      ['mimetype', 'OEBPS/chapter.xhtml']
+    );
+    assert.strictEqual(entries[0].compressedSize, 20);
+    assert.strictEqual(entries[0].uncompressedSize, 20);
+    assert.strictEqual(entries[1].uncompressedSize, 10_000);
+    assert.ok(entries[1].compressedSize < 1_000);
+  });
+
+  it('tolerates a comment, even one containing the end-record signature', async () => {
+    const buf = await twoEntries().generateAsync({
+      type: 'nodebuffer',
+      comment: 'PK\x05\x06 not the end',
+    });
+    assert.strictEqual((await read(buf)).length, 2);
+  });
+
+  it('throws on a file cut off before its end record', async () => {
+    const buf = await twoEntries().generateAsync({ type: 'nodebuffer' });
+    await assert.rejects(read(buf.subarray(0, buf.length - 10)));
+  });
+
+  it('throws when the index claims to lie past the end of the file', async () => {
+    const buf = await twoEntries().generateAsync({ type: 'nodebuffer' });
+    buf.writeUInt32LE(buf.length, endOffset(buf) + 16);
+    await assert.rejects(read(buf));
+  });
+
+  it('throws when the index holds fewer entries than the end record counts', async () => {
+    const buf = await twoEntries().generateAsync({ type: 'nodebuffer' });
+    buf.writeUInt16LE(3, endOffset(buf) + 10);
+    await assert.rejects(read(buf));
+  });
+
+  it('throws on a ZIP64 archive', async () => {
+    const buf = await twoEntries().generateAsync({ type: 'nodebuffer' });
+    buf.writeUInt16LE(0xffff, endOffset(buf) + 10);
+    await assert.rejects(read(buf), /ZIP64/);
   });
 });
 
