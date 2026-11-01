@@ -673,6 +673,32 @@ describe('POST /upload', () => {
     assert.match(res.body.error, /Kobo format/i);
   });
 
+  it('returns 422, which the page treats as this file only, when the converter rejects the book', async () => {
+    const fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-ebook-convert-'));
+    await fs.writeFile(path.join(fakeBinDir, 'ebook-convert'), '#!/bin/sh\nexit 1\n', {
+      mode: 0o755,
+    });
+    const originalPath = process.env.PATH;
+    process.env.PATH = fakeBinDir;
+    try {
+      const { app, key } = await generateKey('Kobo/1.0 Test');
+      const res = await request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .field('key', key)
+        .field('kobo', 'true')
+        .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
+          filename: 'book.epub',
+          contentType: 'application/epub+zip',
+        });
+      assert.strictEqual(res.status, 422);
+      assert.match(res.body.error, /Kobo format/i);
+    } finally {
+      process.env.PATH = originalPath;
+      await fs.rm(fakeBinDir, { recursive: true, force: true });
+    }
+  });
+
   it('does not tell a Kindle user to send the EPUB, which a Kindle cannot open', async () => {
     const { app, key } = await generateKey('Kindle/3.0 Test');
     const res = await withoutConverters(async () =>

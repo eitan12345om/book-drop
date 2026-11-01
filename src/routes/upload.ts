@@ -393,7 +393,7 @@ export function makeUploadRouter(
               return;
             }
             logger.warn({ err: convErr, key, tool, intent, ref, durationMs }, 'Conversion failed');
-            res.status(400).json({
+            res.status(422).json({
               error: (convErr instanceof ConversionError && convErr.userMessage) || turnOff,
               ref,
             });

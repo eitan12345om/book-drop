@@ -738,7 +738,7 @@ function uploadErrorMessage(xhr, fallback) {
 }
 
 /** Statuses that refuse only this file, so the rest of a multi-file upload can go ahead. */
-const FILE_SPECIFIC_STATUSES = new Set([413, 422, 500]);
+const FILE_SPECIFIC_STATUSES = new Set([413, 422, 500, 504]);
 
 /**
  * Builds a link to a new GitHub bug report, prefilled with what the page knows about a failure.
