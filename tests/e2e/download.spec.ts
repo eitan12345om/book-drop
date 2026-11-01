@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-test.use({ userAgent: 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36' });
+const KOBO_UA = 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36';
+
+test.use({ userAgent: KOBO_UA });
 
 test('shows download page for e-reader user-agent', async ({ page }) => {
   await page.goto('/');
@@ -60,6 +62,33 @@ test('old key is deleted when refresh generates a new key', async ({ page }) => 
 
   const res = await page.request.get(`/status/${oldKey}`);
   expect(res.status()).toBe(404);
+});
+
+test('another browser with the same user-agent cannot use the session', async ({
+  page,
+  browser,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('#key-display')).not.toHaveText('\u2013\u2013\u2013\u2013', {
+    timeout: 5000,
+  });
+  const key = (await page.locator('#key-display').textContent())?.trim();
+
+  const other = await browser.newContext({
+    userAgent: KOBO_UA,
+    baseURL: `http://localhost:${process.env.E2E_PORT ?? '3001'}`,
+  });
+  try {
+    expect((await other.request.get(`/status/${key}`)).status()).toBe(404);
+    const del = await other.request.delete(`/file/${key}`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    expect(del.status()).toBe(400);
+  } finally {
+    await other.close();
+  }
+
+  expect((await page.request.get(`/status/${key}`)).status()).toBe(200);
 });
 
 test('QR code updates when refresh button is clicked', async ({ page }) => {
