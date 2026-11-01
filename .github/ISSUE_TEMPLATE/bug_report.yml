@@ -21,7 +21,7 @@ body:
     id: time
     attributes:
       label: When did it happen?
-      description: Roughly, with your time zone. This is how the matching server logs are found.
+      description: Roughly, with your time zone.
       placeholder: Nov 1, around 11:45 AM PST
   - type: dropdown
     id: other-files
