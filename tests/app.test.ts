@@ -652,12 +652,29 @@ describe('POST /upload', () => {
       .set('User-Agent', 'Kobo/1.0 Test')
       .field('key', key)
       .field('kepubify', 'true')
-      .attach('file', Buffer.from('PK\x03\x04'), {
+      .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
         filename: 'book.epub',
         contentType: 'application/epub+zip',
       });
     assert.strictEqual(res.status, 500);
     assert.deepStrictEqual(res.body, { error: 'Conversion failed' });
+  });
+
+  it('returns 422 for an EPUB whose download was cut off', async () => {
+    const { app, key } = await generateKey();
+    const zip = new JSZip()
+      .file('mimetype', 'application/epub+zip')
+      .file('book.txt', 'x'.repeat(1000));
+    const whole = await zip.generateAsync({ type: 'nodebuffer' });
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', whole.subarray(0, whole.length / 2), {
+        filename: 'book.epub',
+        contentType: 'application/epub+zip',
+      });
+    assert.strictEqual(res.status, 422);
   });
 
   it('returns 422 with an actionable message when an EPUB is not a zip', async () => {
@@ -1221,9 +1238,9 @@ describe('POST /upload — metadata failure feedback', () => {
 
   it('reports the metadata failure when fetchmetadata is set and EPUB parsing fails', async () => {
     const { app, key } = await generateKey();
-    // Has a zip signature but isn't a valid ZIP — JSZip throws immediately, so
-    // fetchGoogleBooksMetadata is never called.
-    const fakeEpub = Buffer.from('PK\x03\x04not a real epub file');
+    // An empty zip has no container.xml, so reading metadata throws before
+    // fetchGoogleBooksMetadata is called.
+    const fakeEpub = await new JSZip().generateAsync({ type: 'nodebuffer' });
     const res = await request(app)
       .post('/upload')
       .set('X-Requested-With', 'XMLHttpRequest')

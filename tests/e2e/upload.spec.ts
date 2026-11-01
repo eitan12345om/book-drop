@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { SUPPRESS_HOWTO_STORAGE } from '../../playwright.config';
+import { fakeEpub } from './fakeEpub';
 
 test('shows upload page for desktop user-agent', async ({ page }) => {
   await page.goto('/');
@@ -58,7 +59,7 @@ test('success message names the conversion tool and a failed metadata lookup', a
   await page.locator('#file-input').setInputFiles({
     name: 'book.epub',
     mimeType: 'application/epub+zip',
-    buffer: Buffer.from('PK\x03\x04fake epub'),
+    buffer: fakeEpub('fake epub'),
   });
   await page.locator('#submit-btn').click();
 
@@ -209,7 +210,7 @@ test('update metadata option is enabled for EPUB files', async ({ page }) => {
   await page.locator('#file-input').setInputFiles({
     name: 'test.epub',
     mimeType: 'application/epub+zip',
-    buffer: Buffer.from('PK\x03\x04fake epub'),
+    buffer: fakeEpub('fake epub'),
   });
   await expect(page.locator('#fetchmetadata')).toBeEnabled();
 });
@@ -282,7 +283,7 @@ test('downloads a Chinese-named EPUB under its original name on Kobo', async ({ 
   await uploadPage.locator('#file-input').setInputFiles({
     name: '三体.epub',
     mimeType: 'application/epub+zip',
-    buffer: Buffer.from('PK\x03\x04fake epub'),
+    buffer: fakeEpub('fake epub'),
   });
   await uploadPage.locator('#submit-btn').click();
   await expect(uploadPage.locator('.toast')).toContainText('Sent to', { timeout: 10_000 });
@@ -303,12 +304,12 @@ test('enables conversion options when multiple files of the same type are select
     {
       name: 'first.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('PK\x03\x04fake epub 1'),
+      buffer: fakeEpub('fake epub 1'),
     },
     {
       name: 'second.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('PK\x03\x04fake epub 2'),
+      buffer: fakeEpub('fake epub 2'),
     },
   ]);
   await expect(page.locator('#kepubify')).toBeEnabled();
@@ -325,7 +326,7 @@ test('disables conversion options when multiple files have different formats', a
     {
       name: 'first.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('PK\x03\x04fake epub'),
+      buffer: fakeEpub('fake epub'),
     },
     { name: 'second.pdf', mimeType: 'application/pdf', buffer: Buffer.from('fake pdf') },
   ]);
@@ -340,8 +341,8 @@ test('disables conversion options when multiple files have different formats', a
 test('treats mixed-case extensions as same type', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([
-    { name: 'one.EPUB', mimeType: 'application/epub+zip', buffer: Buffer.from('PK\x03\x04fake 1') },
-    { name: 'two.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('PK\x03\x04fake 2') },
+    { name: 'one.EPUB', mimeType: 'application/epub+zip', buffer: fakeEpub('fake 1') },
+    { name: 'two.epub', mimeType: 'application/epub+zip', buffer: fakeEpub('fake 2') },
   ]);
   await expect(page.locator('#kepubify')).toBeEnabled();
   await expect(page.locator('#kindlegen')).toBeEnabled();
@@ -353,7 +354,7 @@ test('removing a file re-evaluates option availability', async ({ page }) => {
     {
       name: 'book.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('PK\x03\x04fake epub'),
+      buffer: fakeEpub('fake epub'),
     },
     { name: 'doc.pdf', mimeType: 'application/pdf', buffer: Buffer.from('fake pdf') },
   ]);
@@ -376,12 +377,12 @@ test('conversion option propagates to every request in multi-file upload', async
     {
       name: 'first.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('PK\x03\x04fake epub 1'),
+      buffer: fakeEpub('fake epub 1'),
     },
     {
       name: 'second.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('PK\x03\x04fake epub 2'),
+      buffer: fakeEpub('fake epub 2'),
     },
   ]);
   await page.locator('#kepubify').check();
@@ -499,7 +500,7 @@ test('rejects a file over the size limit before uploading it', async ({ page }) 
   expect(uploads).toBe(0);
 });
 
-test('rejects an EPUB that is not a zip before uploading it', async ({ page }) => {
+test('rejects a cut-off EPUB before uploading it', async ({ page }) => {
   let uploads = 0;
   await page.route('/upload', (route) => {
     uploads++;
@@ -511,7 +512,7 @@ test('rejects an EPUB that is not a zip before uploading it', async ({ page }) =
   await page.locator('#file-input').setInputFiles({
     name: 'book.epub',
     mimeType: 'application/epub+zip',
-    buffer: Buffer.from('<html>Not found</html>'),
+    buffer: Buffer.from('PK\x03\x04 cut off before the end'),
   });
 
   await expect(page.locator('#status-msg')).toHaveClass(/status-error/);
@@ -525,7 +526,7 @@ test('rejects an EPUB that is not a zip before uploading it', async ({ page }) =
 test('lists every file left out of a selection in one message', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([
-    { name: 'good.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('PK\x03\x04ok') },
+    { name: 'good.epub', mimeType: 'application/epub+zip', buffer: fakeEpub('ok') },
     { name: 'bad.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('<html>') },
     { name: 'song.mp3', mimeType: 'audio/mpeg', buffer: Buffer.from('ID3') },
   ]);
@@ -683,12 +684,12 @@ test('shows per-file queue list when multiple files are selected', async ({ page
     {
       name: 'first.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('PK\x03\x04fake epub 1'),
+      buffer: fakeEpub('fake epub 1'),
     },
     {
       name: 'second.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('PK\x03\x04fake epub 2'),
+      buffer: fakeEpub('fake epub 2'),
     },
     { name: 'third.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') },
   ]);
@@ -706,7 +707,7 @@ test('queue list is hidden when a single file is selected', async ({ page }) => 
   await page.locator('#file-input').setInputFiles({
     name: 'solo.epub',
     mimeType: 'application/epub+zip',
-    buffer: Buffer.from('PK\x03\x04fake epub'),
+    buffer: fakeEpub('fake epub'),
   });
 
   await expect(page.locator('#file-queue')).toBeHidden();
@@ -718,12 +719,12 @@ test('remove button in queue removes file from selection', async ({ page }) => {
     {
       name: 'first.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('PK\x03\x04fake epub 1'),
+      buffer: fakeEpub('fake epub 1'),
     },
     {
       name: 'second.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('PK\x03\x04fake epub 2'),
+      buffer: fakeEpub('fake epub 2'),
     },
   ]);
 

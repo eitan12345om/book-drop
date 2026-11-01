@@ -34,7 +34,7 @@ import {
   clientIp,
   doTransliterate,
   updateEpubMetadata,
-  hasZipSignature,
+  hasZipEndRecord,
   invalidEpubMessage,
   TYPE_EPUB,
   ALLOWED_TYPES,
@@ -274,7 +274,7 @@ export function makeUploadRouter(
 
         const isEpub =
           mimetype === TYPE_EPUB || path.extname(req.file.originalname).toLowerCase() === '.epub';
-        if (isEpub && !(await hasZipSignature(req.file.path))) {
+        if (isEpub && !(await hasZipEndRecord(req.file.path))) {
           logger.warn(
             { key, mimetype, detectedMime, size: req.file.size },
             'Upload rejected: invalid EPUB'

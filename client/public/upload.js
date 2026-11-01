@@ -261,6 +261,8 @@ function wireMutualExclusion() {
 
 let selectedFiles = [];
 let currentUploadId = 0;
+// Bumped by every selection change, so a slower pending file check can't overwrite a newer one.
+let handleFilesId = 0;
 
 /** Returns a human-readable file size string. */
 function formatSize(bytes) {
@@ -283,6 +285,7 @@ function updateSubmitState() {
 
 /** Updates UI to reflect the currently selected files, or clears if empty. */
 function setFiles(files) {
+  handleFilesId++;
   selectedFiles = files.slice();
   updateSubmitState();
   if (files.length === 0) {
@@ -366,6 +369,7 @@ function unlockFileQueue() {
  * Used after a successful multi-file upload so completed rows stay visible.
  */
 function resetFormAfterUpload() {
+  handleFilesId++;
   selectedFiles = [];
   updateSubmitState();
   zoneEmpty.classList.remove('hidden');
@@ -445,17 +449,32 @@ function renderHistory() {
   historySection.classList.remove('hidden');
 }
 
+// A zip's end record is 22 bytes, followed by a comment of at most 65,535 bytes.
+const ZIP_END_RECORD_SIZE = 22;
+const ZIP_END_SEARCH_BYTES = ZIP_END_RECORD_SIZE + 0xffff;
+
 /**
- * Returns false only if an .epub file is readable and doesn't start with a zip header.
- * Unreadable files pass so the upload path can report its own, more specific error.
+ * Returns false only if an .epub file is readable and lacks the zip end record that a
+ * cut-off download loses. Unreadable files pass so the upload path can report its own,
+ * more specific error.
  */
 async function hasValidEpubSignature(file) {
   if (!file.name.toLowerCase().endsWith('.epub')) {
     return true;
   }
   try {
-    const bytes = new Uint8Array(await file.slice(0, 4).arrayBuffer());
-    return bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
+    const bytes = new Uint8Array(await file.slice(-ZIP_END_SEARCH_BYTES).arrayBuffer());
+    for (let i = bytes.length - ZIP_END_RECORD_SIZE; i >= 0; i--) {
+      if (
+        bytes[i] === 0x50 &&
+        bytes[i + 1] === 0x4b &&
+        bytes[i + 2] === 0x05 &&
+        bytes[i + 3] === 0x06
+      ) {
+        return true;
+      }
+    }
+    return false;
   } catch {
     return true;
   }
@@ -514,9 +533,6 @@ function rejectionMessage(rejected) {
   }
   return lines.join('\n');
 }
-
-let handleFilesId = 0;
-
 /**
  * Stages every acceptable file from a FileList and reports the rest in one message.
  * If none are acceptable, the previous selection is kept.

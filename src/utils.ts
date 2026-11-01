@@ -47,15 +47,24 @@ export const ALLOWED_EXTENSIONS = new Set([
   'jpeg',
 ]);
 
-const ZIP_SIGNATURE = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+const ZIP_END_SIGNATURE = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+const ZIP_END_RECORD_SIZE = 22;
+// The end record is followed by a comment of at most 65,535 bytes.
+const ZIP_END_SEARCH_BYTES = ZIP_END_RECORD_SIZE + 0xffff;
 
-/** Returns true if the file starts with a zip local-file header, as every EPUB must. */
-export async function hasZipSignature(filePath: string): Promise<boolean> {
+/**
+ * Returns true if the file ends with a zip end-of-central-directory record. Every EPUB
+ * has one, and it's the part a cut-off download loses.
+ */
+export async function hasZipEndRecord(filePath: string): Promise<boolean> {
   const handle = await fsp.open(filePath, 'r');
   try {
-    const buf = Buffer.alloc(ZIP_SIGNATURE.length);
-    const { bytesRead } = await handle.read(buf, 0, buf.length, 0);
-    return bytesRead === buf.length && buf.equals(ZIP_SIGNATURE);
+    const { size } = await handle.stat();
+    const length = Math.min(size, ZIP_END_SEARCH_BYTES);
+    const buf = Buffer.alloc(length);
+    await handle.read(buf, 0, length, size - length);
+    const index = buf.lastIndexOf(ZIP_END_SIGNATURE);
+    return index !== -1 && index <= length - ZIP_END_RECORD_SIZE;
   } finally {
     await handle.close();
   }
