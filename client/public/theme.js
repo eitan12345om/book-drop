@@ -10,7 +10,7 @@ function initThemeToggle() {
     btn.setAttribute('title', dark ? 'Switch to light mode' : 'Switch to dark mode');
   }
 
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', function () {
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     try {
