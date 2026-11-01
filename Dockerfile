@@ -68,10 +68,11 @@ COPY --from=builder /build/client/public ./client/public
 COPY client/views ./client/views
 
 # ── Runtime setup ───────────────────────────────────────────────────────────
+# The app user can write only its uploads and home, not the code it runs.
 RUN mkdir uploads && \
     groupadd --system appgroup && \
-    useradd --system --gid appgroup --home-dir /usr/src/app appuser && \
-    chown -R appuser:appgroup /usr/src/app
+    useradd --system --gid appgroup --create-home --home-dir /home/appuser appuser && \
+    chown appuser:appgroup uploads
 USER appuser
 
 ARG BOOKDROP_VERSION=dev

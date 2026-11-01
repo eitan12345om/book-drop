@@ -9,6 +9,11 @@ services:
       - '${PORT:-3001}:${PORT:-3001}'
     cpus: 1.0
     mem_limit: 4g
+    # Converters run untrusted books; keep them from gaining privileges or fork-bombing the host.
+    init: true
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    pids_limit: 256
     logging:
       driver: json-file
       options:
