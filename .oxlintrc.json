@@ -11,7 +11,10 @@
     "no-var": "error",
     "prefer-const": "error",
     "prefer-template": "warn",
-    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "no-unused-vars": [
+      "warn",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "caughtErrorsIgnorePattern": "^_" }
+    ],
     "curly": "error",
     "no-shadow": "error",
     "react/jsx-no-target-blank": "error",
@@ -24,6 +27,13 @@
   },
   "ignorePatterns": ["dist", "node_modules", "static", "*.d.ts"],
   "overrides": [
+    {
+      "files": ["client/public/download.js", "client/public/theme.js"],
+      "rules": {
+        "no-var": "off",
+        "prefer-template": "off"
+      }
+    },
     {
       "files": ["tests/**/*.ts"],
       "rules": {
