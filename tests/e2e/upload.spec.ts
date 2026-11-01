@@ -569,6 +569,35 @@ test('keeps uploading the rest of the files after one is rejected', async ({ pag
   await expect(page.locator('#zone-file-name')).toHaveText('second.txt');
 });
 
+test('links a failure with a reference to a prefilled bug report', async ({ page }) => {
+  await page.route('/device/ABCD', (route) => route.fulfill({ json: { device: 'Kobo' } }));
+  await page.route('/upload', (route) =>
+    route.fulfill({ status: 500, json: { error: 'Conversion failed', ref: '7F3A9C21' } })
+  );
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await expect(page.locator('#kepubify')).toBeChecked();
+  await page.locator('#file-input').setInputFiles({
+    name: 'Private Title.epub',
+    mimeType: 'application/epub+zip',
+    buffer: fakeEpub(),
+  });
+  await page.locator('#submit-btn').click();
+
+  const status = page.locator('#status-msg');
+  await expect(status).toContainText('Conversion failed\nReference: 7F3A9C21');
+  const href = await status.getByRole('link', { name: 'Report this problem' }).getAttribute('href');
+  const url = new URL(href!);
+  expect(url.origin + url.pathname).toBe('https://github.com/eitan12345om/book-drop/issues/new');
+  expect(url.searchParams.get('template')).toBe('bug_report.yml');
+  expect(url.searchParams.get('error')).toBe('Conversion failed\nReference: 7F3A9C21');
+  expect(url.searchParams.get('time')).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
+  expect(url.searchParams.get('device-file')).toMatch(/^Kobo; EPUB, .+, Kobo format$/);
+  expect(url.searchParams.get('install')).toBe('Self-hosted, version dev');
+  expect(href).not.toContain('Private');
+});
+
 test('counts only files in the toast when a URL is sent with them', async ({ page }) => {
   await page.route('/upload', (route) => {
     const name = (route.request().postData() ?? '').match(/filename="([^"]+)"/)?.[1];
