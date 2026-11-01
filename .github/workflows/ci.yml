@@ -90,3 +90,14 @@ jobs:
           check_page download.js -A 'Mozilla/5.0 (Linux) AppleWebKit/538.1 Kobo Touch'
       - if: failure()
         run: docker logs book-drop
+
+  workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+      - name: zizmor
+        run: docker run --rm -v "$PWD:/repo:ro" -w /repo -e GH_TOKEN ghcr.io/zizmorcore/zizmor:1.31.1 --format github .
+        env:
+          GH_TOKEN: ${{ github.token }}
