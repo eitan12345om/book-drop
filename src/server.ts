@@ -10,6 +10,7 @@ import {
   UPLOAD_CLEANUP_INTERVAL_MS,
   MAX_CONCURRENT_CONVERSIONS,
   MAX_CONVERSION_WAIT_MS,
+  CONVERSION_TIMEOUT_MS,
   MAX_QUEUED_CONVERSIONS,
 } from './config.js';
 import { cleanExpiredUploads } from './cleanup.js';
@@ -49,6 +50,7 @@ async function main(): Promise<void> {
         maxConcurrent: MAX_CONCURRENT_CONVERSIONS,
         maxQueued: MAX_QUEUED_CONVERSIONS,
         maxWaitMs: MAX_CONVERSION_WAIT_MS,
+        timeoutMs: CONVERSION_TIMEOUT_MS,
       },
       'Conversion limits'
     );

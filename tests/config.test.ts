@@ -1,7 +1,14 @@
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { envChoice, envCount, envInt } from '../src/config.js';
+import {
+  CONVERSION_TIMEOUT_MS,
+  MAX_CONVERSION_WAIT_MS,
+  METADATA_TIMEOUT_MS,
+  envChoice,
+  envCount,
+  envInt,
+} from '../src/config.js';
 
 const KEY = 'BOOK_DROP_TEST_CHOICE';
 const CONVERTERS = ['calibre', 'kepubify'] as const;
@@ -67,6 +74,41 @@ describe('conversion limits', () => {
       concurrent: 8,
       queued: 16,
     });
+  });
+});
+
+/** Reads one config value as a fresh process would, since config is set on import. */
+function configUnderEnv(env: Record<string, string>, name: string): unknown {
+  const script = `
+    const c = await import('./src/config.js');
+    console.log(JSON.stringify(c[${JSON.stringify(name)}]));
+  `;
+  const stdout = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', '--input-type=module', '--eval', script],
+    { env: { ...process.env, ...env, LOG_LEVEL: 'silent' }, encoding: 'utf8' }
+  );
+  return JSON.parse(stdout.trim().split('\n').at(-1) as string);
+}
+
+describe('upload time budget', () => {
+  it("fits the default worst case for one upload inside the proxy's 100 s window", () => {
+    // Cloudflare gives up after 100 s; the margin covers the upload itself and the response.
+    assert.ok(
+      METADATA_TIMEOUT_MS + MAX_CONVERSION_WAIT_MS + CONVERSION_TIMEOUT_MS <= 90_000,
+      `${METADATA_TIMEOUT_MS} + ${MAX_CONVERSION_WAIT_MS} + ${CONVERSION_TIMEOUT_MS} ms`
+    );
+  });
+
+  it('reads the conversion timeout from the environment, with a floor', () => {
+    assert.strictEqual(
+      configUnderEnv({ CONVERSION_TIMEOUT_MS: '120000' }, 'CONVERSION_TIMEOUT_MS'),
+      120_000
+    );
+    assert.strictEqual(
+      configUnderEnv({ CONVERSION_TIMEOUT_MS: '0' }, 'CONVERSION_TIMEOUT_MS'),
+      1_000
+    );
   });
 });
 

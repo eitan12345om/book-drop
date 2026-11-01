@@ -103,7 +103,8 @@ Copy `.env.example` to `.env` to customise these values.
 | `KINDLE_OUTPUT_FORMAT`       | `azw3`       | Format calibre produces for Kindle: `azw3` or `mobi`. AZW3 suits modern Kindles; MOBI is for pre-2011 models. Ignored by `kindlegen`, which always writes MOBI |
 | `MAX_CONCURRENT_CONVERSIONS` | _(`CPUS`)_   | Conversions allowed to run at the same time; the rest queue. Defaults to `CPUS`, capped at 4                                                                   |
 | `MAX_QUEUED_CONVERSIONS`     | _(2× above)_ | Uploads allowed to wait for a slot; beyond this, uploads are refused with 503                                                                                  |
-| `MAX_CONVERSION_WAIT_MS`     | `30000`      | How long a queued upload waits for a slot before being refused with 503                                                                                        |
+| `MAX_CONVERSION_WAIT_MS`     | `20000`      | How long a queued upload waits for a slot before being refused with 503                                                                                        |
+| `CONVERSION_TIMEOUT_MS`      | `55000`      | How long one conversion may run before it is stopped and the upload answered with 504 (minimum 1000)                                                           |
 
 ## Docker
 
@@ -147,5 +148,12 @@ under `Conversion limits`.
 Memory beyond that buys nothing: a spare 8 GB will not convert a book any faster than a
 spare 8 MB. If uploads are being refused with a 503, the `queuedMs` and `durationMs` fields
 in the conversion logs show whether the queue is too short or the CPU too slow.
+
+Behind Cloudflare, the whole upload has to be answered within 100 seconds, or the
+uploader sees Cloudflare's error page instead of BookDrop's message. The defaults keep the
+worst case — a 15-second metadata lookup, `MAX_CONVERSION_WAIT_MS` in the queue, then
+`CONVERSION_TIMEOUT_MS` converting — at 90 seconds, leaving room for the upload itself. If
+conversions are timing out on a slow host, lower `MAX_QUEUED_CONVERSIONS` so fewer uploads
+wait behind a slow one, rather than raising either timeout past that budget.
 
 Serving plain HTTP (no reverse-proxy TLS)? Set `DISABLE_HSTS=1` — see env vars above.

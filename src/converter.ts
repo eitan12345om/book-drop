@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import { basename, dirname, join } from 'path';
 import { logger } from './logger.js';
 import {
+  CONVERSION_TIMEOUT_MS,
   KINDLE_CONVERTER,
   KINDLE_OUTPUT_FORMAT,
   KOBO_CONVERTER,
@@ -11,9 +12,6 @@ import {
   MAX_QUEUED_CONVERSIONS,
 } from './config.js';
 import { Semaphore } from './semaphore.js';
-
-/** KindleGen is much slower than the other converters, so it gets its own cap. */
-const KINDLEGEN_TIMEOUT_MS = 100_000;
 
 class TimeoutError extends Error {}
 
@@ -72,7 +70,7 @@ function spawnProcess(
   args: string[],
   cwd: string,
   isSuccess: (code: number | null) => boolean = (code) => code === 0,
-  timeoutMs = 55_000
+  timeoutMs = CONVERSION_TIMEOUT_MS
 ): Promise<string> {
   const MAX_OUTPUT_BYTES = 100 * 1024;
   return new Promise((resolve, reject) => {
@@ -147,8 +145,7 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
       [basename(inputPath), '-dont_append_source', '-c1', '-o', basename(outPath)],
       dirname(inputPath),
       // kindlegen uses exit code 1 for success with warnings
-      (code) => code === 0 || code === 1,
-      KINDLEGEN_TIMEOUT_MS
+      (code) => code === 0 || code === 1
     );
     return outPath;
   } catch (err) {
