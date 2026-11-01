@@ -121,7 +121,7 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
   // here (no session), but a shared link can — extract it and hand it to the upload page.
   // multer().none() parses the multipart text fields; a stray file field just errors,
   // which we swallow and treat as "no url".
-  const parseShare = multer().none();
+  const parseShare = multer({ limits: { fieldSize: 64 * 1024 } }).none();
   app.post('/share', (req, res) => {
     parseShare(req, res, () => {
       const url = extractSharedUrl((req.body ?? {}) as { url?: unknown; text?: unknown });

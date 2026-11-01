@@ -456,6 +456,21 @@ describe('extractSharedUrl', () => {
     );
   });
 
+  it('strips a run of mixed trailing punctuation', () => {
+    assert.strictEqual(
+      extractSharedUrl({ text: 'look: https://example.com/page!?!).' }),
+      'https://example.com/page'
+    );
+  });
+
+  it('handles a long run of punctuation inside a URL in linear time', () => {
+    const text = `https://example.com/${'!'.repeat(100_000)}x`;
+    const start = performance.now();
+    assert.strictEqual(extractSharedUrl({ text }), null);
+    const elapsedMs = performance.now() - start;
+    assert.ok(elapsedMs < 500, `took ${Math.round(elapsedMs)} ms`);
+  });
+
   it('rejects non-http(s) schemes in the url field and falls through to text', () => {
     assert.strictEqual(
       extractSharedUrl({ url: 'javascript:alert(1)', text: 'https://safe.example/ok' }),

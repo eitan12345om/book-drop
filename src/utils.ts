@@ -118,6 +118,18 @@ export function isValidUrl(raw: string): boolean {
 
 export const MAX_SHARED_URL_LENGTH = 2048;
 
+const TRAILING_PUNCTUATION = new Set('.,;:!?)]}>"\'');
+
+// A loop rather than a `[...]+$` regex: that regex backtracks quadratically on long
+// punctuation runs that don't reach the end of the string.
+function trimTrailingPunctuation(s: string): string {
+  let end = s.length;
+  while (end > 0 && TRAILING_PUNCTUATION.has(s[end - 1])) {
+    end--;
+  }
+  return s.slice(0, end);
+}
+
 /**
  * Extracts a shareable http(s) URL from Web Share Target fields.
  * Prefers the dedicated `url` field; falls back to the first http(s) URL found in
@@ -135,7 +147,7 @@ export function extractSharedUrl(fields: { url?: unknown; text?: unknown }): str
   const text = typeof fields.text === 'string' ? fields.text : '';
   const match = text.match(/https?:\/\/[^\s]+/i);
   if (match) {
-    const candidate = match[0].replace(/[.,;:!?)\]}>"']+$/, '');
+    const candidate = trimTrailingPunctuation(match[0]);
     if (candidate.length <= MAX_SHARED_URL_LENGTH && isValidUrl(candidate)) {
       return candidate;
     }
