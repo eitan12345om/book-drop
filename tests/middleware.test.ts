@@ -2,13 +2,19 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import express from 'express';
-import { makeRequireKey, makeRequireMatchingAgent, requireXhr } from '../src/middleware.js';
+import {
+  makeRequireKey,
+  makeRequireMatchingAgent,
+  makeLimiter,
+  requireXhr,
+} from '../src/middleware.js';
 import type { KeyInfo } from '../src/types.js';
 
 function makeKeyInfo(agent: string): KeyInfo {
   return {
     created: new Date(),
     ip: '127.0.0.1',
+    network: '127.0.0.1',
     agent,
     files: [],
     urls: [],
@@ -82,6 +88,19 @@ describe('makeRequireMatchingAgent', () => {
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.key, 'ACDF');
     assert.strictEqual(res.body.hasInfo, true);
+  });
+});
+
+describe('makeLimiter', () => {
+  it('counts every address in an IPv6 /56 as one client', async () => {
+    const app = express();
+    app.get('/', makeLimiter(2), (_req, res) => res.send('ok'));
+    const send = (ip: string) => request(app).get('/').set('CF-Connecting-IP', ip);
+
+    assert.strictEqual((await send('2001:db8:1:ab00::1')).status, 200);
+    assert.strictEqual((await send('2001:db8:1:ab01::2')).status, 200);
+    assert.strictEqual((await send('2001:db8:1:abff::3')).status, 429);
+    assert.strictEqual((await send('2001:db8:1:ac00::1')).status, 200);
   });
 });
 
