@@ -71,6 +71,17 @@ describe('calibre conversions', { skip: hasCalibre ? false : 'calibre is not ins
     assert.strictEqual(header.subarray(60, 68).toString('latin1'), 'BOOKMOBI');
   });
 
+  it('writes MOBI with a KF8 half for newer Kindles, as KindleGen did', async () => {
+    const input = await stage('mobi', await brokenTocEpub());
+    const output = await convertWithCalibre(input, 'mobi');
+
+    assert.ok(output.endsWith('.mobi'), `expected .mobi, got ${output}`);
+    const book = await fs.readFile(output);
+    assert.strictEqual(book.subarray(60, 68).toString('latin1'), 'BOOKMOBI');
+    // The record that separates the MOBI6 half from the KF8 one in a joint file.
+    assert.ok(book.includes('BOUNDARY', 0, 'latin1'), 'MOBI has no KF8 half');
+  });
+
   it('reports a rejected book as a conversion failure, not a missing tool', async () => {
     const input = await stage('garbage', notAnEpub());
     await assert.rejects(

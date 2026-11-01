@@ -207,7 +207,12 @@ export async function convertWithCalibre(
   try {
     await spawnProcess(
       'ebook-convert',
-      [basename(inputPath), basename(workPath)],
+      [
+        basename(inputPath),
+        basename(workPath),
+        // calibre writes MOBI6 alone by default, which newer Kindles render poorly.
+        ...(format === 'mobi' ? ['--mobi-file-type', 'both'] : []),
+      ],
       dirname(inputPath)
     );
     if (workPath !== outPath) {
