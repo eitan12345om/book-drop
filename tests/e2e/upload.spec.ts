@@ -591,10 +591,10 @@ test('links a failure with a reference to a prefilled bug report', async ({ page
   const url = new URL(href!);
   expect(url.origin + url.pathname).toBe('https://github.com/eitan12345om/book-drop/issues/new');
   expect(url.searchParams.get('template')).toBe('bug_report.yml');
-  expect(url.searchParams.get('error')).toMatch(/^Conversion failed\nReference: 7F3A9C21\n/);
-  expect(url.searchParams.get('ereader')).toBe('Kobo');
-  expect(url.searchParams.get('file')).toMatch(/^EPUB, .+, Kobo format$/);
-  expect(url.searchParams.get('version')).toBe('dev');
+  expect(url.searchParams.get('error')).toBe('Conversion failed\nReference: 7F3A9C21');
+  expect(url.searchParams.get('time')).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
+  expect(url.searchParams.get('device-file')).toMatch(/^Kobo; EPUB, .+, Kobo format$/);
+  expect(url.searchParams.get('install')).toBe('Self-hosted, version dev');
   expect(href).not.toContain('Private');
 });
 

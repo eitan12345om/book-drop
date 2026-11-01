@@ -731,18 +731,18 @@ function bugReportUrl({ file, message, ref }) {
     ({ label }) => label
   );
   const ext = file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : 'Unknown';
+  const fileSummary = [
+    ext,
+    formatSize(file.size),
+    ...(options.length ? options : ['no options']),
+  ].join(', ');
   const params = new URLSearchParams({
     template: 'bug_report.yml',
     title: message.length > 80 ? `${message.slice(0, 79)}\u2026` : message,
-    error: [
-      message,
-      `Reference: ${ref}`,
-      `Time: ${new Date().toISOString()}`,
-      `Server: ${window.location.hostname === 'bookdrop.cc' ? 'bookdrop.cc' : 'self-hosted'}`,
-    ].join('\n'),
-    ereader: detectedDevice ?? '',
-    file: [ext, formatSize(file.size), ...(options.length ? options : ['no options'])].join(', '),
-    version: appVersion,
+    error: `${message}\nReference: ${ref}`,
+    time: new Date().toISOString(),
+    'device-file': `${detectedDevice ?? 'Unknown e-reader'}; ${fileSummary}`,
+    install: `${window.location.hostname === 'bookdrop.cc' ? 'bookdrop.cc' : 'Self-hosted'}, version ${appVersion}`,
   });
   return `${BUG_REPORT_URL}?${params}`;
 }

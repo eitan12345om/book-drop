@@ -17,6 +17,12 @@ body:
         The exact error BookDrop showed, including its reference if it gave one
         (e.g. "Reference: 7F3A9C21"). The "Report this problem" link fills this in for you.
       render: text
+  - type: input
+    id: time
+    attributes:
+      label: When did it happen?
+      description: Roughly, with your time zone. This is how the matching server logs are found.
+      placeholder: Nov 1, around 11:45 AM PST
   - type: dropdown
     id: other-files
     attributes:
@@ -25,43 +31,26 @@ body:
         - Only this file
         - Every file I've tried
         - I haven't tried another file
-    validations:
-      required: true
   - type: input
-    id: ereader
+    id: device-file
     attributes:
-      label: E-reader
-      description: Model and firmware version, if you know it.
-      placeholder: Kobo Clara 2E, firmware 4.38
-  - type: input
-    id: file
-    attributes:
-      label: File type and conversion
-      placeholder: EPUB, 2.3 MB, with "Kobo format" checked
-  - type: input
-    id: file-source
-    attributes:
-      label: Where did the file come from?
+      label: E-reader and file
       description: >-
-        A store, Project Gutenberg, Standard Ebooks, made or edited in Calibre, etc. If the book
-        is freely available, a link to it helps a lot. Please don't attach copyrighted books.
-  - type: dropdown
-    id: where
+        The e-reader's model and firmware if you know them, then the file's type, size, and the
+        conversion options you checked.
+      placeholder: Kobo Clara 2E, firmware 4.38; EPUB, 2.3 MB, Kobo format
+  - type: input
+    id: install
     attributes:
-      label: Where are you running BookDrop?
-      options:
-        - bookdrop.cc
-        - Self-hosted (Docker)
-        - Self-hosted (Node.js)
+      label: Where are you running BookDrop, and which version?
+      description: >-
+        bookdrop.cc, or self-hosted with Docker or Node.js. The version is shown at the bottom of
+        the page.
+      placeholder: bookdrop.cc, version a1b2c3d
     validations:
       required: true
-  - type: input
-    id: version
-    attributes:
-      label: BookDrop version
-      description: Shown at the bottom of the page.
   - type: textarea
     id: extra
     attributes:
       label: Anything else?
-      description: Screenshots, or server logs if you self-host (please include them for self-hosted installs).
+      description: Error messages, screenshots, or server logs if you self-host.
