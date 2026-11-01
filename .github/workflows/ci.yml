@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   typecheck:
     runs-on: ubuntu-latest
@@ -56,3 +59,34 @@ jobs:
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t book-drop:ci .
+      - name: Smoke-test the image
+        run: |
+          docker run -d --name book-drop -p 3001:3001 book-drop:ci
+          for _ in $(seq 30); do
+            curl -fsS http://localhost:3001/health && break
+            sleep 2
+          done
+          curl -fsS http://localhost:3001/health
+          # Production sits behind a TLS-terminating proxy; plain HTTP gets a 400.
+          get() { curl -fsS -H 'X-Forwarded-Proto: https' "$@"; }
+          # Fetches the page, checks it's the expected variant, then fetches every JS/CSS file it references.
+          check_page() {
+            local expected_script=$1 page asset
+            shift
+            page=$(get "$@" http://localhost:3001/)
+            grep -q "src=\"$expected_script\"" <<< "$page"
+            while read -r asset; do
+              echo "GET /$asset"
+              get -o /dev/null "http://localhost:3001/$asset"
+            done < <(grep -oE '(src|href)="[a-z-]+\.(js|css)"' <<< "$page" | cut -d'"' -f2 | sort -u)
+          }
+          check_page upload.js
+          check_page download.js -A 'Mozilla/5.0 (Linux) AppleWebKit/538.1 Kobo Touch'
+      - if: failure()
+        run: docker logs book-drop
