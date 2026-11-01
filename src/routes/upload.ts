@@ -36,10 +36,12 @@ import {
   updateEpubMetadata,
   hasZipEndRecord,
   invalidEpubMessage,
+  detectEreader,
   TYPE_EPUB,
   ALLOWED_TYPES,
   ALLOWED_EXTENSIONS,
 } from '../utils.js';
+import type { Ereader } from '../utils.js';
 import { makeLimiter, requireXhr } from '../middleware.js';
 
 async function detectMimetype(
@@ -76,13 +78,13 @@ export function sanitiseFilename(
 function predictConvertedFilename(
   sanitised: string,
   mimetype: string,
-  agent: string,
+  device: Ereader | null,
   options: { kindlegen: boolean; kepubify: boolean; pdfcropmargins: boolean }
 ): string {
-  if (mimetype === TYPE_EPUB && agent.includes('Kindle') && options.kindlegen) {
+  if (mimetype === TYPE_EPUB && device === 'Kindle' && options.kindlegen) {
     return sanitised.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.mobi');
   }
-  if (mimetype === TYPE_EPUB && agent.includes('Kobo') && options.kepubify) {
+  if (mimetype === TYPE_EPUB && device === 'Kobo' && options.kepubify) {
     return sanitised.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.kepub.epub');
   }
   return sanitised;
@@ -109,11 +111,11 @@ async function runConversion(
   filePath: string,
   filename: string,
   mimetype: string,
-  agent: string,
+  device: Ereader | null,
   options: { kindlegen: boolean; kepubify: boolean; pdfcropmargins: boolean },
   key: string
 ): Promise<{ convertedPath: string; conversionTool: string | null; filename: string }> {
-  if (mimetype === TYPE_EPUB && agent.includes('Kindle') && options.kindlegen) {
+  if (mimetype === TYPE_EPUB && device === 'Kindle' && options.kindlegen) {
     const conversionTool = 'KindleGen';
     const newFilename = filename.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.mobi');
     logger.info({ key, tool: conversionTool, mimetype }, 'Conversion started');
@@ -121,7 +123,7 @@ async function runConversion(
     logger.info({ key, tool: conversionTool }, 'Conversion succeeded');
     return { convertedPath, conversionTool, filename: newFilename };
   }
-  if (mimetype === TYPE_EPUB && agent.includes('Kobo') && options.kepubify) {
+  if (mimetype === TYPE_EPUB && device === 'Kobo' && options.kepubify) {
     const conversionTool = 'Kepubify';
     const newFilename = filename
       .replace(/\.kepub\.epub$/i, '.epub')
@@ -139,10 +141,6 @@ async function runConversion(
     return { convertedPath, conversionTool, filename };
   }
   return { convertedPath: filePath, conversionTool: null, filename };
-}
-
-function deviceLabel(agent: string): string {
-  return agent.includes('Kobo') ? 'Kobo' : agent.includes('Kindle') ? 'Kindle' : 'your device';
 }
 
 export function makeUploadRouter(
@@ -308,17 +306,13 @@ export function makeUploadRouter(
           pdfcropmargins: !!req.body?.pdfcropmargins,
         };
 
+        const device = detectEreader(info.agent);
         const sanitised = sanitiseFilename(req.file.originalname, {
           transliterate: !!req.body?.transliteration,
-          isKindle: info.agent.includes('Kindle'),
+          isKindle: device === 'Kindle',
         });
 
-        const predicted = predictConvertedFilename(
-          sanitised,
-          mimetype,
-          info.agent,
-          conversionOptions
-        );
+        const predicted = predictConvertedFilename(sanitised, mimetype, device, conversionOptions);
         const finalName = uniqueFilename(predicted, [
           ...info.files.map((f) => f.name),
           ...info.pendingFilenames,
@@ -350,7 +344,7 @@ export function makeUploadRouter(
               req.file.path,
               sanitised,
               mimetype,
-              info.agent,
+              device,
               conversionOptions,
               key
             ));
@@ -414,7 +408,7 @@ export function makeUploadRouter(
           notifySSE(key, info);
 
           res.json({
-            device: deviceLabel(info.agent),
+            device: device ?? 'your device',
             filename: finalName,
             conversionTool,
             url: submittedUrl,

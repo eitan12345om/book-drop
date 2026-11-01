@@ -660,6 +660,43 @@ describe('POST /upload', () => {
     assert.deepStrictEqual(res.body, { error: 'Conversion failed' });
   });
 
+  it('attempts the Kobo conversion for a Kobo whose user-agent is upper-case', async () => {
+    const { app, key } = await generateKey('KOBO/1.0 Test');
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .field('kepubify', 'true')
+      .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
+        filename: 'book.epub',
+        contentType: 'application/epub+zip',
+      });
+    assert.strictEqual(res.status, 500);
+    assert.deepStrictEqual(res.body, { error: 'Conversion failed' });
+  });
+
+  it('names a Tolino in the success response', async () => {
+    const { app, key } = await generateKey('Mozilla/5.0 (Linux; Android 4.4; Tolino)');
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', Buffer.from('hello'), { filename: 'test.txt', contentType: 'text/plain' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.device, 'Tolino');
+  });
+
+  it('reduces filenames to ASCII for a Kindle whose user-agent is lower-case', async () => {
+    const { app, keys, key } = await generateKey('kindle browser');
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', Buffer.from('hello'), { filename: '三体.txt', contentType: 'text/plain' });
+    assert.strictEqual(res.status, 200);
+    assert.match(keys.get(key)!.files[0].name, /^[\x20-\x7e]+$/);
+  });
+
   it('returns 422 for an EPUB whose download was cut off', async () => {
     const { app, key } = await generateKey();
     const zip = new JSZip()
