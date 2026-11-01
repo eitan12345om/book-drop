@@ -1,0 +1,37 @@
+name: Bug report
+description: Something isn't working
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: ereader
+    attributes:
+      label: E-reader
+      description: Model and firmware version, if you know it.
+      placeholder: Kobo Clara 2E, firmware 4.38
+  - type: input
+    id: file
+    attributes:
+      label: File type and conversion
+      placeholder: EPUB with "Convert to KEPUB" checked
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where are you running BookDrop?
+      options:
+        - bookdrop.cc
+        - Self-hosted (Docker)
+        - Self-hosted (Node.js)
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Error messages, screenshots, or server logs if you self-host.
