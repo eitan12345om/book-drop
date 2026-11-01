@@ -3,7 +3,7 @@ FROM golang:alpine AS kepubify-builder
 RUN go install github.com/pgaskin/kepubify/v4/cmd/kepubify@v4.0.4
 
 # ── Stage 1: Builder ─────────────────────────────────────────────────────────
-FROM node:lts-slim AS builder
+FROM node:22-slim AS builder
 
 RUN corepack enable pnpm
 
@@ -19,7 +19,7 @@ COPY client ./client
 RUN pnpm build
 
 # ── Stage 2: Production ───────────────────────────────────────────────────────
-FROM node:lts-slim
+FROM node:22-slim
 
 WORKDIR /usr/src/app
 
