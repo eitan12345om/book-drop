@@ -77,7 +77,9 @@ jobs:
       - run: docker build --build-arg "BOOKDROP_VERSION=${GITHUB_SHA::7}" -t book-drop:ci .
       - name: Smoke-test the image
         run: |
-          docker run -d --name book-drop -p 3001:3001 book-drop:ci
+          # Same hardening as docker-compose.yaml.
+          docker run -d --name book-drop -p 3001:3001 --init --cap-drop ALL \
+            --security-opt no-new-privileges:true --pids-limit 256 book-drop:ci
           for _ in $(seq 30); do
             curl -fsS http://localhost:3001/health && break
             sleep 2
