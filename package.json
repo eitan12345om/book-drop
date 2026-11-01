@@ -23,7 +23,7 @@
     "pdf"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=26"
   },
   "type": "module",
   "main": "dist/server.js",
