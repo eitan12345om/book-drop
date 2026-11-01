@@ -26,7 +26,7 @@ import {
 } from '../config.js';
 import { logger } from '../logger.js';
 import type { KeyInfo } from '../types.js';
-import { isValidKey, clientIp, detectEreader } from '../utils.js';
+import { isValidKey, clientIp, clientNetwork, detectEreader } from '../utils.js';
 import {
   makeRequireKey,
   makeRequireMatchingAgent,
@@ -65,9 +65,10 @@ export function makeKeysRouter(
       return;
     }
     const ip = clientIp(req);
-    const keysForIp = [...keys.values()].filter((k) => k.ip === ip).length;
+    const network = clientNetwork(req);
+    const keysForIp = [...keys.values()].filter((k) => k.network === network).length;
     if (keysForIp >= MAX_KEYS_PER_IP) {
-      logger.warn({ ip, keysForIp }, 'Key rejected: per-IP limit reached');
+      logger.warn({ ip, network, keysForIp }, 'Key rejected: per-IP limit reached');
       res.status(429).send('Too many active sessions');
       return;
     }
@@ -82,6 +83,7 @@ export function makeKeysRouter(
     const info: KeyInfo = {
       created: new Date(),
       ip,
+      network,
       agent,
       token: crypto.randomBytes(32).toString('base64url'),
       files: [],

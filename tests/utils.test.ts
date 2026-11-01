@@ -11,6 +11,7 @@ import {
   isValidUrl,
   isEreaderAgent,
   clientIp,
+  clientNetwork,
   doTransliterate,
   deleteFile,
   extractSharedUrl,
@@ -391,6 +392,38 @@ describe('clientIp', () => {
   it('returns unknown when both are absent', () => {
     const req = { headers: {}, ip: undefined } as unknown as express.Request;
     assert.strictEqual(clientIp(req), 'unknown');
+  });
+});
+
+describe('clientNetwork', () => {
+  const from = (ip: string) =>
+    ({ headers: { 'cf-connecting-ip': ip }, ip: '10.0.0.1' }) as unknown as express.Request;
+
+  it('gives two IPv6 addresses in the same /56 the same network', () => {
+    assert.strictEqual(
+      clientNetwork(from('2001:db8:1:ab00::1')),
+      clientNetwork(from('2001:db8:1:abff:ffff::2'))
+    );
+  });
+
+  it('tells IPv6 addresses in different /56 networks apart', () => {
+    assert.notStrictEqual(
+      clientNetwork(from('2001:db8:1:ab00::1')),
+      clientNetwork(from('2001:db8:1:ac00::1'))
+    );
+  });
+
+  it('leaves an IPv4 address as it is', () => {
+    assert.strictEqual(clientNetwork(from('1.2.3.4')), '1.2.3.4');
+  });
+
+  it('reduces an IPv4-mapped IPv6 address to the IPv4 address', () => {
+    assert.strictEqual(clientNetwork(from('::ffff:1.2.3.4')), '1.2.3.4');
+  });
+
+  it('falls back to req.ip when CF-Connecting-IP is absent', () => {
+    const req = { headers: {}, ip: '10.0.0.1' } as unknown as express.Request;
+    assert.strictEqual(clientNetwork(req), '10.0.0.1');
   });
 });
 

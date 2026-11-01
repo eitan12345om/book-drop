@@ -19,6 +19,8 @@ export interface FileInfo {
 export interface KeyInfo {
   created: Date;
   ip: string;
+  /** The ip's network (see clientNetwork), which the per-client session limit counts by. */
+  network: string;
   agent: string;
   /** Secret held in the receiving browser's `bd_<KEY>` cookie; never log it. */
   token: string;

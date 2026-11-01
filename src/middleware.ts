@@ -3,12 +3,12 @@ import fsp from 'fs/promises';
 import path from 'path';
 import type express from 'express';
 import rateLimit from 'express-rate-limit';
-import { isValidKey, clientIp } from './utils.js';
+import { isValidKey, clientNetwork } from './utils.js';
 import { logger } from './logger.js';
 import type { KeyInfo } from './types.js';
 import { RATE_LIMIT_WINDOW_MS } from './config.js';
 
-/** Creates a rate limiter keyed by real client IP (CF-Connecting-IP → req.ip). */
+/** Creates a rate limiter keyed by the client's network (see clientNetwork). */
 export function makeLimiter(
   max: number,
   extras?: Partial<Parameters<typeof rateLimit>[0]>
@@ -18,7 +18,7 @@ export function makeLimiter(
     max,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => clientIp(req),
+    keyGenerator: (req) => clientNetwork(req),
     ...extras,
   });
 }
