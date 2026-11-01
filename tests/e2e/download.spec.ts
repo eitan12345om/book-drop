@@ -20,6 +20,11 @@ test('theme toggle hidden on e-reader user-agent', async ({ page }) => {
   await expect(page.locator('#theme-toggle')).not.toBeVisible();
 });
 
+test('theme toggle hidden on e-reader /receive', async ({ page }) => {
+  await page.goto('/receive');
+  await expect(page.locator('#theme-toggle')).not.toBeVisible();
+});
+
 test('theme toggle visible on desktop /receive', async ({ browser }) => {
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 TestBrowser',

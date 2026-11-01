@@ -74,15 +74,29 @@ export function invalidEpubMessage(filename: string): string {
   return `\u201c${filename}\u201d isn\u2019t a valid EPUB file. It may be damaged or not fully downloaded. Try downloading it again.`;
 }
 
+export type Ereader = 'Kobo' | 'Kindle' | 'Tolino';
+
+// Match only tokens no phone or desktop browser sends: a false positive serves a phone
+// the receive page, where it can't upload.
+const EREADER_PATTERNS: ReadonlyArray<[Ereader, RegExp]> = [
+  ['Kobo', /kobo/i],
+  ['Kindle', /kindle/i],
+  ['Tolino', /tolino/i],
+];
+
+/** Returns the e-reader family a user-agent belongs to, or null if it isn't a recognised e-reader. */
+export function detectEreader(agent: string): Ereader | null {
+  for (const [name, pattern] of EREADER_PATTERNS) {
+    if (pattern.test(agent)) {
+      return name;
+    }
+  }
+  return null;
+}
+
 /** Returns true if the user-agent string looks like an e-reader browser. */
 export function isEreaderAgent(agent: string): boolean {
-  const lower = agent.toLowerCase();
-  return (
-    lower.includes('kobo') ||
-    lower.includes('kindle') ||
-    lower.includes('tolino') ||
-    agent.includes('eReader')
-  );
+  return detectEreader(agent) !== null || agent.includes('eReader');
 }
 
 /** Returns a size limit as a round figure for display, e.g. "100 MB". */

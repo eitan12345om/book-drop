@@ -25,7 +25,7 @@ import {
 } from '../config.js';
 import { logger } from '../logger.js';
 import type { KeyInfo } from '../types.js';
-import { isValidKey, clientIp } from '../utils.js';
+import { isValidKey, clientIp, detectEreader } from '../utils.js';
 import {
   makeRequireKey,
   makeRequireMatchingAgent,
@@ -137,15 +137,7 @@ export function makeKeysRouter(
       res.json({ device: 'unknown' });
       return;
     }
-    const agent = info.agent.toLowerCase();
-    const device = agent.includes('kobo')
-      ? 'Kobo'
-      : agent.includes('kindle')
-        ? 'Kindle'
-        : agent.includes('tolino')
-          ? 'Tolino'
-          : 'unknown';
-    res.json({ device });
+    res.json({ device: detectEreader(info.agent) ?? 'unknown' });
   });
 
   router.get('/events/:key', eventsLimiter, requireMatchingAgent, (req, res) => {
