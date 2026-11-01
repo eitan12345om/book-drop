@@ -63,6 +63,32 @@ function spawnProcess(
   });
 }
 
+/** A conversion failure whose `userMessage` is safe to show to the uploader. */
+export class ConversionError extends Error {
+  constructor(
+    message: string,
+    readonly userMessage: string,
+    options?: ErrorOptions
+  ) {
+    super(message, options);
+    this.name = 'ConversionError';
+  }
+}
+
+const KINDLEGEN_ERROR_MESSAGES: Record<string, string> = {
+  E23006: 'Language not recognized in metadata. Try adding it with an ebook editor tool.',
+};
+
+/** Extracts the reason from KindleGen's `Error(<module>):E<code>: <reason>` line, if any. */
+function kindlegenErrorReason(output: string): string | null {
+  const m = output.match(/^Error\([^)]*\):(E\d+):\s*(.+?)(?:\s*Aborting\.)?\s*$/m);
+  if (!m) {
+    return null;
+  }
+  const [, code, reason] = m;
+  return KINDLEGEN_ERROR_MESSAGES[code] ?? reason;
+}
+
 /** Applies a series of string replacements to sanitize tool output before surfacing it to the user. */
 function sanitizeOutput(message: string, ...replacements: [string, string][]): string {
   return replacements.reduce((msg, [from, to]) => msg.replaceAll(from, to), message);
@@ -89,6 +115,12 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
       [basename(inputPath), 'infile.epub'],
       [basename(outPath), 'outfile.mobi']
     );
+    const reason = kindlegenErrorReason(msg);
+    if (reason) {
+      throw new ConversionError(msg, `KindleGen couldn't convert this EPUB: ${reason}`, {
+        cause: err,
+      });
+    }
     throw new Error(msg, { cause: err });
   } finally {
     await deleteFile(inputPath);
