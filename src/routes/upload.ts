@@ -12,6 +12,7 @@ import {
   releasePendingDisk,
 } from '../keyStore.js';
 import {
+  ConversionError,
   convertWithKindlegen,
   convertWithKepubify,
   convertWithPdfCropMargins,
@@ -351,7 +352,9 @@ export function makeUploadRouter(
           } catch (convErr) {
             logger.error({ err: convErr, key }, 'Conversion failed');
             deleteFile(req.file.path);
-            res.status(500).json({ error: 'Conversion failed' });
+            res.status(500).json({
+              error: convErr instanceof ConversionError ? convErr.userMessage : 'Conversion failed',
+            });
             return;
           }
 
