@@ -28,7 +28,7 @@ Run the same checks CI runs:
 pnpm typecheck
 pnpm lint
 pnpm test
-pnpm build && pnpm e2e   # end-to-end tests (run `pnpm exec playwright install chromium` once first)
+pnpm build && pnpm e2e   # end-to-end tests (run `pnpm exec playwright install --with-deps chromium` once first)
 ```
 
 A pre-commit hook formats staged files with Prettier and oxlint automatically.
