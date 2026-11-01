@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'fs';
 import fsp from 'fs/promises';
 import type express from 'express';
+import { ipKeyGenerator } from 'express-rate-limit';
 import JSZip from 'jszip';
 import { transliterate } from 'transliteration';
 import { logger } from './logger.js';
@@ -159,6 +160,14 @@ export function extractSharedUrl(fields: { url?: unknown; text?: unknown }): str
 /** Returns the real client IP, preferring Cloudflare's CF-Connecting-IP header over req.ip. */
 export function clientIp(req: express.Request): string {
   return (req.headers['cf-connecting-ip'] as string) ?? req.ip ?? 'unknown';
+}
+
+/**
+ * Returns the client's network for counting requests and sessions: its IPv4 address, or the
+ * /56 an IPv6 address belongs to, since one household is usually handed a whole /56.
+ */
+export function clientNetwork(req: express.Request): string {
+  return ipKeyGenerator(clientIp(req));
 }
 
 /** Returns a short ID that ties an error shown to a user to its log entry. */
