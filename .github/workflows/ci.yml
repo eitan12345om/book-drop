@@ -74,10 +74,19 @@ jobs:
           done
           curl -fsS http://localhost:3001/health
           # Production sits behind a TLS-terminating proxy; plain HTTP gets a 400.
-          upload_page=$(curl -fsS -H 'X-Forwarded-Proto: https' http://localhost:3001/)
-          grep -q 'upload.js' <<< "$upload_page"
-          ereader_page=$(curl -fsS -H 'X-Forwarded-Proto: https' \
-            -A 'Mozilla/5.0 (Linux) AppleWebKit/538.1 Kobo Touch' http://localhost:3001/)
-          grep -q 'download.js' <<< "$ereader_page"
+          get() { curl -fsS -H 'X-Forwarded-Proto: https' "$@"; }
+          # Fetches the page, checks it's the expected variant, then fetches every JS/CSS file it references.
+          check_page() {
+            local expected_script=$1 page asset
+            shift
+            page=$(get "$@" http://localhost:3001/)
+            grep -q "src=\"$expected_script\"" <<< "$page"
+            while read -r asset; do
+              echo "GET /$asset"
+              get -o /dev/null "http://localhost:3001/$asset"
+            done < <(grep -oE '(src|href)="[a-z-]+\.(js|css)"' <<< "$page" | cut -d'"' -f2 | sort -u)
+          }
+          check_page upload.js
+          check_page download.js -A 'Mozilla/5.0 (Linux) AppleWebKit/538.1 Kobo Touch'
       - if: failure()
         run: docker logs book-drop
