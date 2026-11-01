@@ -70,9 +70,11 @@ jobs:
             sleep 2
           done
           curl -fsS http://localhost:3001/health
-          upload_page=$(curl -fsS http://localhost:3001/)
+          # Production sits behind a TLS-terminating proxy; plain HTTP gets a 400.
+          upload_page=$(curl -fsS -H 'X-Forwarded-Proto: https' http://localhost:3001/)
           grep -q 'upload.js' <<< "$upload_page"
-          ereader_page=$(curl -fsS -A 'Mozilla/5.0 (Linux) AppleWebKit/538.1 Kobo Touch' http://localhost:3001/)
+          ereader_page=$(curl -fsS -H 'X-Forwarded-Proto: https' \
+            -A 'Mozilla/5.0 (Linux) AppleWebKit/538.1 Kobo Touch' http://localhost:3001/)
           grep -q 'download.js' <<< "$ereader_page"
       - if: failure()
         run: docker logs book-drop
