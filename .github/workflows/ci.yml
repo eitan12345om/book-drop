@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: docker build -t book-drop:ci .
+      - run: docker build --build-arg "BOOKDROP_VERSION=${GITHUB_SHA::7}" -t book-drop:ci .
       - name: Smoke-test the image
         run: |
           docker run -d --name book-drop -p 3001:3001 book-drop:ci
@@ -82,7 +82,7 @@ jobs:
             curl -fsS http://localhost:3001/health && break
             sleep 2
           done
-          curl -fsS http://localhost:3001/health
+          curl -fsS http://localhost:3001/health | grep -q "\"version\":\"${GITHUB_SHA::7}\""
           # Production sits behind a TLS-terminating proxy; plain HTTP gets a 400.
           get() { curl -fsS -H 'X-Forwarded-Proto: https' "$@"; }
           # Fetches the page, checks it's the expected variant, then fetches every JS/CSS file it references.

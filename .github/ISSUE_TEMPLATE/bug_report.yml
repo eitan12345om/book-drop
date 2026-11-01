@@ -9,6 +9,24 @@ body:
       description: What did you do, what did you expect, and what happened instead?
     validations:
       required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error message
+      description: >-
+        The exact error BookDrop showed, including its reference if it gave one
+        (e.g. "Reference: 7F3A9C21"). The "Report this problem" link fills this in for you.
+      render: text
+  - type: dropdown
+    id: other-files
+    attributes:
+      label: Does it happen with other files?
+      options:
+        - Only this file
+        - Every file I've tried
+        - I haven't tried another file
+    validations:
+      required: true
   - type: input
     id: ereader
     attributes:
@@ -19,7 +37,14 @@ body:
     id: file
     attributes:
       label: File type and conversion
-      placeholder: EPUB with "Convert to KEPUB" checked
+      placeholder: EPUB, 2.3 MB, with "Kobo format" checked
+  - type: input
+    id: file-source
+    attributes:
+      label: Where did the file come from?
+      description: >-
+        A store, Project Gutenberg, Standard Ebooks, made or edited in Calibre, etc. If the book
+        is freely available, a link to it helps a lot. Please don't attach copyrighted books.
   - type: dropdown
     id: where
     attributes:
@@ -30,8 +55,13 @@ body:
         - Self-hosted (Node.js)
     validations:
       required: true
+  - type: input
+    id: version
+    attributes:
+      label: BookDrop version
+      description: Shown at the bottom of the page.
   - type: textarea
     id: extra
     attributes:
       label: Anything else?
-      description: Error messages, screenshots, or server logs if you self-host.
+      description: Screenshots, or server logs if you self-host (please include them for self-hosted installs).

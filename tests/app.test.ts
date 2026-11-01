@@ -657,7 +657,7 @@ describe('POST /upload', () => {
         contentType: 'application/epub+zip',
       });
     assert.strictEqual(res.status, 500);
-    assert.deepStrictEqual(res.body, { error: 'Conversion failed' });
+    assert.strictEqual(res.body.error, 'Conversion failed');
   });
 
   it('attempts the Kobo conversion for a Kobo whose user-agent is upper-case', async () => {
@@ -672,7 +672,7 @@ describe('POST /upload', () => {
         contentType: 'application/epub+zip',
       });
     assert.strictEqual(res.status, 500);
-    assert.deepStrictEqual(res.body, { error: 'Conversion failed' });
+    assert.strictEqual(res.body.error, 'Conversion failed');
   });
 
   it('names a Tolino in the success response', async () => {
@@ -1404,6 +1404,7 @@ exit 2
       "KindleGen couldn't convert this EPUB: Language not recognized in metadata. " +
         'Try adding it with an ebook editor tool.'
     );
+    assert.match(res.body.ref, /^[0-9A-F]{8}$/);
   });
 });
 
@@ -1692,6 +1693,7 @@ describe('HSTS', () => {
     const { app } = createApp();
     const res = await connect(app).get('/health');
     assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(res.body, { status: 'ok', version: 'dev' });
   });
 });
 

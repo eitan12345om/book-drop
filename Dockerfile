@@ -64,6 +64,9 @@ RUN mkdir uploads && \
     chown -R appuser:appgroup /usr/src/app
 USER appuser
 
+ARG BOOKDROP_VERSION=dev
+ENV BOOKDROP_VERSION=$BOOKDROP_VERSION
+
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:${PORT:-3001}/health || exit 1

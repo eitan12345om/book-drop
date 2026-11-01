@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'fs';
 import fsp from 'fs/promises';
 import type express from 'express';
@@ -146,6 +147,11 @@ export function extractSharedUrl(fields: { url?: unknown; text?: unknown }): str
 /** Returns the real client IP, preferring Cloudflare's CF-Connecting-IP header over req.ip. */
 export function clientIp(req: express.Request): string {
   return (req.headers['cf-connecting-ip'] as string) ?? req.ip ?? 'unknown';
+}
+
+/** Returns a short ID that ties an error shown to a user to its log entry. */
+export function newErrorRef(): string {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
 }
 
 /** Schedules an async unlink of filePath, logging non-ENOENT errors. */

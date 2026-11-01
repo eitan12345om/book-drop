@@ -38,6 +38,7 @@ import {
   hasZipEndRecord,
   invalidEpubMessage,
   detectEreader,
+  newErrorRef,
   TYPE_EPUB,
   ALLOWED_TYPES,
   ALLOWED_EXTENSIONS,
@@ -350,10 +351,12 @@ export function makeUploadRouter(
               key
             ));
           } catch (convErr) {
-            logger.error({ err: convErr, key }, 'Conversion failed');
+            const ref = newErrorRef();
+            logger.error({ err: convErr, key, ref }, 'Conversion failed');
             deleteFile(req.file.path);
             res.status(500).json({
               error: convErr instanceof ConversionError ? convErr.userMessage : 'Conversion failed',
+              ref,
             });
             return;
           }

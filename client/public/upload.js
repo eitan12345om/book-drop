@@ -115,6 +115,12 @@ const OPTIONS = [
   },
 ];
 
+const BUG_REPORT_URL = 'https://github.com/eitan12345om/book-drop/issues/new';
+const appVersion = document.getElementById('app-version')?.textContent ?? 'unknown';
+
+/** Device type of the key in the key field, from /device/:key; null until known. */
+let detectedDevice = null;
+
 const MUTUALLY_EXCLUSIVE = ['kepubify', 'kindlegen'];
 const OPTIONS_STORAGE_KEY = 'bookdrop-options';
 
@@ -716,6 +722,41 @@ function uploadErrorMessage(xhr, fallback) {
 /** Statuses that refuse only this file, so the rest of a multi-file upload can go ahead. */
 const FILE_SPECIFIC_STATUSES = new Set([413, 422, 500]);
 
+/**
+ * Builds a link to a new GitHub bug report, prefilled with what the page knows about a failure.
+ * Leaves out the filename, since book titles can be private.
+ */
+function bugReportUrl({ file, message, ref }) {
+  const options = OPTIONS.filter(({ id }) => document.getElementById(id).checked).map(
+    ({ label }) => label
+  );
+  const ext = file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : 'Unknown';
+  const params = new URLSearchParams({
+    template: 'bug_report.yml',
+    title: message.length > 80 ? `${message.slice(0, 79)}\u2026` : message,
+    error: [
+      message,
+      `Reference: ${ref}`,
+      `Time: ${new Date().toISOString()}`,
+      `Server: ${window.location.hostname === 'bookdrop.cc' ? 'bookdrop.cc' : 'self-hosted'}`,
+    ].join('\n'),
+    ereader: detectedDevice ?? '',
+    file: [ext, formatSize(file.size), ...(options.length ? options : ['no options'])].join(', '),
+    version: appVersion,
+  });
+  return `${BUG_REPORT_URL}?${params}`;
+}
+
+/** Appends a failure's reference and a link to report it to the status message. */
+function appendReportLink(failure) {
+  const link = document.createElement('a');
+  link.href = bugReportUrl(failure);
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = 'Report this problem';
+  statusMsg.append(`\nReference: ${failure.ref} \u00b7 `, link);
+}
+
 /** Builds one error message for the files in an upload that weren't sent. */
 function uploadFailureMessage(failures, unsent, total) {
   if (total === 1) {
@@ -954,7 +995,11 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
 
     if (xhr.status < 200 || xhr.status >= 300) {
       setFileQueueStatus(i, '\u2717 error', 'error');
-      failures.push({ file, message: uploadErrorMessage(xhr, 'Upload failed.') });
+      failures.push({
+        file,
+        message: uploadErrorMessage(xhr, 'Upload failed.'),
+        ref: readJson(xhr)?.ref,
+      });
       if (FILE_SPECIFIC_STATUSES.has(xhr.status)) {
         continue;
       }
@@ -1002,6 +1047,10 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   updateSubmitState();
   if (failures.length > 0) {
     showStatus('error', uploadFailureMessage(failures, unsent, total));
+    const reportable = failures.find((f) => f.ref);
+    if (reportable) {
+      appendReportLink(reportable);
+    }
   } else {
     hideStatus();
   }
@@ -1078,6 +1127,7 @@ function lookupDevice(key) {
       return r.ok ? r.json() : null;
     })
     .then(function (data) {
+      detectedDevice = data?.device ?? null;
       if (!data) {
         return;
       }
@@ -1095,6 +1145,7 @@ function lookupDevice(key) {
 
 document.getElementById('keyinput').addEventListener('input', function (e) {
   const key = e.target.value.trim().toUpperCase();
+  detectedDevice = null;
   if (key.length === 4) {
     lookupDevice(key);
   }

@@ -6,10 +6,10 @@ import helmet from 'helmet';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { DISABLE_HSTS, MAX_FILE_SIZE } from './config.js';
+import { BOOKDROP_VERSION, DISABLE_HSTS, MAX_FILE_SIZE } from './config.js';
 import { logger } from './logger.js';
 import type { KeyInfo } from './types.js';
-import { isEreaderAgent, extractSharedUrl, formatLimit } from './utils.js';
+import { isEreaderAgent, extractSharedUrl, formatLimit, newErrorRef } from './utils.js';
 import { serveHtml, makeNotifySSE } from './middleware.js';
 import { makeKeysRouter } from './routes/keys.js';
 import { makeUploadRouter } from './routes/upload.js';
@@ -73,7 +73,7 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
 
   app.get('/health', (_req, res) => {
     logger.debug('health check');
-    res.send('ok');
+    res.json({ status: 'ok', version: BOOKDROP_VERSION });
   });
 
   app.use((req, res, next) => {
@@ -132,6 +132,7 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
     const ereaderClass = isEreaderAgent(req.get('user-agent') ?? '') ? 'ereader' : '';
     void serveHtml(VIEWS_DIR, 'download.html', nonceMap.get(req) ?? '', res, next, {
       EREADER_CLASS_PLACEHOLDER: ereaderClass,
+      VERSION_PLACEHOLDER: BOOKDROP_VERSION,
     });
   });
   app.get('/', (req, res, next) => {
@@ -139,10 +140,11 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
     const isEreader = isEreaderAgent(ua);
     const page = isEreader ? 'download.html' : 'upload.html';
     const extras: Record<string, string> = isEreader
-      ? { EREADER_CLASS_PLACEHOLDER: 'ereader' }
+      ? { EREADER_CLASS_PLACEHOLDER: 'ereader', VERSION_PLACEHOLDER: BOOKDROP_VERSION }
       : {
           MAX_FILE_SIZE_PLACEHOLDER: String(MAX_FILE_SIZE),
           MAX_FILE_SIZE_LABEL_PLACEHOLDER: formatLimit(MAX_FILE_SIZE),
+          VERSION_PLACEHOLDER: BOOKDROP_VERSION,
         };
     void serveHtml(VIEWS_DIR, page, nonceMap.get(req) ?? '', res, next, extras);
   });
@@ -157,9 +159,10 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
         res.status(400).json({ error: 'Bad request.' });
         return;
       }
-      logger.error({ err }, 'Unhandled error');
+      const ref = newErrorRef();
+      logger.error({ err, ref }, 'Unhandled error');
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Internal server error.' });
+        res.status(500).json({ error: 'Internal server error.', ref });
       }
     }
   );
