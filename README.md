@@ -11,6 +11,8 @@ Live at [bookdrop.cc](https://bookdrop.cc) · Forked from [send2ereader](https:/
 3. Pick one or more files and click **Upload and send**.
 4. Download links appear on the ereader within seconds.
 
+The ereader's browser must accept cookies: the key comes with a secret in an HttpOnly `bd_<KEY>` cookie, and only the browser holding it can see, download, or delete the session's files. The key alone is enough to send files.
+
 Supported formats: EPUB, MOBI, AZW3, PDF, CBZ, CBR, HTML, TXT, PNG, JPG.
 
 Optional conversions (requires external tools — see below):
@@ -18,6 +20,9 @@ Optional conversions (requires external tools — see below):
 - EPUB → KEPUB (Kobo, via kepubify) — better typography and font control
 - EPUB → MOBI (Kindle, via [kindling](https://github.com/ciscoriordan/kindling)) — Kindle doesn't support EPUB natively. kindling replaces Amazon's discontinued KindleGen, which is still available with `KINDLE_CONVERTER=kindlegen`
 - PDF margin cropping (via pdfCropMargins) — fills more of the small screen
+
+EPUBs with more than 10,000 files inside, or more than 512 MiB uncompressed, are sent without conversion only.
+
 - Update EPUB metadata from Google Books — patches title, author, publisher, etc. and shows a before/after diff on the download page (requires a `GOOGLE_BOOKS_API_KEY`)
 
 ## Running locally
@@ -72,7 +77,7 @@ Copy `.env.example` to `.env` to customise these values.
 | `MAX_DISK_BYTES`             | `1073741824` | Total upload directory size cap in bytes (1 GB); uploads returning 507 when exceeded                                                  |
 | `MAX_FILES_PER_KEY`          | `5`          | Max files staged per session key; further uploads return 400                                                                          |
 | `MAX_URLS_PER_KEY`           | `20`         | Max URLs staged per session key; further submissions return 400                                                                       |
-| `MAX_KEYS_PER_IP`            | `3`          | Max concurrent sessions per IP; further requests return 429                                                                           |
+| `MAX_KEYS_PER_IP`            | `3`          | Max concurrent sessions per IP (an IPv6 /56 counts as one IP, as do the rate limits); further requests return 429                     |
 | `RATE_LIMIT_WINDOW_MS`       | `900000`     | Rate-limit window for `/generate` (ms)                                                                                                |
 | `RATE_LIMIT_MAX`             | `20`         | Max key generations per window per IP                                                                                                 |
 | `LOG_LEVEL`                  | `info`       | Pino log level (`trace`, `debug`, `info`, `warn`, `error`)                                                                            |
