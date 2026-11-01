@@ -119,12 +119,14 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
   // Web Share Target. A service worker normally handles /share client-side; this is
   // the fallback when it isn't yet controlling the page. Shared files can't be recovered
   // here (no session), but a shared link can — extract it and hand it to the upload page.
-  // multer().none() parses the multipart text fields; a stray file field just errors,
-  // which we swallow and treat as "no url".
-  const parseShare = multer().none();
+  // multer().none() parses the multipart text fields; a stray file field or an oversized
+  // field errors, which we treat as "no url" (req.body may hold fields parsed before the error).
+  const parseShare = multer({ limits: { fieldSize: 64 * 1024 } }).none();
   app.post('/share', (req, res) => {
-    parseShare(req, res, () => {
-      const url = extractSharedUrl((req.body ?? {}) as { url?: unknown; text?: unknown });
+    parseShare(req, res, (err?: unknown) => {
+      const url = err
+        ? null
+        : extractSharedUrl((req.body ?? {}) as { url?: unknown; text?: unknown });
       res.redirect(303, url ? `/?shared_url=${encodeURIComponent(url)}` : '/');
     });
   });

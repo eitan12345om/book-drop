@@ -20,7 +20,11 @@ function extractSharedUrl(url, text) {
   const t = typeof text === 'string' ? text : '';
   const match = t.match(/https?:\/\/[^\s]+/i);
   if (match) {
-    const candidate = match[0].replace(/[.,;:!?)\]}>"']+$/, '');
+    let end = match[0].length;
+    while (end > 0 && '.,;:!?)]}>"\''.includes(match[0][end - 1])) {
+      end--;
+    }
+    const candidate = match[0].slice(0, end);
     if (candidate.length <= MAX_SHARED_URL_LENGTH && isHttp(candidate)) {
       return candidate;
     }

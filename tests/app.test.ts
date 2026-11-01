@@ -1727,6 +1727,24 @@ describe('POST /share (Web Share Target)', () => {
     assert.strictEqual(res.headers.location, '/');
   });
 
+  it('ignores shared text larger than the field size limit', async () => {
+    const { app } = createApp();
+    const text = `https://example.com/story ${'a'.repeat(100 * 1024)}`;
+    const res = await request(app).post('/share').field('text', text);
+    assert.strictEqual(res.status, 303);
+    assert.strictEqual(res.headers.location, '/');
+  });
+
+  it('ignores a valid url field when a later field is over the size limit', async () => {
+    const { app } = createApp();
+    const res = await request(app)
+      .post('/share')
+      .field('url', 'https://example.com/article')
+      .field('text', 'a'.repeat(100 * 1024));
+    assert.strictEqual(res.status, 303);
+    assert.strictEqual(res.headers.location, '/');
+  });
+
   it('falls back to / gracefully when a file is shared (no active service worker)', async () => {
     const { app } = createApp();
     const res = await request(app).post('/share').attach('file', Buffer.from('dummy'), 'book.epub');
