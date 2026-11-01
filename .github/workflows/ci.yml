@@ -56,3 +56,23 @@ jobs:
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t book-drop:ci .
+      - name: Smoke-test the image
+        run: |
+          docker run -d --name book-drop -p 3001:3001 book-drop:ci
+          for _ in $(seq 30); do
+            curl -fsS http://localhost:3001/health && break
+            sleep 2
+          done
+          curl -fsS http://localhost:3001/health
+          upload_page=$(curl -fsS http://localhost:3001/)
+          grep -q 'upload.js' <<< "$upload_page"
+          ereader_page=$(curl -fsS -A 'Mozilla/5.0 (Linux) AppleWebKit/538.1 Kobo Touch' http://localhost:3001/)
+          grep -q 'download.js' <<< "$ereader_page"
+      - if: failure()
+        run: docker logs book-drop
