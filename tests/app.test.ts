@@ -1046,6 +1046,27 @@ describe('GET /:filename', () => {
     await fs.rm(tmpFile, { force: true });
   });
 
+  it('serves a staged AZW3 with the Kindle KF8 media type', async () => {
+    const agent = 'Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 Kindle/3.0';
+    const { app, keys, key } = await generateKey(agent);
+    const tmpFile = path.join('uploads', `test-serve-azw3-${Date.now()}.azw3`);
+    await fs.writeFile(tmpFile, 'kf8 ebook');
+    keys.get(key)!.files = [
+      { name: 'book.azw3', path: tmpFile, size: 9, uploaded: new Date(), downloadTimer: null },
+    ];
+
+    const res = await request(app)
+      .get(`/book.azw3?key=${key}`)
+      .set('User-Agent', agent)
+      .responseType('blob');
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.headers['content-type'], 'application/vnd.amazon.mobi8-ebook');
+    assert.match(res.headers['content-disposition'], /^attachment; filename="?book\.azw3"?$/);
+    assert.strictEqual(res.body.toString(), 'kf8 ebook');
+
+    await fs.rm(tmpFile, { force: true });
+  });
+
   it('serves a staged file whose name contains a percent sign', async () => {
     const agent = 'TestBrowser/1.0';
     const { app, keys, key } = await generateKey(agent);

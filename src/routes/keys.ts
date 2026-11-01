@@ -25,7 +25,7 @@ import {
 } from '../config.js';
 import { logger } from '../logger.js';
 import type { KeyInfo } from '../types.js';
-import { isValidKey, clientIp, detectEreader } from '../utils.js';
+import { isValidKey, clientIp, detectEreader, TYPE_AZW3 } from '../utils.js';
 import {
   makeRequireKey,
   makeRequireMatchingAgent,
@@ -283,6 +283,10 @@ export function makeKeysRouter(
 
     // absPath is server-generated, so a dot-directory in UPLOAD_DIR is not a hidden file
     const sendOptions = { dotfiles: 'allow' } as const;
+    // Express's MIME table has no entry for .azw3, and a type set here is kept.
+    if (/\.azw3$/i.test(filename)) {
+      res.type(TYPE_AZW3);
+    }
     if (/^[\x20-\x7e]*$/.test(filename)) {
       res.download(absPath, filename, sendOptions);
     } else {
