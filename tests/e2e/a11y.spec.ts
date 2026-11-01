@@ -1,10 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { fakeEpub } from './fakeEpub';
 
 const epub = (name: string) => ({
   name,
   mimeType: 'application/epub+zip',
-  buffer: Buffer.from('fake'),
+  buffer: fakeEpub(),
 });
 
 const uploadPageStates: [string, (page: Page) => Promise<void>][] = [
@@ -89,11 +90,16 @@ test.describe('Upload page (desktop)', () => {
 
   test('dropping a file onto the drop zone selects it', async ({ page }) => {
     await page.goto('/');
-    const dataTransfer = await page.evaluateHandle(() => {
-      const dt = new DataTransfer();
-      dt.items.add(new File(['fake'], 'dropped.epub', { type: 'application/epub+zip' }));
-      return dt;
-    });
+    const dataTransfer = await page.evaluateHandle(
+      (bytes) => {
+        const dt = new DataTransfer();
+        dt.items.add(
+          new File([new Uint8Array(bytes)], 'dropped.epub', { type: 'application/epub+zip' })
+        );
+        return dt;
+      },
+      [...fakeEpub()]
+    );
     await page.dispatchEvent('#drop-zone', 'drop', { dataTransfer });
     await expect(page.locator('#zone-file-name')).toHaveText('dropped.epub');
   });
@@ -103,7 +109,7 @@ test.describe('Upload page (desktop)', () => {
     await page.locator('#file-input').setInputFiles({
       name: 'test.epub',
       mimeType: 'application/epub+zip',
-      buffer: Buffer.from('fake'),
+      buffer: fakeEpub(),
     });
     await page.locator('#keyinput').fill('AB'); // invalid — not 4 chars
     await page.locator('#submit-btn').click();

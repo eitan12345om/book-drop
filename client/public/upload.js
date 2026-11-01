@@ -261,6 +261,8 @@ function wireMutualExclusion() {
 
 let selectedFiles = [];
 let currentUploadId = 0;
+// Bumped by every selection change, so a slower pending file check can't overwrite a newer one.
+let handleFilesId = 0;
 
 /** Returns a human-readable file size string. */
 function formatSize(bytes) {
@@ -283,6 +285,7 @@ function updateSubmitState() {
 
 /** Updates UI to reflect the currently selected files, or clears if empty. */
 function setFiles(files) {
+  handleFilesId++;
   selectedFiles = files.slice();
   updateSubmitState();
   if (files.length === 0) {
@@ -366,6 +369,7 @@ function unlockFileQueue() {
  * Used after a successful multi-file upload so completed rows stay visible.
  */
 function resetFormAfterUpload() {
+  handleFilesId++;
   selectedFiles = [];
   updateSubmitState();
   zoneEmpty.classList.remove('hidden');
@@ -445,41 +449,116 @@ function renderHistory() {
   historySection.classList.remove('hidden');
 }
 
-/** Returns true if the file has an accepted extension and fits the upload limit, showing an error otherwise. */
-function validateFile(file) {
-  const ext = `.${file.name.split('.').pop().toLowerCase()}`;
-  if (!ACCEPTED_EXTENSIONS.includes(ext)) {
-    showStatus(
-      'error',
-      `Unsupported format: ${file.name}\nAllowed: ${ACCEPTED_EXTENSIONS.join(', ')}`
-    );
-    return false;
+// A zip's end record is 22 bytes, followed by a comment of at most 65,535 bytes.
+const ZIP_END_RECORD_SIZE = 22;
+const ZIP_END_SEARCH_BYTES = ZIP_END_RECORD_SIZE + 0xffff;
+
+/**
+ * Returns false only if an .epub file is readable and lacks a zip end record.
+ * Unreadable files pass so the upload path can report its own, more specific error.
+ */
+async function hasEpubEndRecord(file) {
+  if (!file.name.toLowerCase().endsWith('.epub')) {
+    return true;
   }
-  if (MAX_FILE_SIZE && file.size > MAX_FILE_SIZE) {
-    showStatus(
-      'error',
-      `\u201c${file.name}\u201d is ${formatSize(file.size)} \u2014 the limit is ${formatLimit(MAX_FILE_SIZE)} per file.`
-    );
+  try {
+    const bytes = new Uint8Array(await file.slice(-ZIP_END_SEARCH_BYTES).arrayBuffer());
+    for (let i = bytes.length - ZIP_END_RECORD_SIZE; i >= 0; i--) {
+      if (
+        bytes[i] === 0x50 &&
+        bytes[i + 1] === 0x4b &&
+        bytes[i + 2] === 0x05 &&
+        bytes[i + 3] === 0x06
+      ) {
+        return true;
+      }
+    }
     return false;
+  } catch {
+    return true;
   }
-  return true;
 }
 
-/** Validates all files from a FileList and stages them, or shows an error and stops. */
-function handleFiles(files) {
+/** Returns why a file can't be uploaded ('format', 'size', or 'epub'), or null if it can. */
+async function rejectionReason(file) {
+  const ext = `.${file.name.split('.').pop().toLowerCase()}`;
+  if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+    return 'format';
+  }
+  if (MAX_FILE_SIZE && file.size > MAX_FILE_SIZE) {
+    return 'size';
+  }
+  if (!(await hasEpubEndRecord(file))) {
+    return 'epub';
+  }
+  return null;
+}
+
+function sizeMessage(file) {
+  return `\u201c${file.name}\u201d is ${formatSize(file.size)} \u2014 the limit is ${formatLimit(MAX_FILE_SIZE)} per file.`;
+}
+
+const ALLOWED_FORMATS_LINE = `Allowed: ${ACCEPTED_EXTENSIONS.join(', ')}`;
+
+/** Builds one error message covering every file that couldn't be added. */
+function rejectionMessage(rejected) {
+  if (rejected.length === 1) {
+    const { file, reason } = rejected[0];
+    if (reason === 'format') {
+      return `Unsupported format: ${file.name}\n${ALLOWED_FORMATS_LINE}`;
+    }
+    if (reason === 'size') {
+      return sizeMessage(file);
+    }
+    return `\u201c${file.name}\u201d isn\u2019t a valid EPUB file. It may be damaged or not fully downloaded. Try downloading it again.`;
+  }
+  const lines = [`${rejected.length} files weren\u2019t added:`];
+  for (const { file, reason } of rejected) {
+    if (reason === 'format') {
+      lines.push(`\u2022 \u201c${file.name}\u201d is an unsupported format.`);
+    } else if (reason === 'size') {
+      lines.push(`\u2022 ${sizeMessage(file)}`);
+    } else {
+      lines.push(`\u2022 \u201c${file.name}\u201d isn\u2019t a valid EPUB file.`);
+    }
+  }
+  if (rejected.some((r) => r.reason === 'format')) {
+    lines.push(ALLOWED_FORMATS_LINE);
+  }
+  if (rejected.some((r) => r.reason === 'epub')) {
+    lines.push(
+      'Invalid EPUB files may be damaged or not fully downloaded. Try downloading them again.'
+    );
+  }
+  return lines.join('\n');
+}
+/**
+ * Stages every acceptable file from a FileList and reports the rest in one message.
+ * If none are acceptable, the previous selection is kept.
+ */
+async function handleFiles(files) {
+  const id = ++handleFilesId;
   if (!files || files.length === 0) {
     setFiles([]);
     return;
   }
-  const valid = [];
-  for (let i = 0; i < files.length; i++) {
-    if (!validateFile(files[i])) {
-      return; // validateFile already showed the error
-    }
-    valid.push(files[i]);
+  const list = Array.from(files);
+  const reasons = await Promise.all(list.map(rejectionReason));
+  if (id !== handleFilesId) {
+    return;
   }
-  setFiles(valid);
-  hideStatus();
+  const valid = list.filter((_, i) => reasons[i] === null);
+  const rejected = list
+    .map((file, i) => ({ file, reason: reasons[i] }))
+    .filter((r) => r.reason !== null);
+  if (valid.length > 0) {
+    setFiles(valid);
+  }
+  if (rejected.length > 0) {
+    showStatus('error', rejectionMessage(rejected));
+  } else {
+    hideStatus();
+  }
 }
 
 zoneClearBtn.addEventListener('click', (e) => {
@@ -505,9 +584,15 @@ urlInput.addEventListener('input', updateSubmitState);
 
 /** Builds a brief success summary string suitable for a toast. */
 function buildSuccessToast(results) {
-  const device = results.find((r) => r.device)?.device ?? 'your device';
-  const count = results.length;
-  return count === 1 ? `1 file sent to ${device}` : `${count} files sent to ${device}`;
+  const files = results.filter((r) => r.filename);
+  const urlAdded = results.some((r) => !r.filename && r.url);
+  if (files.length === 0) {
+    return 'URL added';
+  }
+  const device = files.find((r) => r.device)?.device ?? 'your device';
+  const sent =
+    files.length === 1 ? `1 file sent to ${device}` : `${files.length} files sent to ${device}`;
+  return urlAdded ? `${sent}, URL added` : sent;
 }
 
 /** Shows a self-dismissing toast notification for 3 seconds. */
@@ -626,6 +711,29 @@ function uploadErrorMessage(xhr, fallback) {
       : 'File too large.';
   }
   return `${fallback} (HTTP ${xhr.status}) Please try again in a moment.`;
+}
+
+/** Statuses that refuse only this file, so the rest of a multi-file upload can go ahead. */
+const FILE_SPECIFIC_STATUSES = new Set([413, 422, 500]);
+
+/** Builds one error message for the files in an upload that weren't sent. */
+function uploadFailureMessage(failures, unsent, total) {
+  if (total === 1) {
+    return failures[0].message;
+  }
+  const describe = ({ file, message }) =>
+    message.includes(`\u201c${file.name}\u201d`) ? message : `\u201c${file.name}\u201d: ${message}`;
+  const lines =
+    failures.length === 1
+      ? [describe(failures[0])]
+      : [
+          `${failures.length} files weren\u2019t sent:`,
+          ...failures.map((f) => `\u2022 ${describe(f)}`),
+        ];
+  if (unsent.length > 0) {
+    lines.push(`Not sent: ${unsent.map((f) => `\u201c${f.name}\u201d`).join(', ')}`);
+  }
+  return lines.join('\n');
 }
 
 function attemptUpload(formData, onProgress) {
@@ -784,6 +892,8 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   if (total > 1) {
     lockFileQueue();
   }
+  const failures = [];
+  let stoppedAt = total;
   for (let i = 0; i < total; i++) {
     if (uploadId !== currentUploadId) {
       return;
@@ -814,39 +924,28 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       setFileQueueStatus(i, 'uploading\u2026', 'uploading');
     }
 
+    const file = filesToUpload[i];
     let xhr;
     try {
-      xhr = await uploadOneFile(key, '', filesToUpload[i], onProgress);
+      xhr = await uploadOneFile(key, '', file, onProgress);
     } catch (err) {
       if (uploadId !== currentUploadId) {
         return;
       }
-      if (total > 1) {
-        setFileQueueStatus(i, '\u2717 error', 'error');
-        unlockFileQueue();
-      }
-      submitBtn.disabled = false;
-      setProgress(0, false);
-      if (successResults.length > 0) {
-        addToHistory(successResults);
-        renderHistory();
-        showToast(buildSuccessToast(successResults));
-        resetFormAfterUpload();
-        urlInput.value = '';
-        updateSubmitState();
-      }
+      setFileQueueStatus(i, '\u2717 error', 'error');
       if (err.message === 'read') {
-        showStatus(
-          'error',
-          `Could not read \u201c${filesToUpload[i].name}\u201d \u2014 try downloading it to your device first.`
-        );
-      } else {
-        showStatus(
-          'error',
-          `Upload failed for \u201c${filesToUpload[i].name}\u201d. Try downloading the file to your device before uploading.`
-        );
+        failures.push({
+          file,
+          message: `Could not read \u201c${file.name}\u201d \u2014 try downloading it to your device first.`,
+        });
+        continue;
       }
-      return;
+      failures.push({
+        file,
+        message: `Upload failed for \u201c${file.name}\u201d. Try downloading the file to your device before uploading.`,
+      });
+      stoppedAt = i + 1;
+      break;
     }
 
     if (uploadId !== currentUploadId) {
@@ -854,48 +953,58 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     }
 
     if (xhr.status < 200 || xhr.status >= 300) {
-      if (total > 1) {
-        setFileQueueStatus(i, '\u2717 error', 'error');
-        unlockFileQueue();
+      setFileQueueStatus(i, '\u2717 error', 'error');
+      failures.push({ file, message: uploadErrorMessage(xhr, 'Upload failed.') });
+      if (FILE_SPECIFIC_STATUSES.has(xhr.status)) {
+        continue;
       }
-      submitBtn.disabled = false;
-      setProgress(0, false);
-      if (successResults.length > 0) {
-        addToHistory(successResults);
-        renderHistory();
-        showToast(buildSuccessToast(successResults));
-        resetFormAfterUpload();
-        urlInput.value = '';
-        updateSubmitState();
-      }
-      showStatus('error', uploadErrorMessage(xhr, 'Upload failed.'));
-      return;
+      stoppedAt = i + 1;
+      break;
     }
 
-    if (total > 1) {
-      setFileQueueStatus(i, '\u2713 done', 'done');
-    }
+    setFileQueueStatus(i, '\u2713 done', 'done');
     successResults.push(readResult(xhr));
   }
 
   if (uploadId !== currentUploadId) {
     return;
   }
+  const unsent = filesToUpload.slice(stoppedAt);
+  for (let j = stoppedAt; j < total; j++) {
+    setFileQueueStatus(j, 'not sent', null);
+  }
   submitBtn.disabled = false;
   setProgress(0, false);
-  addToHistory(successResults);
-  renderHistory();
-  hideStatus();
-  if (total > 1) {
-    // Queue rows already show ✓ done — just show a brief summary, keep queue visible.
-    showToast(buildSuccessToast(successResults));
-    resetFormAfterUpload();
-  } else {
-    showToast(formatSuccessMessages(successResults));
-    setFiles([]);
+  if (failures.length > 0 && total > 1) {
+    unlockFileQueue();
   }
-  urlInput.value = '';
+  if (successResults.length > 0) {
+    addToHistory(successResults);
+    renderHistory();
+    showToast(
+      total > 1 ? buildSuccessToast(successResults) : formatSuccessMessages(successResults)
+    );
+  }
+  // If no file went through, the selection is already exactly the files to resend.
+  if (successResults.some((r) => r.filename)) {
+    const remaining = [...failures.map((f) => f.file), ...unsent];
+    if (remaining.length > 0) {
+      setFiles(remaining);
+    } else if (total > 1) {
+      resetFormAfterUpload();
+    } else {
+      setFiles([]);
+    }
+  }
+  if (urlVal) {
+    urlInput.value = '';
+  }
   updateSubmitState();
+  if (failures.length > 0) {
+    showStatus('error', uploadFailureMessage(failures, unsent, total));
+  } else {
+    hideStatus();
+  }
 });
 
 /** Checks if a file was shared via the Web Share Target API and pre-populates the drop zone. */
@@ -913,9 +1022,7 @@ async function checkPendingShare() {
   const file = new File([await response.blob()], name, {
     type: response.headers.get('Content-Type') || 'application/octet-stream',
   });
-  if (validateFile(file)) {
-    setFiles([file]);
-  }
+  await handleFiles([file]);
 }
 
 /** Saves current checkbox states to localStorage, skipping disabled checkboxes. */

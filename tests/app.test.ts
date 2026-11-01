@@ -652,12 +652,59 @@ describe('POST /upload', () => {
       .set('User-Agent', 'Kobo/1.0 Test')
       .field('key', key)
       .field('kepubify', 'true')
-      .attach('file', Buffer.from('PK\x03\x04'), {
+      .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
         filename: 'book.epub',
         contentType: 'application/epub+zip',
       });
     assert.strictEqual(res.status, 500);
     assert.deepStrictEqual(res.body, { error: 'Conversion failed' });
+  });
+
+  it('returns 422 for an EPUB whose download was cut off', async () => {
+    const { app, key } = await generateKey();
+    const zip = new JSZip()
+      .file('mimetype', 'application/epub+zip')
+      .file('book.txt', 'x'.repeat(1000));
+    const whole = await zip.generateAsync({ type: 'nodebuffer' });
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', whole.subarray(0, whole.length / 2), {
+        filename: 'book.epub',
+        contentType: 'application/epub+zip',
+      });
+    assert.strictEqual(res.status, 422);
+  });
+
+  it('returns 422 with an actionable message when an EPUB is not a zip', async () => {
+    const { app, keys, key } = await generateKey('Kobo/1.0 Test');
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('User-Agent', 'Kobo/1.0 Test')
+      .field('key', key)
+      .field('kepubify', 'true')
+      .attach('file', Buffer.from('<html>Not found</html>'), {
+        filename: 'book.epub',
+        contentType: 'application/epub+zip',
+      });
+    assert.strictEqual(res.status, 422);
+    assert.match(res.body.error, /\u201cbook\.epub\u201d isn\u2019t a valid EPUB/);
+    assert.strictEqual(keys.get(key)!.files.length, 0);
+  });
+
+  it('returns 422 for a non-zip .epub sent as application/octet-stream', async () => {
+    const { app, key } = await generateKey();
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', Buffer.from('not a zip'), {
+        filename: 'book.epub',
+        contentType: 'application/octet-stream',
+      });
+    assert.strictEqual(res.status, 422);
   });
 });
 
@@ -1191,8 +1238,9 @@ describe('POST /upload — metadata failure feedback', () => {
 
   it('reports the metadata failure when fetchmetadata is set and EPUB parsing fails', async () => {
     const { app, key } = await generateKey();
-    // Not a valid ZIP — JSZip throws immediately, so fetchGoogleBooksMetadata is never called.
-    const fakeEpub = Buffer.from('not a real epub file');
+    // An empty zip has no container.xml, so reading metadata throws before
+    // fetchGoogleBooksMetadata is called.
+    const fakeEpub = await new JSZip().generateAsync({ type: 'nodebuffer' });
     const res = await request(app)
       .post('/upload')
       .set('X-Requested-With', 'XMLHttpRequest')

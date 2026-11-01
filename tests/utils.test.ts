@@ -19,6 +19,7 @@ import {
   writeEpubMetadata,
   fetchGoogleBooksMetadata,
   updateEpubMetadata,
+  hasZipEndRecord,
 } from '../src/utils.js';
 
 // ── EPUB metadata helpers ────────────────────────────────────────────────────
@@ -237,6 +238,28 @@ describe('updateEpubMetadata', () => {
     } finally {
       await fsp.unlink(tmpPath).catch(() => {});
     }
+  });
+});
+
+describe('hasZipEndRecord', () => {
+  async function check(buf: Buffer): Promise<boolean> {
+    const tmpPath = path.join(os.tmpdir(), `test-${Date.now()}-${Math.random()}.epub`);
+    await fsp.writeFile(tmpPath, buf);
+    try {
+      return await hasZipEndRecord(tmpPath);
+    } finally {
+      await fsp.unlink(tmpPath).catch(() => {});
+    }
+  }
+
+  it('accepts a zip whose comment ends with the end-record signature', async () => {
+    const zip = new JSZip().file('mimetype', 'application/epub+zip');
+    const buf = await zip.generateAsync({ type: 'nodebuffer', comment: 'PK\x05\x06' });
+    assert.strictEqual(await check(buf), true);
+  });
+
+  it('rejects a file too short to hold an end record', async () => {
+    assert.strictEqual(await check(Buffer.from('PK\x05\x06')), false);
   });
 });
 
