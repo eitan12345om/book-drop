@@ -11,6 +11,8 @@ Live at [bookdrop.cc](https://bookdrop.cc) · Forked from [send2ereader](https:/
 3. Pick one or more files and click **Upload and send**.
 4. Download links appear on the ereader within seconds.
 
+The ereader's browser must accept cookies: the key comes with a secret in an HttpOnly `bd_<KEY>` cookie, and only the browser holding it can see, download, or delete the session's files. The key alone is enough to send files.
+
 Supported formats: EPUB, MOBI, AZW3, PDF, CBZ, CBR, HTML, TXT, PNG, JPG.
 
 Optional conversions (requires external tools — see below):

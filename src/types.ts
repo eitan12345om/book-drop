@@ -21,6 +21,8 @@ export interface KeyInfo {
   ip: string;
   network: string;
   agent: string;
+  /** Secret held in the receiving browser's `bd_<KEY>` cookie; never log it. */
+  token: string;
   files: FileInfo[];
   urls: string[];
   timer: ReturnType<typeof setTimeout> | null;

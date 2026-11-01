@@ -18,8 +18,10 @@ import {
   MAX_URLS_PER_KEY,
   FILE_DELETE_DELAY_MS,
   UPLOAD_RATE_LIMIT_MAX,
+  MAX_EXPIRE_MS,
 } from '../src/config.js';
 import { addDiskUsage, subtractDiskUsage, getDiskUsage, removeKey } from '../src/keyStore.js';
+import { logger } from '../src/logger.js';
 import { sanitiseFilename } from '../src/routes/upload.js';
 import type { KeyInfo } from '../src/types.js';
 
@@ -84,7 +86,18 @@ async function generateKey(agent = 'Mozilla/5.0 TestBrowser') {
     .post('/generate')
     .set('User-Agent', agent)
     .set('X-Requested-With', 'XMLHttpRequest');
-  return { app, keys, key: res.body.key as string, status: res.status };
+  return {
+    app,
+    keys,
+    key: res.body.key as string,
+    status: res.status,
+    cookie: sessionCookie(res),
+  };
+}
+
+function sessionCookie(res: supertest.Response): string {
+  const setCookie = res.headers['set-cookie'] as unknown as string[] | undefined;
+  return setCookie?.find((c) => c.startsWith('bd_'))?.split(';')[0] ?? '';
 }
 
 // deleteFile() doesn't wait for its unlink, so a rejected upload's temp file can outlive the response.
@@ -110,8 +123,11 @@ describe('POST /generate', () => {
   });
 
   it('GET /qr/:key returns a PNG image', async () => {
-    const { app, key } = await generateKey('Kobo/1.0 Test');
-    const res = await request(app).get(`/qr/${key}`).set('User-Agent', 'Kobo/1.0 Test');
+    const { app, key, cookie } = await generateKey('Kobo/1.0 Test');
+    const res = await request(app)
+      .get(`/qr/${key}`)
+      .set('User-Agent', 'Kobo/1.0 Test')
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.headers['content-type'], 'image/png');
     assert.ok(res.body.length > 0);
@@ -124,12 +140,13 @@ describe('POST /generate', () => {
   });
 
   it('removes the old key when a valid abandon key is provided', async () => {
-    const { app, key: oldKey, keys } = await generateKey('TestBrowser/1.0');
+    const { app, key: oldKey, keys, cookie } = await generateKey('TestBrowser/1.0');
     assert.ok(keys.has(oldKey));
     await request(app)
       .post(`/generate?abandon=${oldKey}`)
       .set('User-Agent', 'TestBrowser/1.0')
-      .set('X-Requested-With', 'XMLHttpRequest');
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Cookie', cookie);
     assert.ok(!keys.has(oldKey), 'old key should be removed from the store');
   });
 
@@ -161,6 +178,156 @@ describe('POST /generate', () => {
   });
 });
 
+describe('receiver session cookie', () => {
+  const agent = 'Mozilla/5.0 (Linux; Kobo Touch 4.39)';
+
+  const generate = (app: Application, cookie = '') =>
+    request(app)
+      .post('/generate')
+      .set('User-Agent', agent)
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Cookie', cookie);
+
+  function setCookies(res: supertest.Response): string[] {
+    return (res.headers['set-cookie'] as unknown as string[] | undefined) ?? [];
+  }
+
+  it('is set by /generate as an HttpOnly, SameSite=Strict, Secure cookie for the session', async () => {
+    const { app } = createApp();
+    const res = await generate(app);
+    const header = setCookies(res).find((c) => c.startsWith(`bd_${res.body.key}=`));
+    assert.ok(header, 'no session cookie was set');
+    const attributes = header
+      .split(';')
+      .slice(1)
+      .map((a) => a.trim().toLowerCase());
+    assert.ok(attributes.includes('httponly'));
+    assert.ok(attributes.includes('samesite=strict'));
+    assert.ok(attributes.includes('secure'));
+    assert.ok(attributes.includes('path=/'));
+    assert.ok(attributes.includes(`max-age=${MAX_EXPIRE_MS / 1000}`));
+  });
+
+  it('holds a fresh 256-bit secret for each session', async () => {
+    const first = await generateKey(agent);
+    const second = await generateKey(agent);
+    const secret = (cookie: string) => cookie.split('=')[1];
+    assert.match(secret(first.cookie), /^[A-Za-z0-9_-]{43}$/);
+    assert.notStrictEqual(secret(first.cookie), secret(second.cookie));
+  });
+
+  const routes: {
+    name: string;
+    send: (app: Application, key: string) => supertest.Test;
+    succeeds: boolean;
+  }[] = [
+    {
+      name: 'GET /status/:key',
+      send: (app, key) => request(app).get(`/status/${key}`).set('User-Agent', agent),
+      succeeds: true,
+    },
+    {
+      // A successful request opens a stream; the SSE tests cover it.
+      name: 'GET /events/:key',
+      send: (app, key) => request(app).get(`/events/${key}`).set('User-Agent', agent),
+      succeeds: false,
+    },
+    {
+      name: 'GET /qr/:key',
+      send: (app, key) => request(app).get(`/qr/${key}`).set('User-Agent', agent),
+      succeeds: true,
+    },
+    {
+      name: 'GET /:filename?key=',
+      send: (app, key) => request(app).get(`/book.txt?key=${key}`).set('User-Agent', agent),
+      succeeds: true,
+    },
+    {
+      name: 'DELETE /file/:key/:filename',
+      send: (app, key) =>
+        request(app).delete(`/file/${key}/book.txt`).set('X-Requested-With', 'XMLHttpRequest'),
+      succeeds: true,
+    },
+    {
+      name: 'DELETE /file/:key',
+      send: (app, key) =>
+        request(app).delete(`/file/${key}`).set('X-Requested-With', 'XMLHttpRequest'),
+      succeeds: true,
+    },
+  ];
+
+  for (const route of routes) {
+    it(`${route.name} answers a missing or wrong cookie exactly as it answers an unknown key`, async () => {
+      const { app, keys, key, cookie } = await generateKey(agent);
+      const tmpFile = path.join('uploads', `test-cookie-${Date.now()}-${Math.random()}.txt`);
+      await fs.writeFile(tmpFile, 'staged');
+      keys.get(key)!.files = [
+        { name: 'book.txt', path: tmpFile, size: 0, uploaded: new Date(), downloadTimer: null },
+      ];
+      const attacker = sessionCookie(await generate(app));
+
+      const missing = await route.send(app, key);
+      const wrong = await route.send(app, key).set('Cookie', `bd_${key}=${attacker.split('=')[1]}`);
+      assert.strictEqual(keys.get(key)!.files.length, 1, 'a rejected request changed the session');
+
+      if (route.succeeds) {
+        const allowed = await route.send(app, key).set('Cookie', cookie);
+        assert.strictEqual(allowed.status, 200);
+      }
+
+      removeKey(key, keys);
+      const unknown = await route.send(app, key);
+      assert.notStrictEqual(unknown.status, 200);
+      for (const res of [missing, wrong]) {
+        assert.strictEqual(res.status, unknown.status);
+        assert.strictEqual(res.text, unknown.text);
+      }
+      await fs.rm(tmpFile, { force: true });
+    });
+  }
+
+  it('does not abandon a session the caller holds no cookie for', async () => {
+    const { app, keys, key: victim } = await generateKey(agent);
+    const res = await request(app)
+      .post(`/generate?abandon=${victim}`)
+      .set('User-Agent', agent)
+      .set('X-Requested-With', 'XMLHttpRequest');
+    assert.strictEqual(res.status, 200);
+    assert.ok(keys.has(victim), 'the victim session was removed');
+  });
+
+  it('clears the cookie of the session it abandons', async () => {
+    const { app, keys, key: oldKey, cookie } = await generateKey(agent);
+    const res = await generate(app, cookie).query({ abandon: oldKey });
+    assert.ok(!keys.has(oldKey));
+    const cleared = setCookies(res).find((c) => c.startsWith(`bd_${oldKey}=;`));
+    assert.ok(cleared, 'the abandoned session cookie was not cleared');
+    assert.match(cleared, /Expires=Thu, 01 Jan 1970/);
+  });
+
+  it('never writes the secret to the log', async () => {
+    const logged: unknown[] = [];
+    const mocks = (['debug', 'info', 'warn', 'error'] as const).map((level) =>
+      mock.method(logger, level, (...args: unknown[]) => {
+        logged.push(args);
+      })
+    );
+    try {
+      const { app, key, cookie } = await generateKey(agent);
+      await request(app).get(`/status/${key}`).set('User-Agent', 'Other/1.0').set('Cookie', cookie);
+      await generate(app, cookie).query({ abandon: key });
+      const secret = cookie.split('=')[1];
+      assert.ok(secret);
+      assert.ok(logged.length > 0, 'nothing was logged, so the check proves nothing');
+      assert.ok(!JSON.stringify(logged).includes(secret), 'the session secret was logged');
+    } finally {
+      for (const m of mocks) {
+        m.mock.restore();
+      }
+    }
+  });
+});
+
 describe('GET /status/:key', () => {
   it('returns 404 for an unknown key', async () => {
     const { app } = createApp();
@@ -171,22 +338,28 @@ describe('GET /status/:key', () => {
 
   it('returns empty files/urls for a freshly generated key', async () => {
     const agent = 'TestBrowser/1.0';
-    const { app, key } = await generateKey(agent);
-    const res = await request(app).get(`/status/${key}`).set('User-Agent', agent);
+    const { app, key, cookie } = await generateKey(agent);
+    const res = await request(app)
+      .get(`/status/${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 200);
     assert.deepStrictEqual(res.body.files, []);
     assert.deepStrictEqual(res.body.urls, []);
   });
 
   it('returns 404 when user-agent does not match', async () => {
-    const { app, key } = await generateKey('BrowserA/1.0');
-    const res = await request(app).get(`/status/${key}`).set('User-Agent', 'BrowserB/2.0');
+    const { app, key, cookie } = await generateKey('BrowserA/1.0');
+    const res = await request(app)
+      .get(`/status/${key}`)
+      .set('User-Agent', 'BrowserB/2.0')
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 404);
   });
 
   it('reflects file info after it has been set', async () => {
     const agent = 'TestBrowser/1.0';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     const info = keys.get(key)!;
     info.files = [
       {
@@ -198,7 +371,10 @@ describe('GET /status/:key', () => {
       },
     ];
 
-    const res = await request(app).get(`/status/${key}`).set('User-Agent', agent);
+    const res = await request(app)
+      .get(`/status/${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.files.length, 1);
     assert.strictEqual(res.body.files[0].name, 'book.epub');
@@ -214,7 +390,7 @@ describe('DELETE /file/:key', () => {
 
   it('clears all files and returns ok', async () => {
     const agent = 'TestBrowser/1.0';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     const info = keys.get(key)!;
     info.files = [
       {
@@ -226,11 +402,17 @@ describe('DELETE /file/:key', () => {
       },
     ];
 
-    const del = await request(app).delete(`/file/${key}`).set('X-Requested-With', 'XMLHttpRequest');
+    const del = await request(app)
+      .delete(`/file/${key}`)
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Cookie', cookie);
     assert.strictEqual(del.status, 200);
     assert.strictEqual(del.text, 'ok');
 
-    const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
+    const status = await request(app)
+      .get(`/status/${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.deepStrictEqual(status.body.files, []);
   });
 });
@@ -245,7 +427,7 @@ describe('DELETE /file/:key/:filename', () => {
   });
 
   it('returns 404 when the filename does not match any staged file', async () => {
-    const { app, keys, key } = await generateKey();
+    const { app, keys, key, cookie } = await generateKey();
     keys.get(key)!.files = [
       {
         name: 'real.epub',
@@ -257,13 +439,14 @@ describe('DELETE /file/:key/:filename', () => {
     ];
     const res = await request(app)
       .delete(`/file/${key}/other.epub`)
-      .set('X-Requested-With', 'XMLHttpRequest');
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 404);
   });
 
   it('removes only the named file and leaves others intact', async () => {
     const agent = 'TestBrowser/1.0';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     const info = keys.get(key)!;
     info.files = [
       {
@@ -284,17 +467,21 @@ describe('DELETE /file/:key/:filename', () => {
 
     const del = await request(app)
       .delete(`/file/${key}/first.epub`)
-      .set('X-Requested-With', 'XMLHttpRequest');
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Cookie', cookie);
     assert.strictEqual(del.status, 200);
 
-    const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
+    const status = await request(app)
+      .get(`/status/${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.strictEqual(status.body.files.length, 1);
     assert.strictEqual(status.body.files[0].name, 'second.epub');
   });
 
   it('URL-decodes the filename parameter', async () => {
     const agent = 'TestBrowser/1.0';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     keys.get(key)!.files = [
       {
         name: 'my book.epub',
@@ -307,16 +494,20 @@ describe('DELETE /file/:key/:filename', () => {
 
     const del = await request(app)
       .delete(`/file/${key}/my%20book.epub`)
-      .set('X-Requested-With', 'XMLHttpRequest');
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Cookie', cookie);
     assert.strictEqual(del.status, 200);
 
-    const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
+    const status = await request(app)
+      .get(`/status/${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.deepStrictEqual(status.body.files, []);
   });
 
   it('removes a file whose name contains a percent sign', async () => {
     const agent = 'TestBrowser/1.0';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     keys.get(key)!.files = [
       {
         name: '100% true.epub',
@@ -329,10 +520,14 @@ describe('DELETE /file/:key/:filename', () => {
 
     const del = await request(app)
       .delete(`/file/${key}/${encodeURIComponent('100% true.epub')}`)
-      .set('X-Requested-With', 'XMLHttpRequest');
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Cookie', cookie);
     assert.strictEqual(del.status, 200);
 
-    const status = await request(app).get(`/status/${key}`).set('User-Agent', agent);
+    const status = await request(app)
+      .get(`/status/${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.deepStrictEqual(status.body.files, []);
   });
 
@@ -881,6 +1076,7 @@ describe('POST /generate — capacity', () => {
       ip: '1.2.3.4',
       network: '1.2.3.4',
       agent: 'test',
+      token: 'test-token',
       files: [],
       urls: [],
       timer: null,
@@ -902,14 +1098,17 @@ describe('POST /generate — capacity', () => {
 describe('GET /:filename', () => {
   it('serves a staged file when key and filename match', async () => {
     const agent = 'TestBrowser/1.0';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     const tmpFile = path.join('uploads', `test-serve-${Date.now()}.txt`);
     await fs.writeFile(tmpFile, 'ebook content here');
     keys.get(key)!.files = [
       { name: 'mybook.txt', path: tmpFile, size: 0, uploaded: new Date(), downloadTimer: null },
     ];
 
-    const res = await request(app).get(`/mybook.txt?key=${key}`).set('User-Agent', agent);
+    const res = await request(app)
+      .get(`/mybook.txt?key=${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 200);
     assert.ok(res.text.includes('ebook content here'));
     assert.strictEqual(
@@ -923,14 +1122,17 @@ describe('GET /:filename', () => {
 
   it('forces a download disposition for image files on non-Kindle agents', async () => {
     const agent = 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     const tmpFile = path.join('uploads', `test-serve-img-${Date.now()}.png`);
     await fs.writeFile(tmpFile, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
     keys.get(key)!.files = [
       { name: 'cover.png', path: tmpFile, size: 8, uploaded: new Date(), downloadTimer: null },
     ];
 
-    const res = await request(app).get(`/cover.png?key=${key}`).set('User-Agent', agent);
+    const res = await request(app)
+      .get(`/cover.png?key=${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.headers['content-type'], 'image/png');
     assert.strictEqual(
@@ -944,7 +1146,7 @@ describe('GET /:filename', () => {
 
   it('serves a staged file when UPLOAD_DIR is inside a dot-directory', async () => {
     const agent = 'TestBrowser/1.0';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     const dir = path.join('uploads', '.hidden');
     await fs.mkdir(dir, { recursive: true });
     const tmpFile = path.join(dir, `test-serve-dotdir-${Date.now()}.txt`);
@@ -953,7 +1155,10 @@ describe('GET /:filename', () => {
       { name: 'dotdir.txt', path: tmpFile, size: 24, uploaded: new Date(), downloadTimer: null },
     ];
 
-    const res = await request(app).get(`/dotdir.txt?key=${key}`).set('User-Agent', agent);
+    const res = await request(app)
+      .get(`/dotdir.txt?key=${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.text, 'ebook in a dot-directory');
 
@@ -962,7 +1167,7 @@ describe('GET /:filename', () => {
 
   it('serves a non-ASCII name with a bare attachment so Kobo names it from the URL', async () => {
     const agent = 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     const tmpFile = path.join('uploads', `test-serve-cjk-${Date.now()}.epub`);
     await fs.writeFile(tmpFile, 'chinese ebook');
     keys.get(key)!.files = [
@@ -972,6 +1177,7 @@ describe('GET /:filename', () => {
     const res = await request(app)
       .get(`/${encodeURIComponent('三体.epub')}?key=${key}`)
       .set('User-Agent', agent)
+      .set('Cookie', cookie)
       .responseType('blob');
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.headers['content-type'], 'application/epub+zip');
@@ -983,7 +1189,7 @@ describe('GET /:filename', () => {
 
   it('serves a staged file whose name contains a percent sign', async () => {
     const agent = 'TestBrowser/1.0';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     const tmpFile = path.join('uploads', `test-serve-percent-${Date.now()}.txt`);
     await fs.writeFile(tmpFile, 'percent content');
     keys.get(key)!.files = [
@@ -992,7 +1198,8 @@ describe('GET /:filename', () => {
 
     const res = await request(app)
       .get(`/${encodeURIComponent('100% true.txt')}?key=${key}`)
-      .set('User-Agent', agent);
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.text, 'percent content');
 
@@ -1001,7 +1208,7 @@ describe('GET /:filename', () => {
 
   it('falls through (404) when the filename does not match any staged file', async () => {
     const agent = 'TestBrowser/1.0';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     keys.get(key)!.files = [
       {
         name: 'real.txt',
@@ -1012,7 +1219,10 @@ describe('GET /:filename', () => {
       },
     ];
 
-    const res = await request(app).get(`/wrong.txt?key=${key}`).set('User-Agent', agent);
+    const res = await request(app)
+      .get(`/wrong.txt?key=${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 404);
   });
 
@@ -1037,7 +1247,7 @@ describe('GET /:filename — download timer', () => {
   it('sets downloadTimer on the FileInfo after a successful download', async () => {
     mock.timers.enable({ apis: ['setTimeout'] });
     const agent = 'TestBrowser/1.0';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     const tmpFile = path.join('uploads', `test-timer-${Date.now()}.txt`);
     await fs.writeFile(tmpFile, 'timer test content');
     const fileEntry = {
@@ -1049,7 +1259,10 @@ describe('GET /:filename — download timer', () => {
     };
     keys.get(key)!.files = [fileEntry];
 
-    const res = await request(app).get(`/timer.txt?key=${key}`).set('User-Agent', agent);
+    const res = await request(app)
+      .get(`/timer.txt?key=${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 200);
     assert.notStrictEqual(
       fileEntry.downloadTimer,
@@ -1063,7 +1276,7 @@ describe('GET /:filename — download timer', () => {
   it('removes the file from info.files after FILE_DELETE_DELAY_MS', async () => {
     mock.timers.enable({ apis: ['setTimeout'] });
     const agent = 'TestBrowser/1.0';
-    const { app, keys, key } = await generateKey(agent);
+    const { app, keys, key, cookie } = await generateKey(agent);
     const tmpFile = path.join('uploads', `test-autorm-${Date.now()}.txt`);
     await fs.writeFile(tmpFile, 'timer test content');
     keys.get(key)!.files = [
@@ -1076,7 +1289,10 @@ describe('GET /:filename — download timer', () => {
       },
     ];
 
-    await request(app).get(`/autoremove.txt?key=${key}`).set('User-Agent', agent);
+    await request(app)
+      .get(`/autoremove.txt?key=${key}`)
+      .set('User-Agent', agent)
+      .set('Cookie', cookie);
     assert.strictEqual(keys.get(key)!.files.length, 1, 'file should still be staged before delay');
 
     mock.timers.tick(FILE_DELETE_DELAY_MS + 1);
@@ -1246,6 +1462,7 @@ describe('POST /generate — 503 body', () => {
       ip: '1.2.3.4',
       network: '1.2.3.4',
       agent: 'test',
+      token: 'test-token',
       files: [],
       urls: [],
       timer: null,
@@ -1472,14 +1689,10 @@ describe('GET /events/:key', () => {
   let app: ReturnType<typeof createApp>['app'];
   let keys: ReturnType<typeof createApp>['keys'];
   let key: string;
+  let cookie: string;
 
   before(async () => {
-    ({ app, keys } = createApp());
-    const res = await request(app)
-      .post('/generate')
-      .set('User-Agent', agent)
-      .set('X-Requested-With', 'XMLHttpRequest');
-    key = res.body.key;
+    ({ app, keys, key, cookie } = await generateKey(agent));
   });
 
   it('returns 400 for invalid key format', async () => {
@@ -1493,7 +1706,10 @@ describe('GET /events/:key', () => {
   });
 
   it('returns 404 for wrong user-agent', async () => {
-    const res = await request(app).get(`/events/${key}`).set('User-Agent', 'Mozilla/5.0');
+    const res = await request(app)
+      .get(`/events/${key}`)
+      .set('User-Agent', 'Mozilla/5.0')
+      .set('Cookie', cookie);
     assert.strictEqual(res.status, 404);
   });
 
@@ -1506,7 +1722,7 @@ describe('GET /events/:key', () => {
             hostname: '127.0.0.1',
             port,
             path: `/events/${encodeURIComponent(key)}`,
-            headers: { 'User-Agent': agent, 'X-Forwarded-Proto': 'https' },
+            headers: { 'User-Agent': agent, 'X-Forwarded-Proto': 'https', Cookie: cookie },
           },
           (res) => {
             try {
@@ -1560,7 +1776,7 @@ describe('GET /events/:key', () => {
             hostname: '127.0.0.1',
             port,
             path: `/events/${encodeURIComponent(key)}`,
-            headers: { 'User-Agent': agent, 'X-Forwarded-Proto': 'https' },
+            headers: { 'User-Agent': agent, 'X-Forwarded-Proto': 'https', Cookie: cookie },
           },
           (res) => {
             res.on('data', () => {
@@ -1589,13 +1805,13 @@ describe('GET /events/:key', () => {
   });
 
   it('keeps pushing to a new SSE connection after the replaced one closes', async () => {
-    const { app: sseApp, key: sseKey } = await generateKey(agent);
+    const { app: sseApp, key: sseKey, cookie: sseCookie } = await generateKey(agent);
     const server = sseApp.listen(0, '127.0.0.1');
     await new Promise<void>((resolve) => server.once('listening', resolve));
     const { port } = server.address() as AddressInfo;
     const open = () =>
       fetch(`http://127.0.0.1:${port}/events/${encodeURIComponent(sseKey)}`, {
-        headers: { 'User-Agent': agent, 'X-Forwarded-Proto': 'https' },
+        headers: { 'User-Agent': agent, 'X-Forwarded-Proto': 'https', Cookie: sseCookie },
       }).then((res) => res.body!.getReader());
     try {
       const first = await open();
@@ -1611,6 +1827,7 @@ describe('GET /events/:key', () => {
         .delete(`/file/${sseKey}`)
         .set('User-Agent', agent)
         .set('X-Requested-With', 'XMLHttpRequest')
+        .set('Cookie', sseCookie)
         .expect(200);
 
       const update = await Promise.race([
