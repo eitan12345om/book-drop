@@ -26,6 +26,11 @@ export const MAX_KEYS_PER_IP = envInt('MAX_KEYS_PER_IP', 3);
 export const MAX_DISK_BYTES = envInt('MAX_DISK_BYTES', 1 * 1024 * 1024 * 1024);
 export const MAX_FILES_PER_KEY = envInt('MAX_FILES_PER_KEY', 5);
 export const MAX_URLS_PER_KEY = envInt('MAX_URLS_PER_KEY', 20);
+/** Most entries, and most declared uncompressed bytes, an EPUB may have to be converted. */
+export const MAX_CONVERT_ENTRIES = 10_000;
+export const MAX_CONVERT_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
+/** Largest compressed container.xml or OPF the metadata lookup will inflate. */
+export const MAX_METADATA_ENTRY_BYTES = 64 * 1024;
 export const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY ?? '';
 export const DISABLE_HSTS = process.env.DISABLE_HSTS === '1';
 // Injected into HTML, so restricted to characters that are safe there.
