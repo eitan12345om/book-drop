@@ -5,8 +5,9 @@ RUN go install github.com/pgaskin/kepubify/v4/cmd/kepubify@v4.0.4
 # ── Stage 1: Builder ─────────────────────────────────────────────────────────
 FROM node:26-slim AS builder
 
-# Node 25+ no longer bundles corepack.
-RUN npm install -g corepack@0.36.0 && corepack enable pnpm
+# Keep in sync with "packageManager" in package.json.
+COPY --from=ghcr.io/pnpm/pnpm:12.16.1 /opt/pnpm /opt/pnpm
+RUN for bin in pnpm pn pnpx pnx; do ln -s "/opt/pnpm/$bin" "/usr/local/bin/$bin"; done
 
 WORKDIR /build
 
@@ -45,7 +46,8 @@ RUN dpkg --add-architecture i386 && \
     rm -rf /var/lib/apt/lists/*
 
 # ── Production dependencies ─────────────────────────────────────────────────
-RUN npm install -g corepack@0.36.0 && corepack enable pnpm
+COPY --from=ghcr.io/pnpm/pnpm:12.16.1 /opt/pnpm /opt/pnpm
+RUN for bin in pnpm pn pnpx pnx; do ln -s "/opt/pnpm/$bin" "/usr/local/bin/$bin"; done
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts
