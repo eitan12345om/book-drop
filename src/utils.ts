@@ -52,10 +52,7 @@ const ZIP_END_RECORD_SIZE = 22;
 // The end record is followed by a comment of at most 65,535 bytes.
 const ZIP_END_SEARCH_BYTES = ZIP_END_RECORD_SIZE + 0xffff;
 
-/**
- * Returns true if the file ends with a zip end-of-central-directory record. Every EPUB
- * has one, and it's the part a cut-off download loses.
- */
+/** Returns true if the file ends with a zip end-of-central-directory record, as every complete EPUB does. */
 export async function hasZipEndRecord(filePath: string): Promise<boolean> {
   const handle = await fsp.open(filePath, 'r');
   try {
@@ -63,14 +60,16 @@ export async function hasZipEndRecord(filePath: string): Promise<boolean> {
     const length = Math.min(size, ZIP_END_SEARCH_BYTES);
     const buf = Buffer.alloc(length);
     await handle.read(buf, 0, length, size - length);
-    const index = buf.lastIndexOf(ZIP_END_SIGNATURE);
-    return index !== -1 && index <= length - ZIP_END_RECORD_SIZE;
+    if (length < ZIP_END_RECORD_SIZE) {
+      return false;
+    }
+    return buf.lastIndexOf(ZIP_END_SIGNATURE, length - ZIP_END_RECORD_SIZE) !== -1;
   } finally {
     await handle.close();
   }
 }
 
-/** Returns the user-facing error for a file that claims to be an EPUB but isn't a zip. */
+/** Returns the user-facing error for a file that claims to be an EPUB but isn't a complete zip. */
 export function invalidEpubMessage(filename: string): string {
   return `\u201c${filename}\u201d isn\u2019t a valid EPUB file. It may be damaged or not fully downloaded. Try downloading it again.`;
 }

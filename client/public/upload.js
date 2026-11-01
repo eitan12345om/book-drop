@@ -454,11 +454,10 @@ const ZIP_END_RECORD_SIZE = 22;
 const ZIP_END_SEARCH_BYTES = ZIP_END_RECORD_SIZE + 0xffff;
 
 /**
- * Returns false only if an .epub file is readable and lacks the zip end record that a
- * cut-off download loses. Unreadable files pass so the upload path can report its own,
- * more specific error.
+ * Returns false only if an .epub file is readable and lacks a zip end record.
+ * Unreadable files pass so the upload path can report its own, more specific error.
  */
-async function hasValidEpubSignature(file) {
+async function hasEpubEndRecord(file) {
   if (!file.name.toLowerCase().endsWith('.epub')) {
     return true;
   }
@@ -489,7 +488,7 @@ async function rejectionReason(file) {
   if (MAX_FILE_SIZE && file.size > MAX_FILE_SIZE) {
     return 'size';
   }
-  if (!(await hasValidEpubSignature(file))) {
+  if (!(await hasEpubEndRecord(file))) {
     return 'epub';
   }
   return null;
@@ -714,11 +713,7 @@ function uploadErrorMessage(xhr, fallback) {
   return `${fallback} (HTTP ${xhr.status}) Please try again in a moment.`;
 }
 
-/**
- * Statuses that mean only this file was refused (too large, invalid, failed to convert),
- * so the rest of a multi-file upload can still go ahead. Anything else (an expired key,
- * the file limit, rate limiting, an unreachable server) would fail every remaining file.
- */
+/** Statuses that refuse only this file, so the rest of a multi-file upload can go ahead. */
 const FILE_SPECIFIC_STATUSES = new Set([413, 422, 500]);
 
 /** Builds one error message for the files in an upload that weren't sent. */
@@ -990,8 +985,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       total > 1 ? buildSuccessToast(successResults) : formatSuccessMessages(successResults)
     );
   }
-  // Leave only the files that didn't go through selected, so they can be resent.
-  // If none went through, the selection is already exactly that.
+  // If no file went through, the selection is already exactly the files to resend.
   if (successResults.some((r) => r.filename)) {
     const remaining = [...failures.map((f) => f.file), ...unsent];
     if (remaining.length > 0) {
