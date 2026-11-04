@@ -125,3 +125,29 @@ jobs:
         with:
           node-version: 26
       - run: pnpm audit --audit-level high
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [typecheck, lint, test, e2e, docker, workflows, audit]
+    runs-on: ubuntu-latest
+    environment: production
+    # Let a running deploy finish; a newer push replaces any deploy still waiting.
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          audience: ${{ secrets.TS_AUDIENCE }}
+          tags: tag:ci
+      - name: Trigger deploy over SSH
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: exit 0
