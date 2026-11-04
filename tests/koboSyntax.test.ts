@@ -10,6 +10,7 @@ import { parse, type Node } from 'acorn';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const DOWNLOAD_HTML = path.join(ROOT, 'client', 'views', 'download.html');
+const THEME_JS = path.join(ROOT, 'client', 'public', 'theme.js');
 
 const UNSUPPORTED_OPERATORS = new Set(['??', '**', '??=', '**=', '||=', '&&=']);
 
@@ -60,9 +61,33 @@ function unsupported(node: AnyNode): string | null {
         return '`async`/`await`';
       }
       return node.generator ? 'generator' : null;
+    case 'Literal':
+      return unsupportedLiteral(node);
     default:
       return null;
   }
+}
+
+function unsupportedLiteral(node: AnyNode): string | null {
+  const raw = String(node.raw);
+  if (node.bigint !== undefined) {
+    return 'BigInt';
+  }
+  if (typeof node.value === 'number') {
+    if (raw.includes('_')) {
+      return 'numeric separator';
+    }
+    return /^0[bo]/i.test(raw) ? 'binary or octal literal' : null;
+  }
+  const regex = node.regex as { flags: string } | undefined;
+  const newFlag = regex?.flags.replace(/[gim]/g, '')[0];
+  if (newFlag) {
+    return `regex flag \`${newFlag}\``;
+  }
+  // An odd number of backslashes before `u{` is the escape, not a literal backslash.
+  return typeof node.value === 'string' && /(?:^|[^\\])(?:\\\\)*\\u\{/.test(raw)
+    ? '`\\u{…}` escape'
+    : null;
 }
 
 function childNodes(node: AnyNode): AnyNode[] {
@@ -90,22 +115,32 @@ function koboSyntaxProblems(fileName: string, source: string): string[] {
   return problems;
 }
 
-/** External scripts the download page loads, plus its inline scripts padded so line numbers match the HTML. */
-function downloadPageScripts(): { fileName: string; source: string }[] {
-  const html = fs.readFileSync(DOWNLOAD_HTML, 'utf8');
+const SCRIPT_TAG = /<script\b([^>]*)>([\s\S]*?)<\/script[^>]*>/gi;
+const JS_TYPES = new Set(['', 'text/javascript', 'application/javascript', 'module']);
+
+function attribute(attrs: string, name: string): string | undefined {
+  const match = new RegExp(
+    `(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`,
+    'i'
+  ).exec(attrs);
+  return match ? (match[1] ?? match[2] ?? match[3]) : undefined;
+}
+
+/** External scripts a page loads, plus its inline scripts padded so line numbers match the HTML. */
+function pageScripts(html: string, htmlName: string): { fileName: string; source: string }[] {
   const scripts: { fileName: string; source: string }[] = [];
-  for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {
+  for (const match of html.matchAll(SCRIPT_TAG)) {
     const [, attrs, body] = match;
-    const src = /\bsrc="([^"]+)"/.exec(attrs)?.[1];
-    if (src) {
-      const file = path.join(ROOT, 'client', 'public', src);
+    if (!JS_TYPES.has((attribute(attrs, 'type') ?? '').trim().toLowerCase())) {
+      continue;
+    }
+    const src = attribute(attrs, 'src');
+    if (src !== undefined) {
+      const file = path.join(ROOT, 'client', 'public', src.replace(/^\//, ''));
       scripts.push({ fileName: path.relative(ROOT, file), source: fs.readFileSync(file, 'utf8') });
-    } else if (!/\btype="(?!text\/javascript)/.test(attrs)) {
+    } else {
       const linesBefore = html.slice(0, match.index).split('\n').length - 1;
-      scripts.push({
-        fileName: path.relative(ROOT, DOWNLOAD_HTML),
-        source: '\n'.repeat(linesBefore) + body,
-      });
+      scripts.push({ fileName: htmlName, source: '\n'.repeat(linesBefore) + body });
     }
   }
   return scripts;
@@ -129,6 +164,11 @@ describe('Kobo syntax check', () => {
       ['var v = a ?? b;', '`??`'],
       ['async function f() {}', '`async`/`await`'],
       ['function* g() {}', 'generator'],
+      ['var n = 1_000;', 'numeric separator'],
+      ['var n = 1n;', 'BigInt'],
+      ['var n = 0b1;', 'binary or octal literal'],
+      ['var r = /a/u;', 'regex flag `u`'],
+      ["var s = '\\u{1F600}';", '`\\u{…}` escape'],
     ];
     for (const [source, expected] of samples) {
       assert.deepStrictEqual(koboSyntaxProblems('sample.js', source), [`sample.js:1: ${expected}`]);
@@ -149,8 +189,30 @@ describe('Kobo syntax check', () => {
     assert.strictEqual(koboSyntaxProblems('sample.js', 'var = ;').length, 1);
   });
 
+  it('finds every executable script in a page', () => {
+    const html = [
+      '<SCRIPT>var upper = 1;</SCRIPT>',
+      '<script type="application/javascript">var typed = 1;</script >',
+      "<script src='theme.js' defer></script>",
+      '<script type="application/ld+json">{"not": "js"}</script>',
+    ].join('\n');
+    const scripts = pageScripts(html, 'page.html');
+    assert.deepStrictEqual(
+      scripts.map((s) => [s.fileName, s.source.trim()]),
+      [
+        ['page.html', 'var upper = 1;'],
+        ['page.html', 'var typed = 1;'],
+        [path.join('client', 'public', 'theme.js'), fs.readFileSync(THEME_JS, 'utf8').trim()],
+      ]
+    );
+    assert.strictEqual(scripts[1].source.split('\n').length, 2);
+  });
+
   it('download page scripts only use syntax old Kobo WebKit supports', () => {
-    const scripts = downloadPageScripts();
+    const scripts = pageScripts(
+      fs.readFileSync(DOWNLOAD_HTML, 'utf8'),
+      path.relative(ROOT, DOWNLOAD_HTML)
+    );
     assert.ok(scripts.some((s) => s.fileName.endsWith('download.js')));
     const problems = scripts.flatMap((s) => koboSyntaxProblems(s.fileName, s.source));
     assert.deepStrictEqual(problems, []);
