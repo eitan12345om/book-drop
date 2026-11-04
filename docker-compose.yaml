@@ -8,8 +8,8 @@ services:
     ports:
       - '${PORT:-3001}:${PORT:-3001}'
     # Conversions are CPU-bound and each one needs roughly 250 MB, so these decide
-    # conversion throughput. CPUS reaches the app through env_file below, which sizes
-    # the concurrency limit from it. Defaults suit a 1-vCPU host.
+    # conversion throughput. The app sizes its concurrency limit from CPUS, passed in
+    # below. Defaults suit a 1-vCPU host.
     cpus: ${CPUS:-1.0}
     mem_limit: ${MEM_LIMIT:-2g}
     logging:
@@ -22,3 +22,5 @@ services:
         required: false
     environment:
       - PORT
+      # Resolved the same way as `cpus` above, so a shell override reaches both.
+      - CPUS=${CPUS:-1.0}
