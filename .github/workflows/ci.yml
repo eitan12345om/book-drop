@@ -98,6 +98,11 @@ jobs:
           }
           check_page upload.js
           check_page download.js -A 'Mozilla/5.0 (Linux) AppleWebKit/538.1 Kobo Touch'
+      - name: Convert real books with the image's converters
+        # The suite skips converters it can't find, so check first that the image has them.
+        run: |
+          docker run --rm -v "$PWD/tests:/usr/src/app/tests:ro" book-drop:ci sh -c \
+            'ebook-convert --version && kepubify --version && node --test tests/integration/'
       - if: failure()
         run: docker logs book-drop
 
