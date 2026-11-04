@@ -12,7 +12,7 @@ import {
   releasePendingDisk,
 } from '../keyStore.js';
 import { backendFor, convert, ConversionError } from '../converter.js';
-import type { ConversionIntent } from '../converter.js';
+import type { ConversionIntent, ConversionTiming } from '../converter.js';
 import { QueueFullError } from '../semaphore.js';
 import {
   MAX_FILE_SIZE,
@@ -143,7 +143,8 @@ async function runConversion(
   mimetype: string,
   device: Ereader | null,
   options: ConversionOptions,
-  key: string
+  key: string,
+  timing: ConversionTiming
 ): Promise<{ convertedPath: string; conversionTool: string | null }> {
   const intent = intentFor(mimetype, device, options);
   if (!intent) {
@@ -151,12 +152,8 @@ async function runConversion(
   }
   const backend = backendFor(intent);
   logger.info({ key, intent, tool: backend.tool, mimetype }, 'Conversion started');
-  const startedAt = Date.now();
-  const convertedPath = await convert(intent, filePath);
-  logger.info(
-    { key, intent, tool: backend.tool, durationMs: Date.now() - startedAt },
-    'Conversion succeeded'
-  );
+  const convertedPath = await convert(intent, filePath, timing);
+  logger.info({ key, intent, tool: backend.tool, ...timing }, 'Conversion succeeded');
   return { convertedPath, conversionTool: backend.tool };
 }
 
@@ -356,21 +353,21 @@ export function makeUploadRouter(
 
           let convertedPath: string;
           let conversionTool: string | null;
-          const conversionStartedAt = Date.now();
+          const timing: ConversionTiming = {};
           try {
             ({ convertedPath, conversionTool } = await runConversion(
               req.file.path,
               mimetype,
               device,
               conversionOptions,
-              key
+              key,
+              timing
             ));
           } catch (convErr) {
             const ref = newErrorRef();
             deleteFile(req.file.path);
-            const durationMs = Date.now() - conversionStartedAt;
             if (convErr instanceof QueueFullError) {
-              logger.warn({ key, durationMs }, 'Conversion rejected: too many in progress');
+              logger.warn({ key, ...timing }, 'Conversion rejected: too many in progress');
               res.set('Retry-After', '30').status(503).json({
                 error: 'Too many conversions in progress — please try again in a moment.',
               });
@@ -386,13 +383,13 @@ export function makeUploadRouter(
             }
             if (convErr instanceof ConversionError && convErr.timedOut) {
               logger.error(
-                { err: convErr, key, tool, intent, ref, durationMs },
+                { err: convErr, key, tool, intent, ref, ...timing },
                 'Conversion timed out'
               );
               res.status(504).json({ error: turnOff, ref });
               return;
             }
-            logger.warn({ err: convErr, key, tool, intent, ref, durationMs }, 'Conversion failed');
+            logger.warn({ err: convErr, key, tool, intent, ref, ...timing }, 'Conversion failed');
             res.status(422).json({
               error: (convErr instanceof ConversionError && convErr.userMessage) || turnOff,
               ref,

@@ -329,22 +329,35 @@ export function backendFor(intent: ConversionIntent): ConverterBackend {
   return backend;
 }
 
+/** How long a conversion waited for a slot, and how long it then ran. */
+export interface ConversionTiming {
+  queuedMs?: number;
+  durationMs?: number;
+}
+
 /**
  * Runs an intent through its configured backend once a slot is free, tagging failures
- * with the intent and with whether the tool was missing altogether.
+ * with the intent and with whether the tool was missing altogether. Fills in timing as
+ * it goes, so a caller can log it whether the conversion succeeds or fails.
  */
-export async function convert(intent: ConversionIntent, inputPath: string): Promise<string> {
+export async function convert(
+  intent: ConversionIntent,
+  inputPath: string,
+  timing: ConversionTiming = {}
+): Promise<string> {
+  const requestedAt = Date.now();
   try {
     return await conversionSlots.run(async (queuedMs) => {
-      if (queuedMs > 0) {
-        logger.info(
-          { intent, queuedMs, active: conversionSlots.activeCount },
-          'Conversion waited for a free slot'
-        );
+      timing.queuedMs = queuedMs;
+      const startedAt = Date.now();
+      try {
+        return await backendFor(intent).run(inputPath);
+      } finally {
+        timing.durationMs = Date.now() - startedAt;
       }
-      return backendFor(intent).run(inputPath);
     });
   } catch (err) {
+    timing.queuedMs ??= Date.now() - requestedAt;
     if (err instanceof ConversionError) {
       err.intent = intent;
       err.toolMissing = err.cause instanceof SpawnError && err.cause.code === 'ENOENT';

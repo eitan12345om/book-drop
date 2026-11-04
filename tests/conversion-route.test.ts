@@ -17,12 +17,13 @@ Object.assign(process.env, {
   UPLOAD_DIR: uploadDir,
   CONVERSION_TIMEOUT_MS: '1000',
   MAX_CONCURRENT_CONVERSIONS: '1',
-  MAX_QUEUED_CONVERSIONS: '0',
+  MAX_QUEUED_CONVERSIONS: '1',
   KOBO_CONVERTER: 'calibre',
   MAX_KEYS_PER_IP: '10',
   PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH}`,
 });
 const { createApp } = await import('../src/app.js');
+const { convert } = await import('../src/converter.js');
 
 // FAKE_CONVERTER is read when the converter is spawned, so each test picks its own failure.
 await fs.writeFile(
@@ -111,11 +112,12 @@ describe('POST /upload — how conversion failures are answered', () => {
     assert.deepStrictEqual(await fs.readdir(uploadDir), []);
   });
 
-  it('refuses an upload with 503 and Retry-After while every slot is busy', async () => {
+  it('refuses an upload with 503 and Retry-After while every slot and the queue are full', async () => {
     process.env.FAKE_CONVERTER = 'hang';
     await fs.rm(startedMarker, { force: true });
     const busy = uploadForKobo(await generateKoboKey());
     await waitForConverterToStart();
+    const queued = assert.rejects(convert('kobo', path.join(uploadDir, 'queued.epub')));
 
     const res = await uploadForKobo(await generateKoboKey());
     assert.strictEqual(res.status, 503);
@@ -123,5 +125,21 @@ describe('POST /upload — how conversion failures are answered', () => {
     assert.match(res.body.error, /Too many conversions/);
 
     assert.strictEqual((await busy).status, 504);
+    await queued;
+  });
+
+  it('times a conversion from when it gets a slot, not from when it joined the queue', async () => {
+    process.env.FAKE_CONVERTER = 'hang';
+    await fs.rm(startedMarker, { force: true });
+    const first = {};
+    const second: { queuedMs?: number; durationMs?: number } = {};
+    const running = assert.rejects(convert('kobo', path.join(uploadDir, 'first.epub'), first));
+    await waitForConverterToStart();
+    process.env.FAKE_CONVERTER = 'fail';
+    const waiting = assert.rejects(convert('kobo', path.join(uploadDir, 'second.epub'), second));
+    await Promise.all([running, waiting]);
+
+    assert.ok(second.queuedMs! >= 800, `queued ${second.queuedMs} ms behind a 1 s conversion`);
+    assert.ok(second.durationMs! < 500, `ran ${second.durationMs} ms for an instant failure`);
   });
 });
