@@ -90,11 +90,12 @@ async function waitForConverterToStart(): Promise<void> {
 }
 
 describe('POST /upload — how conversion failures are answered', () => {
-  it('answers a book the converter rejects with 422 and the device guidance', async () => {
+  it('answers a book the converter rejects with 422, the device guidance, and a reference', async () => {
     process.env.FAKE_CONVERTER = 'fail';
     const res = await uploadForKobo(await generateKoboKey());
     assert.strictEqual(res.status, 422);
     assert.match(res.body.error, /Kobo format/);
+    assert.match(res.body.ref, /^[0-9A-F]{8}$/);
     assert.deepStrictEqual(await fs.readdir(uploadDir), []);
   });
 
@@ -105,6 +106,7 @@ describe('POST /upload — how conversion failures are answered', () => {
     const elapsed = Date.now() - startedAt;
     assert.strictEqual(res.status, 504);
     assert.match(res.body.error, /Kobo format/);
+    assert.match(res.body.ref, /^[0-9A-F]{8}$/);
     assert.ok(elapsed < 3_000, `took ${elapsed} ms`);
     assert.deepStrictEqual(await fs.readdir(uploadDir), []);
   });
