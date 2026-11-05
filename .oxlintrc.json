@@ -37,7 +37,7 @@
       }
     },
     {
-      "files": ["tests/**/*.ts"],
+      "files": ["tests/**/*.ts", "scripts/**"],
       "rules": {
         "no-console": "off"
       }
