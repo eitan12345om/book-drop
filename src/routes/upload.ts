@@ -327,14 +327,6 @@ export function makeUploadRouter(
           return;
         }
 
-        if (info.files.length + info.pendingUploads >= MAX_FILES_PER_KEY) {
-          res.status(400).json({
-            error: `File limit reached - this session supports up to ${MAX_FILES_PER_KEY} files`,
-          });
-          deleteFile(req.file.path);
-          return;
-        }
-
         const conversionOptions = {
           kindlegen: !!req.body?.kindlegen,
           kepubify: !!req.body?.kepubify,
@@ -356,6 +348,15 @@ export function makeUploadRouter(
           const option = converter === 'KindleGen' ? 'Kindle format' : 'Kobo format';
           res.status(422).json({
             error: `\u201c${req.file.originalname}\u201d is too large to convert. Turn off \u201c${option}\u201d and send it again.`,
+          });
+          deleteFile(req.file.path);
+          return;
+        }
+
+        // No await between this check and reserving the slot below.
+        if (info.files.length + info.pendingUploads >= MAX_FILES_PER_KEY) {
+          res.status(400).json({
+            error: `File limit reached - this session supports up to ${MAX_FILES_PER_KEY} files`,
           });
           deleteFile(req.file.path);
           return;
