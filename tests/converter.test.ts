@@ -109,9 +109,9 @@ echo mobi > "$4"
       assert.deepStrictEqual(await fs.readdir(uploadDir), ['file-1700000000000-abc.mobi']);
       assert.deepStrictEqual((await fs.readFile(argsFile, 'utf8')).trim().split('\n'), [
         'build',
-        'file-1700000000000-abc.epub',
+        'in.epub',
         '-o',
-        'file-1700000000000-abc.mobi',
+        'out.mobi',
         '--legacy-mobi',
         '--no-validate',
         '--no-embed-source',
@@ -121,6 +121,19 @@ echo mobi > "$4"
       ]);
     });
     await fs.rm(argsFile, { force: true });
+    await fs.rm(uploadDir, { recursive: true, force: true });
+  });
+
+  it('keeps the converted book when the EPUB was uploaded under another extension', async () => {
+    const uploadDir = await fs.mkdtemp(path.join(os.tmpdir(), 'uploads-'));
+    const input = path.join(uploadDir, 'file-1700000000000-abc.zip');
+    await fs.writeFile(input, 'not really an epub');
+    await withFakeTool('kindling-cli', '#!/bin/sh\necho mobi > "$4"\n', async () => {
+      const output = await convertWithKindling(input);
+
+      assert.strictEqual(output, path.join(uploadDir, 'file-1700000000000-abc.mobi'));
+      assert.deepStrictEqual(await fs.readdir(uploadDir), ['file-1700000000000-abc.mobi']);
+    });
     await fs.rm(uploadDir, { recursive: true, force: true });
   });
 

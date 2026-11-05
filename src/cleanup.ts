@@ -2,6 +2,7 @@ import fsp from 'fs/promises';
 import type { Stats } from 'fs';
 import path from 'path';
 import { logger } from './logger.js';
+import { KINDLING_WORK_DIR_PREFIX } from './converter.js';
 import type { KeyInfo } from './types.js';
 
 function getFileAgeMs(filePath: string, stat: Stats, now: number): number {
@@ -31,6 +32,14 @@ export async function cleanExpiredUploads(
       continue;
     }
     const stat = await fsp.stat(filePath).catch(() => null);
+    // A conversion's scratch folder outlives it only if the server stopped mid-conversion.
+    if (stat?.isDirectory() && f.startsWith(KINDLING_WORK_DIR_PREFIX)) {
+      if (getFileAgeMs(filePath, stat, now) > maxAgeMs) {
+        await fsp.rm(filePath, { recursive: true, force: true });
+        deleted++;
+      }
+      continue;
+    }
     if (!stat || !stat.isFile()) {
       continue;
     }

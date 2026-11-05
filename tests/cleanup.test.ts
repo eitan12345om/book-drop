@@ -65,6 +65,34 @@ describe('cleanExpiredUploads', () => {
     await assert.rejects(fsp.access(filePath), { code: 'ENOENT' });
   });
 
+  it('deletes an abandoned kindling scratch folder and the book inside it', async () => {
+    const workDir = path.join(tmpDir, '.kindling-a1B2c3');
+    await fsp.mkdir(path.join(workDir, '.kindling_epub_file-1000-abc_1'), { recursive: true });
+    await fsp.writeFile(path.join(workDir, 'file-1000-abc.epub'), 'data');
+
+    await cleanExpiredUploads(tmpDir, new Map(), MAX_AGE, expiredNow());
+
+    await assert.rejects(fsp.access(workDir), { code: 'ENOENT' });
+  });
+
+  it('leaves a kindling scratch folder alone while its conversion may still be running', async () => {
+    const workDir = path.join(tmpDir, '.kindling-a1B2c3');
+    await fsp.mkdir(workDir);
+
+    await cleanExpiredUploads(tmpDir, new Map(), MAX_AGE, Date.now());
+
+    await assert.doesNotReject(fsp.access(workDir));
+  });
+
+  it('leaves other directories alone', async () => {
+    const dir = path.join(tmpDir, '.hidden');
+    await fsp.mkdir(dir);
+
+    await cleanExpiredUploads(tmpDir, new Map(), MAX_AGE, expiredNow());
+
+    await assert.doesNotReject(fsp.access(dir));
+  });
+
   it('does not delete non-expired file', async () => {
     const filePath = path.join(tmpDir, 'file-1000-abc.epub');
     await fsp.writeFile(filePath, 'data');

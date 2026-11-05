@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import { spawn } from 'child_process';
-import { basename, dirname, join } from 'path';
+import { basename, dirname, extname, join } from 'path';
 import { logger } from './logger.js';
 
 /** KindleGen is much slower than the other converters, so it gets its own cap. */
@@ -128,6 +128,9 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
   }
 }
 
+/** Prefix of the scratch folders kindling runs in, which the cleanup worker also looks for. */
+export const KINDLING_WORK_DIR_PREFIX = '.kindling-';
+
 /**
  * Converts an EPUB to MOBI using kindling, deleting the original on completion.
  *
@@ -135,13 +138,15 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
  * or is killed, so it runs in a scratch folder that is removed whatever the outcome.
  */
 export async function convertWithKindling(inputPath: string): Promise<string> {
-  const outPath = inputPath.replace(/\.epub$/i, '.mobi');
+  const outPath = join(dirname(inputPath), `${basename(inputPath, extname(inputPath))}.mobi`);
   let workDir: string | undefined;
+  let moved = false;
   try {
-    workDir = await fs.mkdtemp(join(dirname(inputPath), '.kindling-'));
-    const workInput = join(workDir, basename(inputPath));
-    const workOutput = join(workDir, basename(outPath));
+    workDir = await fs.mkdtemp(join(dirname(inputPath), KINDLING_WORK_DIR_PREFIX));
+    const workInput = join(workDir, 'in.epub');
+    const workOutput = join(workDir, 'out.mobi');
     await fs.rename(inputPath, workInput);
+    moved = true;
     await spawnProcess(
       'kindling-cli',
       [
@@ -164,15 +169,10 @@ export async function convertWithKindling(inputPath: string): Promise<string> {
     );
     await fs.rename(workOutput, outPath);
     return outPath;
-  } catch (err) {
-    const msg = sanitizeOutput(
-      (err as Error).message,
-      [basename(inputPath), 'infile.epub'],
-      [basename(outPath), 'outfile.mobi']
-    );
-    throw new Error(msg, { cause: err });
   } finally {
-    await deleteFile(inputPath);
+    if (!moved) {
+      await deleteFile(inputPath);
+    }
     if (workDir) {
       await fs.rm(workDir, { recursive: true, force: true });
     }
