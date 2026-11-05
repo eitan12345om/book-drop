@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import express from 'express';
@@ -25,13 +26,22 @@ import {
 } from '../config.js';
 import { logger } from '../logger.js';
 import type { KeyInfo } from '../types.js';
-import { isValidKey, clientIp, detectEreader } from '../utils.js';
+import { isValidKey, clientIp, clientNetwork, detectEreader } from '../utils.js';
 import {
   makeRequireKey,
   makeRequireMatchingAgent,
   makeLimiter,
   requireXhr,
+  hasReceiverToken,
+  receiverCookieName,
 } from '../middleware.js';
+
+const receiverCookieOptions = (req: express.Request): express.CookieOptions => ({
+  httpOnly: true,
+  sameSite: 'strict',
+  secure: req.secure,
+  path: '/',
+});
 
 export function makeKeysRouter(
   keys: Map<string, KeyInfo>,
@@ -55,9 +65,10 @@ export function makeKeysRouter(
       return;
     }
     const ip = clientIp(req);
-    const keysForIp = [...keys.values()].filter((k) => k.ip === ip).length;
+    const network = clientNetwork(req);
+    const keysForIp = [...keys.values()].filter((k) => k.network === network).length;
     if (keysForIp >= MAX_KEYS_PER_IP) {
-      logger.warn({ ip, keysForIp }, 'Key rejected: per-IP limit reached');
+      logger.warn({ ip, network, keysForIp }, 'Key rejected: per-IP limit reached');
       res.status(429).send('Too many active sessions');
       return;
     }
@@ -72,7 +83,9 @@ export function makeKeysRouter(
     const info: KeyInfo = {
       created: new Date(),
       ip,
+      network,
       agent,
+      token: crypto.randomBytes(32).toString('base64url'),
       files: [],
       urls: [],
       timer: null,
@@ -100,12 +113,18 @@ export function makeKeysRouter(
 
     const abandonKey =
       typeof req.query.abandon === 'string' ? req.query.abandon.toUpperCase() : null;
-    if (abandonKey && isValidKey(abandonKey) && keys.has(abandonKey)) {
+    const abandoned = abandonKey && isValidKey(abandonKey) ? keys.get(abandonKey) : undefined;
+    if (abandonKey && abandoned && hasReceiverToken(req, abandonKey, abandoned)) {
       removeKey(abandonKey, keys);
+      res.clearCookie(receiverCookieName(abandonKey), receiverCookieOptions(req));
     }
 
     logger.info({ key, ip, activeKeys: keys.size }, 'Generated key');
 
+    res.cookie(receiverCookieName(key), info.token, {
+      ...receiverCookieOptions(req),
+      maxAge: MAX_EXPIRE_MS,
+    });
     res.json({ key });
   });
 
@@ -202,7 +221,7 @@ export function makeKeysRouter(
       return;
     }
     const info = keys.get(key);
-    if (!info) {
+    if (!info || !hasReceiverToken(req, key, info)) {
       res.status(404).send('Unknown key');
       return;
     }
@@ -235,7 +254,7 @@ export function makeKeysRouter(
       return;
     }
     const info = keys.get(key);
-    if (!info) {
+    if (!info || !hasReceiverToken(req, key, info)) {
       res.status(400).send(`Unknown key: ${key}`);
       return;
     }
@@ -252,7 +271,7 @@ export function makeKeysRouter(
 
     const filename = req.params.filename as string;
     const info = keys.get(key);
-    if (!info) {
+    if (!info || !hasReceiverToken(req, key, info)) {
       return next();
     }
     const fileEntry = info.files.find((f) => f.name === filename);

@@ -2,11 +2,12 @@ import crypto from 'node:crypto';
 import fs from 'fs';
 import fsp from 'fs/promises';
 import type express from 'express';
+import { ipKeyGenerator } from 'express-rate-limit';
 import JSZip from 'jszip';
 import { transliterate } from 'transliteration';
 import { logger } from './logger.js';
 import type { MetadataDiff } from './types.js';
-import { GOOGLE_BOOKS_API_KEY } from './config.js';
+import { GOOGLE_BOOKS_API_KEY, MAX_METADATA_ENTRY_BYTES } from './config.js';
 
 export const KEY_REGEX = /^[23456789ACDEFGHJKLMNPRSTUVWXYZ]{4}$/;
 
@@ -53,6 +54,12 @@ const ZIP_END_RECORD_SIZE = 22;
 // The end record is followed by a comment of at most 65,535 bytes.
 const ZIP_END_SEARCH_BYTES = ZIP_END_RECORD_SIZE + 0xffff;
 
+const ZIP_DIR_SIGNATURE = 0x02014b50;
+const ZIP_DIR_HEADER_SIZE = 46;
+/** Value of a size, offset or count field whose real value is in a ZIP64 record. */
+const ZIP64_U16 = 0xffff;
+const ZIP64_U32 = 0xffffffff;
+
 /** Returns true if the file ends with a zip end-of-central-directory record, as every complete EPUB does. */
 export async function hasZipEndRecord(filePath: string): Promise<boolean> {
   const handle = await fsp.open(filePath, 'r');
@@ -65,6 +72,85 @@ export async function hasZipEndRecord(filePath: string): Promise<boolean> {
       return false;
     }
     return buf.lastIndexOf(ZIP_END_SIGNATURE, length - ZIP_END_RECORD_SIZE) !== -1;
+  } finally {
+    await handle.close();
+  }
+}
+
+export interface ZipEntry {
+  name: string;
+  compressedSize: number;
+  /** As the archive declares it; nothing checks it against the data. */
+  uncompressedSize: number;
+}
+
+/**
+ * Lists a zip's entries from its central directory without inflating anything.
+ * Throws if the file has no end record, its index is inconsistent, or it is ZIP64.
+ */
+export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
+  const handle = await fsp.open(filePath, 'r');
+  try {
+    const { size } = await handle.stat();
+    const tailStart = Math.max(0, size - ZIP_END_SEARCH_BYTES);
+    const tail = Buffer.alloc(size - tailStart);
+    await handle.read(tail, 0, tail.length, tailStart);
+
+    // The real end record is the one whose comment runs exactly to the end of the file.
+    let end = tail.length - ZIP_END_RECORD_SIZE;
+    while (
+      end >= 0 &&
+      !(
+        tail.readUInt32LE(end) === ZIP_END_SIGNATURE.readUInt32LE(0) &&
+        end + ZIP_END_RECORD_SIZE + tail.readUInt16LE(end + 20) === tail.length
+      )
+    ) {
+      // A negative offset would make lastIndexOf search from the end again.
+      end = end === 0 ? -1 : tail.lastIndexOf(ZIP_END_SIGNATURE, end - 1);
+    }
+    if (end < 0) {
+      throw new Error('Zip end record not found');
+    }
+
+    const count = tail.readUInt16LE(end + 10);
+    const dirSize = tail.readUInt32LE(end + 12);
+    const dirOffset = tail.readUInt32LE(end + 16);
+    if (count === ZIP64_U16 || dirSize === ZIP64_U32 || dirOffset === ZIP64_U32) {
+      throw new Error('ZIP64 archives are not supported');
+    }
+    if (dirOffset + dirSize > tailStart + end) {
+      throw new Error('Zip index lies past the end of the file');
+    }
+
+    const dir = Buffer.alloc(dirSize);
+    await handle.read(dir, 0, dirSize, dirOffset);
+    const entries: ZipEntry[] = [];
+    let pos = 0;
+    for (let i = 0; i < count; i++) {
+      if (pos + ZIP_DIR_HEADER_SIZE > dirSize || dir.readUInt32LE(pos) !== ZIP_DIR_SIGNATURE) {
+        throw new Error('Malformed zip index');
+      }
+      const compressedSize = dir.readUInt32LE(pos + 20);
+      const uncompressedSize = dir.readUInt32LE(pos + 24);
+      if (compressedSize === ZIP64_U32 || uncompressedSize === ZIP64_U32) {
+        throw new Error('ZIP64 archives are not supported');
+      }
+      const nameStart = pos + ZIP_DIR_HEADER_SIZE;
+      const nameEnd = nameStart + dir.readUInt16LE(pos + 28);
+      if (nameEnd > dirSize) {
+        throw new Error('Malformed zip index');
+      }
+      entries.push({
+        name: dir.toString('utf8', nameStart, nameEnd),
+        compressedSize,
+        uncompressedSize,
+      });
+      pos = nameEnd + dir.readUInt16LE(pos + 30) + dir.readUInt16LE(pos + 32);
+    }
+    if (pos !== dirSize) {
+      throw new Error('Zip index holds more or fewer entries than its end record counts');
+    }
+    return entries;
   } finally {
     await handle.close();
   }
@@ -159,6 +245,14 @@ export function extractSharedUrl(fields: { url?: unknown; text?: unknown }): str
 /** Returns the real client IP, preferring Cloudflare's CF-Connecting-IP header over req.ip. */
 export function clientIp(req: express.Request): string {
   return (req.headers['cf-connecting-ip'] as string) ?? req.ip ?? 'unknown';
+}
+
+/**
+ * Returns the client's network for counting requests and sessions: its IPv4 address, or the
+ * /56 an IPv6 address belongs to, since one household is usually handed a whole /56.
+ */
+export function clientNetwork(req: express.Request): string {
+  return ipKeyGenerator(clientIp(req));
 }
 
 /** Returns a short ID that ties an error shown to a user to its log entry. */
@@ -293,6 +387,15 @@ export async function fetchGoogleBooksMetadata(
 
 /** Fetches metadata from Google Books and applies it to an EPUB, returning a diff of changes. */
 export async function updateEpubMetadata(filePath: string): Promise<MetadataDiff> {
+  // JSZip inflates an entry in full before anything can check its size.
+  const oversized = (await readZipEntries(filePath)).find(
+    (e) =>
+      (e.name === 'META-INF/container.xml' || e.name.toLowerCase().endsWith('.opf')) &&
+      e.compressedSize > MAX_METADATA_ENTRY_BYTES
+  );
+  if (oversized) {
+    throw new Error(`EPUB metadata entry too large: ${oversized.name}`);
+  }
   const before = await readEpubMetadata(filePath);
   const fetched = await fetchGoogleBooksMetadata(before.title ?? '', before.creator ?? '');
   await writeEpubMetadata(filePath, fetched);
