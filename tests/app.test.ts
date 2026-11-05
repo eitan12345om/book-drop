@@ -1418,6 +1418,40 @@ describe('POST /upload — EPUBs too large to convert or read', () => {
     assert.match(res.body.error, /Turn off \u201cKindle format\u201d/);
   });
 
+  it('lets only one of two simultaneous conversions take the last file slot', async () => {
+    const { app, keys, key } = await generateKey(KOBO);
+    keys.get(key)!.files = Array.from({ length: MAX_FILES_PER_KEY - 1 }, (_, i) => ({
+      name: `staged-${i}.epub`,
+      path: `/tmp/nonexistent-${i}.epub`,
+      size: 0,
+      uploaded: new Date(),
+      downloadTimer: null,
+    }));
+    const epub = await baseEpub().generateAsync({ type: 'nodebuffer' });
+    const send = () =>
+      request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .field('key', key)
+        .field('kepubify', 'true')
+        .attach('file', epub, { filename: 'book.epub', contentType: 'application/epub+zip' });
+
+    // Conversions must succeed, or the first upload frees its slot before the second arrives.
+    const fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-kepubify-'));
+    await fs.writeFile(path.join(fakeBinDir, 'kepubify'), '#!/bin/sh\ncp "$5" "$4"\n');
+    await fs.chmod(path.join(fakeBinDir, 'kepubify'), 0o755);
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${fakeBinDir}${path.delimiter}${originalPath}`;
+    try {
+      const statuses = (await Promise.all([send(), send()])).map((r) => r.status);
+      assert.deepStrictEqual(statuses.sort(), [200, 400]);
+      assert.strictEqual(keys.get(key)!.files.length, MAX_FILES_PER_KEY);
+    } finally {
+      process.env.PATH = originalPath;
+      await fs.rm(fakeBinDir, { recursive: true, force: true });
+    }
+  });
+
   it('accepts the same EPUBs when no conversion is asked for', async () => {
     for (const epub of [await manyEntriesEpub(), await hugeDeclaredEpub()]) {
       const { res, keys, key } = await upload(KOBO, epub, {});

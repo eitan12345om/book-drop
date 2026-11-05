@@ -320,6 +320,19 @@ describe('readZipEntries', () => {
     await assert.rejects(read(buf));
   });
 
+  it('throws, rather than searching forever, on a lone end record with a wrong comment length', async () => {
+    const buf = Buffer.alloc(22);
+    buf.writeUInt32LE(0x06054b50, 0);
+    buf.writeUInt16LE(1, 20);
+    await assert.rejects(read(buf));
+  });
+
+  it('throws when the end record counts fewer entries than the index holds', async () => {
+    const buf = await twoEntries().generateAsync({ type: 'nodebuffer' });
+    buf.writeUInt16LE(0, endOffset(buf) + 10);
+    await assert.rejects(read(buf));
+  });
+
   it('throws on a ZIP64 archive', async () => {
     const buf = await twoEntries().generateAsync({ type: 'nodebuffer' });
     buf.writeUInt16LE(0xffff, endOffset(buf) + 10);

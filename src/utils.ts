@@ -102,7 +102,8 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
         end + ZIP_END_RECORD_SIZE + tail.readUInt16LE(end + 20) === tail.length
       )
     ) {
-      end = tail.lastIndexOf(ZIP_END_SIGNATURE, end - 1);
+      // A negative offset would make lastIndexOf search from the end again.
+      end = end === 0 ? -1 : tail.lastIndexOf(ZIP_END_SIGNATURE, end - 1);
     }
     if (end < 0) {
       throw new Error('Zip end record not found');
@@ -142,6 +143,9 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
         uncompressedSize,
       });
       pos = nameEnd + dir.readUInt16LE(pos + 30) + dir.readUInt16LE(pos + 32);
+    }
+    if (pos !== dirSize) {
+      throw new Error('Zip index holds more or fewer entries than its end record counts');
     }
     return entries;
   } finally {
