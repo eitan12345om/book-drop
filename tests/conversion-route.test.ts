@@ -11,14 +11,13 @@ import type { Application } from 'express';
 // Config is read once on import, and node --test gives each file its own process, so
 // these settings reach the app without leaking into the other test files.
 const uploadDir = await fs.mkdtemp(path.join(os.tmpdir(), 'conversion-route-uploads-'));
-const fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-ebook-convert-'));
+const fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-converters-'));
 const startedMarker = path.join(fakeBinDir, 'started');
 Object.assign(process.env, {
   UPLOAD_DIR: uploadDir,
   CONVERSION_TIMEOUT_MS: '1000',
   MAX_CONCURRENT_CONVERSIONS: '1',
   MAX_QUEUED_CONVERSIONS: '1',
-  KOBO_CONVERTER: 'calibre',
   MAX_KEYS_PER_IP: '10',
   PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH}`,
 });
@@ -34,6 +33,14 @@ case "$FAKE_CONVERTER" in
   hang) exec sleep 30 ;;
   *) echo 'ValueError: not a valid EPUB file (could not find opf)'; exit 1 ;;
 esac
+`,
+  { mode: 0o755 }
+);
+await fs.writeFile(
+  path.join(fakeBinDir, 'kepubify'),
+  `#!/bin/sh
+while [ "$#" -gt 1 ]; do case "$1" in -o) out="$2"; shift ;; esac; shift; done
+: > "$out"
 `,
   { mode: 0o755 }
 );
@@ -56,22 +63,24 @@ after(async () => {
 
 const request = () => supertest(server);
 
-async function generateKoboKey(): Promise<string> {
+type Device = 'Kindle' | 'Kobo';
+
+async function generateKey(device: Device): Promise<string> {
   const res = await request()
     .post('/generate')
     .set('X-Forwarded-Proto', 'https')
     .set('X-Requested-With', 'XMLHttpRequest')
-    .set('User-Agent', 'Kobo/1.0 Test');
+    .set('User-Agent', device === 'Kindle' ? 'Kindle/3.0 Test' : 'Kobo/1.0 Test');
   return res.body.key as string;
 }
 
-async function uploadForKobo(key: string) {
+async function uploadFor(device: Device, key: string) {
   return request()
     .post('/upload')
     .set('X-Forwarded-Proto', 'https')
     .set('X-Requested-With', 'XMLHttpRequest')
     .field('key', key)
-    .field('kobo', 'true')
+    .field(device.toLowerCase(), 'true')
     .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
       filename: 'book.epub',
       contentType: 'application/epub+zip',
@@ -93,9 +102,9 @@ async function waitForConverterToStart(): Promise<void> {
 describe('POST /upload — how conversion failures are answered', () => {
   it('answers a book the converter rejects with 422, the device guidance, and a reference', async () => {
     process.env.FAKE_CONVERTER = 'fail';
-    const res = await uploadForKobo(await generateKoboKey());
+    const res = await uploadFor('Kindle', await generateKey('Kindle'));
     assert.strictEqual(res.status, 422);
-    assert.match(res.body.error, /Kobo format/);
+    assert.match(res.body.error, /Kindle format/);
     assert.match(res.body.ref, /^[0-9A-F]{8}$/);
     assert.deepStrictEqual(await fs.readdir(uploadDir), []);
   });
@@ -103,10 +112,10 @@ describe('POST /upload — how conversion failures are answered', () => {
   it('answers a conversion that runs past the timeout with 504 and the guidance', async () => {
     process.env.FAKE_CONVERTER = 'hang';
     const startedAt = Date.now();
-    const res = await uploadForKobo(await generateKoboKey());
+    const res = await uploadFor('Kindle', await generateKey('Kindle'));
     const elapsed = Date.now() - startedAt;
     assert.strictEqual(res.status, 504);
-    assert.match(res.body.error, /Kobo format/);
+    assert.match(res.body.error, /Kindle format/);
     assert.match(res.body.ref, /^[0-9A-F]{8}$/);
     assert.ok(elapsed < 3_000, `took ${elapsed} ms`);
     assert.deepStrictEqual(await fs.readdir(uploadDir), []);
@@ -115,14 +124,29 @@ describe('POST /upload — how conversion failures are answered', () => {
   it('refuses an upload with 503 and Retry-After while every slot and the queue are full', async () => {
     process.env.FAKE_CONVERTER = 'hang';
     await fs.rm(startedMarker, { force: true });
-    const busy = uploadForKobo(await generateKoboKey());
+    const busy = uploadFor('Kindle', await generateKey('Kindle'));
     await waitForConverterToStart();
-    const queued = assert.rejects(convert('kobo', path.join(uploadDir, 'queued.epub')));
+    const queued = assert.rejects(convert('kindle', path.join(uploadDir, 'queued.epub')));
 
-    const res = await uploadForKobo(await generateKoboKey());
+    const res = await uploadFor('Kindle', await generateKey('Kindle'));
     assert.strictEqual(res.status, 503);
     assert.strictEqual(res.headers['retry-after'], '30');
     assert.match(res.body.error, /Too many conversions/);
+
+    assert.strictEqual((await busy).status, 504);
+    await queued;
+  });
+
+  it('converts a Kobo upload with kepubify straight away while every slot and the queue are full', async () => {
+    process.env.FAKE_CONVERTER = 'hang';
+    await fs.rm(startedMarker, { force: true });
+    const busy = uploadFor('Kindle', await generateKey('Kindle'));
+    await waitForConverterToStart();
+    const queued = assert.rejects(convert('kindle', path.join(uploadDir, 'queued.epub')));
+
+    const res = await uploadFor('Kobo', await generateKey('Kobo'));
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.conversionTool, 'Kepubify');
 
     assert.strictEqual((await busy).status, 504);
     await queued;
@@ -133,10 +157,10 @@ describe('POST /upload — how conversion failures are answered', () => {
     await fs.rm(startedMarker, { force: true });
     const first = {};
     const second: { queuedMs?: number; durationMs?: number } = {};
-    const running = assert.rejects(convert('kobo', path.join(uploadDir, 'first.epub'), first));
+    const running = assert.rejects(convert('kindle', path.join(uploadDir, 'first.epub'), first));
     await waitForConverterToStart();
     process.env.FAKE_CONVERTER = 'fail';
-    const waiting = assert.rejects(convert('kobo', path.join(uploadDir, 'second.epub'), second));
+    const waiting = assert.rejects(convert('kindle', path.join(uploadDir, 'second.epub'), second));
     await Promise.all([running, waiting]);
 
     assert.ok(second.queuedMs! >= 800, `queued ${second.queuedMs} ms behind a 1 s conversion`);

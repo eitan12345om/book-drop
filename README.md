@@ -106,7 +106,7 @@ Copy `.env.example` to `.env` to customise these values.
 | `KOBO_CONVERTER`             | `kepubify`   | Tool behind the "Kobo format" option: `kepubify` or `calibre`                                                                                                  |
 | `KINDLE_CONVERTER`           | `calibre`    | Tool behind the "Kindle format" option: `calibre` or `kindlegen`                                                                                               |
 | `KINDLE_OUTPUT_FORMAT`       | `azw3`       | Format calibre produces for Kindle: `azw3` or `mobi`. AZW3 suits modern Kindles; MOBI is for pre-2011 models. Ignored by `kindlegen`, which always writes MOBI |
-| `MAX_CONCURRENT_CONVERSIONS` | _(`CPUS`)_   | Conversions allowed to run at the same time; the rest queue. Defaults to `CPUS`, capped at 4                                                                   |
+| `MAX_CONCURRENT_CONVERSIONS` | _(`CPUS`)_   | Conversions allowed to run at the same time; the rest queue. Defaults to `CPUS`, capped at 4. kepubify conversions are not counted                             |
 | `MAX_QUEUED_CONVERSIONS`     | _(2× above)_ | Uploads allowed to wait for a slot; beyond this, uploads are refused with 503                                                                                  |
 | `MAX_CONVERSION_WAIT_MS`     | `20000`      | How long a queued upload waits for a slot before being refused with 503                                                                                        |
 | `CONVERSION_TIMEOUT_MS`      | `55000`      | How long one conversion may run before it is stopped and the upload answered with 504 (minimum 1000)                                                           |
@@ -132,7 +132,9 @@ it can convert at once. Running more of them than there are CPUs does not add th
 just makes each one slower — and since the conversion timeout is wall clock, enough of them
 at once makes them all fail together. They are therefore limited to
 `MAX_CONCURRENT_CONVERSIONS` at a time; further uploads wait briefly and are then refused
-with a 503 rather than being admitted to a queue they would time out in.
+with a 503 rather than being admitted to a queue they would time out in. kepubify is the
+exception: it finishes a book in a fraction of a second, so Kobo uploads using it skip the
+queue rather than waiting behind a slow calibre or PDF conversion.
 
 In practice there is one number to set. `CPUS` and `MEM_LIMIT` in `.env` size the
 container, and `MAX_CONCURRENT_CONVERSIONS` defaults to `CPUS` so the limit follows the

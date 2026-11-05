@@ -267,6 +267,11 @@ export interface ConverterBackend {
   outputName(filename: string): string;
   /** Runs the conversion and resolves with the path to the converted file. */
   run(inputPath: string): Promise<string>;
+  /**
+   * Set for a tool that finishes in a fraction of a second, so it runs straight away
+   * rather than waiting for a conversion slot behind a slow one.
+   */
+  readonly skipsQueue?: boolean;
 }
 
 const BACKENDS: Record<ConversionIntent, Record<string, ConverterBackend>> = {
@@ -282,6 +287,7 @@ const BACKENDS: Record<ConversionIntent, Record<string, ConverterBackend>> = {
       command: 'kepubify',
       outputName: (filename) => `${stripEbookExtension(filename)}.kepub.epub`,
       run: convertWithKepubify,
+      skipsQueue: true,
     },
   },
   kindle: {
@@ -336,26 +342,29 @@ export interface ConversionTiming {
 }
 
 /**
- * Runs an intent through its configured backend once a slot is free, tagging failures
- * with the intent and with whether the tool was missing altogether. Fills in timing as
- * it goes, so a caller can log it whether the conversion succeeds or fails.
+ * Runs an intent through its configured backend once a slot is free, or at once for a
+ * backend that skips the queue, tagging failures with the intent and with whether the
+ * tool was missing altogether. Fills in timing as it goes, so a caller can log it whether
+ * the conversion succeeds or fails.
  */
 export async function convert(
   intent: ConversionIntent,
   inputPath: string,
   timing: ConversionTiming = {}
 ): Promise<string> {
+  const backend = backendFor(intent);
+  const runTimed = async (queuedMs: number) => {
+    timing.queuedMs = queuedMs;
+    const startedAt = Date.now();
+    try {
+      return await backend.run(inputPath);
+    } finally {
+      timing.durationMs = Date.now() - startedAt;
+    }
+  };
   const requestedAt = Date.now();
   try {
-    return await conversionSlots.run(async (queuedMs) => {
-      timing.queuedMs = queuedMs;
-      const startedAt = Date.now();
-      try {
-        return await backendFor(intent).run(inputPath);
-      } finally {
-        timing.durationMs = Date.now() - startedAt;
-      }
-    });
+    return await (backend.skipsQueue ? runTimed(0) : conversionSlots.run(runTimed));
   } catch (err) {
     timing.queuedMs ??= Date.now() - requestedAt;
     if (err instanceof ConversionError) {
