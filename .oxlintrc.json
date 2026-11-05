@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react"],
+  "jsPlugins": ["./oxlint-plugins/es5.js"],
   "categories": {
     "correctness": "error",
     "suspicious": "warn"
@@ -31,7 +32,8 @@
       "files": ["client/public/download.js", "client/public/theme.js"],
       "rules": {
         "no-var": "off",
-        "prefer-template": "off"
+        "prefer-template": "off",
+        "es5/syntax": "error"
       }
     },
     {

@@ -1,24 +1,24 @@
-// NOTE: this file runs on old Kobo WebKit (538.1) which does not support `let`.
-// Use `var` for mutable variables; `const` is fine.
+// NOTE: this file runs on old e-reader browsers (as old as Kobo WebKit 538.1), so it
+// must be plain ES5: `var` only, no `let` or `const`.
 /* eslint-disable no-var */
-const POLL_INTERVAL_MS = 5000;
+var POLL_INTERVAL_MS = 5000;
 var currentKey = null;
 var pollTimer = null;
 var currentSSE = null;
 var qrImg = document.getElementById('qr-code');
 var qrFigure = document.getElementById('qr-figure');
 
-const keyDisplay = document.getElementById('key-display');
-const refreshBtn = document.getElementById('refresh-btn');
-const statusDot = document.getElementById('status-dot');
-const statusLabel = document.getElementById('status-label');
-const downloadCard = document.getElementById('download-card');
-const downloadCardTitle = document.getElementById('download-card-title');
-const downloadList = document.getElementById('download-list');
-const errorMsg = document.getElementById('error-msg');
-const pageUrlLink = document.getElementById('page-url');
+var keyDisplay = document.getElementById('key-display');
+var refreshBtn = document.getElementById('refresh-btn');
+var statusDot = document.getElementById('status-dot');
+var statusLabel = document.getElementById('status-label');
+var downloadCard = document.getElementById('download-card');
+var downloadCardTitle = document.getElementById('download-card-title');
+var downloadList = document.getElementById('download-list');
+var errorMsg = document.getElementById('error-msg');
+var pageUrlLink = document.getElementById('page-url');
 
-const uploadUrl = window.location.origin + '/';
+var uploadUrl = window.location.origin + '/';
 pageUrlLink.href = uploadUrl;
 pageUrlLink.textContent = uploadUrl;
 
@@ -152,25 +152,25 @@ function renderDownloads(files, urls) {
     for (var fi = 0; fi < files.length; fi++) {
       var file = files[fi];
 
-      const entry = document.createElement('div');
+      var entry = document.createElement('div');
       entry.className = 'download-entry';
 
-      const row = document.createElement('div');
+      var row = document.createElement('div');
       row.className = 'download-row';
 
-      const a = document.createElement('a');
+      var a = document.createElement('a');
       a.href = '/' + encodeURIComponent(file.name) + '?key=' + encodeURIComponent(currentKey);
       a.className = 'download-item';
       a.innerHTML =
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2a.75.75 0 0 1 .75.75v8.69l2.47-2.47a.75.75 0 1 1 1.06 1.06l-3.75 3.75a.75.75 0 0 1-1.06 0L5.72 10.03a.75.75 0 1 1 1.06-1.06l2.47 2.47V2.75A.75.75 0 0 1 10 2ZM3.75 15a.75.75 0 0 0 0 1.5h12.5a.75.75 0 0 0 0-1.5H3.75Z"/></svg>';
-      const span = document.createElement('span');
+      var span = document.createElement('span');
       span.textContent = file.name;
       a.appendChild(span);
       row.appendChild(a);
 
       // Delete button — IIFE captures entry and file.name for the async click handler
       (function (entryEl, fileName) {
-        const btn = document.createElement('button');
+        var btn = document.createElement('button');
         btn.className = 'btn-delete';
         btn.setAttribute('aria-label', 'Remove ' + fileName);
         btn.innerHTML =
@@ -242,14 +242,14 @@ function renderDownloads(files, urls) {
         continue;
       }
       safeUrl = urls[i];
-      const link = document.createElement('a');
+      var link = document.createElement('a');
       link.href = safeUrl;
       link.className = 'download-item';
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.innerHTML =
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M12.232 4.232a2.5 2.5 0 0 1 3.536 3.536l-1.225 1.224a.75.75 0 0 0 1.061 1.06l1.224-1.224a4 4 0 0 0-5.656-5.656l-3 3a4 4 0 0 0 .225 5.865.75.75 0 0 0 .977-1.138 2.5 2.5 0 0 1-.142-3.667l3-3Z"/><path d="M11.603 7.963a.75.75 0 0 0-.977 1.138 2.5 2.5 0 0 1 .142 3.667l-3 3a2.5 2.5 0 0 1-3.536-3.536l1.225-1.224a.75.75 0 0 0-1.061-1.06l-1.224 1.224a4 4 0 1 0 5.656 5.656l3-3a4 4 0 0 0-.225-5.865Z"/></svg>';
-      const urlSpan = document.createElement('span');
+      var urlSpan = document.createElement('span');
       urlSpan.textContent = urls[i];
       link.appendChild(urlSpan);
       downloadList.appendChild(link);
@@ -264,8 +264,8 @@ function poll() {
   if (!currentKey) {
     return;
   }
-  const key = currentKey;
-  const xhr = new XMLHttpRequest();
+  var key = currentKey;
+  var xhr = new XMLHttpRequest();
   xhr.open('GET', '/status/' + encodeURIComponent(key));
   xhr.onreadystatechange = function () {
     if (xhr.readyState !== 4) {
@@ -312,7 +312,7 @@ function requestKey() {
   setStatus('idle', 'Generating key\u2026');
   refreshBtn.disabled = true;
 
-  const xhr = new XMLHttpRequest();
+  var xhr = new XMLHttpRequest();
   xhr.open(
     'POST',
     abandonKey ? '/generate?abandon=' + encodeURIComponent(abandonKey) : '/generate'
@@ -332,7 +332,7 @@ function requestKey() {
         setStatus('idle', '');
         return;
       }
-      const key = data.key;
+      var key = data.key;
       currentKey = key;
       keyDisplay.textContent = key;
       keyDisplay.setAttribute('aria-label', 'Key: ' + key.split('').join(' '));

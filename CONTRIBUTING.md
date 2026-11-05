@@ -34,6 +34,6 @@ pnpm build && pnpm e2e   # end-to-end tests (run `pnpm exec playwright install -
 
 A pre-commit hook formats staged files with Prettier and oxlint automatically.
 
-`client/public/download.js` and `theme.js` run in old Kobo browsers, so they must avoid `let`, template literals, and `catch {}` without a binding. Lint rules that would rewrite them into that syntax are turned off for those files.
+The download page (`client/views/download.html` and the scripts it loads, `client/public/download.js` and `theme.js`) runs in old e-reader browsers (as old as Kobo WebKit 538.1), so it must be plain ES5: `var` only (no `let` or `const`), and no arrow functions, template literals, `catch {}` without a binding, classes, destructuring, spread, default parameters, shorthand properties, `?.`, or `??`. The `es5/syntax` lint rule (`oxlint-plugins/es5.js`) flags this in the two script files, `tests/koboSyntax.test.ts` also checks the page's inline scripts, and lint rules that would rewrite those files into newer syntax are turned off for them.
 
 Please keep pull requests focused on one change, and add or update tests when you change behavior. PRs are squash-merged, so don't worry about tidying up your commit history.
