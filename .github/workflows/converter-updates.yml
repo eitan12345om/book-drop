@@ -1,0 +1,75 @@
+name: Converter updates
+
+# Dependabot can't see the converters the Dockerfile downloads, so this keeps one open
+# issue per converter while its pin is behind the latest upstream release.
+
+on:
+  schedule:
+    - cron: '23 14 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+# Overlapping runs could each find no issue and both open one.
+concurrency:
+  group: converter-updates
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Open, update or close one issue per converter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          node scripts/pinned-tool-versions.mjs > "$RUNNER_TEMP/pins.json"
+          while read -r pin; do
+            name=$(jq -r .name <<< "$pin")
+            repo=$(jq -r .repo <<< "$pin")
+            pinned=$(jq -r .pinned <<< "$pin")
+            tag=$(gh api "repos/$repo/releases/latest" --jq .tag_name)
+            latest=${tag#v}
+            title="$name is behind its latest release"
+            issue=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+              --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+            echo "$name: pinned $pinned, latest $latest, open issue: ${issue:-none}"
+
+            if [ "$pinned" = "$latest" ]; then
+              if [ -n "$issue" ]; then
+                gh issue close "$issue" --comment "Now pinned to $pinned, the latest release."
+              fi
+              continue
+            fi
+
+            case "$name" in
+              calibre)
+                steps="Bump \`ARG CALIBRE_VERSION\` in the \`Dockerfile\`, and replace both \`sha256\` values with the output of:
+
+          \`\`\`bash
+          for arch in x86_64 arm64; do
+            curl -fsSL \"https://download.calibre-ebook.com/$latest/calibre-$latest-\$arch.txz\" | sha256sum
+          done
+          \`\`\`" ;;
+              *)
+                steps="Bump \`$name@v…\` in the \`Dockerfile\`." ;;
+            esac
+            body="$name is pinned to **$pinned** in the \`Dockerfile\`, but the latest release is **$latest** ([release notes](https://github.com/$repo/releases/tag/$tag)).
+
+          $steps
+
+          This issue is kept up to date by \`.github/workflows/converter-updates.yml\`, and closes itself once the pin matches the latest release."
+
+            if [ -n "$issue" ]; then
+              gh issue edit "$issue" --body "$body"
+            else
+              gh issue create --title "$title" --body "$body"
+            fi
+          done < <(jq -c '.[]' "$RUNNER_TEMP/pins.json")
