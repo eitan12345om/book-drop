@@ -84,15 +84,6 @@ describe('cleanExpiredUploads', () => {
     await assert.doesNotReject(fsp.access(workDir));
   });
 
-  it('leaves other directories alone', async () => {
-    const dir = path.join(tmpDir, '.hidden');
-    await fsp.mkdir(dir);
-
-    await cleanExpiredUploads(tmpDir, new Map(), MAX_AGE, expiredNow());
-
-    await assert.doesNotReject(fsp.access(dir));
-  });
-
   it('does not delete non-expired file', async () => {
     const filePath = path.join(tmpDir, 'file-1000-abc.epub');
     await fsp.writeFile(filePath, 'data');

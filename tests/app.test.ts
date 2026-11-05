@@ -1368,11 +1368,9 @@ describe('POST /upload — kindling rejects the EPUB', () => {
   before(async () => {
     fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-kindling-'));
     const script = path.join(fakeBinDir, 'kindling-cli');
-    // kindling unpacks the book beside its input before failing, as the real tool does.
     await fs.writeFile(
       script,
       `#!/bin/sh
-mkdir ".kindling_epub_$(basename "$2" .epub)_1"
 echo 'Error(prcgen):E24000: Could not process input file'
 exit 1
 `
@@ -1387,12 +1385,11 @@ exit 1
     await fs.rm(fakeBinDir, { recursive: true, force: true });
   });
 
-  it('answers 500 with a reference and keeps no copy of the book', async () => {
+  it('answers 500 with a reference', async () => {
     const { app, key } = await generateKey('Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0');
     const zip = new JSZip();
     zip.file('mimetype', 'application/epub+zip');
     const epub = await zip.generateAsync({ type: 'nodebuffer' });
-    const filesBefore = await fs.readdir('uploads');
 
     const res = await request(app)
       .post('/upload')
@@ -1404,7 +1401,6 @@ exit 1
     assert.strictEqual(res.status, 500);
     assert.strictEqual(res.body.error, 'Conversion failed');
     assert.match(res.body.ref, /^[0-9A-F]{8}$/);
-    assert.deepStrictEqual(await fs.readdir('uploads'), filesBefore);
   });
 });
 

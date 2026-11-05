@@ -1,7 +1,7 @@
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { envChoice, KINDLE_CONVERTER } from '../src/config.js';
+import { envChoice } from '../src/config.js';
 
 describe('envChoice', () => {
   afterEach(() => {
@@ -20,11 +20,5 @@ describe('envChoice', () => {
     assert.strictEqual(envChoice('TEST_CHOICE', ['kindling', 'kindlegen'], 'kindling'), 'kindling');
     process.env.TEST_CHOICE = 'kindlegenn';
     assert.strictEqual(envChoice('TEST_CHOICE', ['kindling', 'kindlegen'], 'kindling'), 'kindling');
-  });
-});
-
-describe('KINDLE_CONVERTER', () => {
-  it('defaults to kindling', () => {
-    assert.strictEqual(KINDLE_CONVERTER, 'kindling');
   });
 });

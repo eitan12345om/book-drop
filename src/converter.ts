@@ -128,7 +128,6 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
   }
 }
 
-/** Prefix of the scratch folders kindling runs in, which the cleanup worker also looks for. */
 export const KINDLING_WORK_DIR_PREFIX = '.kindling-';
 
 /**
