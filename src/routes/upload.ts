@@ -14,10 +14,12 @@ import {
 import {
   ConversionError,
   convertWithKindlegen,
+  convertWithKindling,
   convertWithKepubify,
   convertWithPdfCropMargins,
 } from '../converter.js';
 import {
+  KINDLE_CONVERTER,
   MAX_FILE_SIZE,
   MAX_DISK_BYTES,
   MAX_FILES_PER_KEY,
@@ -118,10 +120,13 @@ async function runConversion(
   key: string
 ): Promise<{ convertedPath: string; conversionTool: string | null; filename: string }> {
   if (mimetype === TYPE_EPUB && device === 'Kindle' && options.kindlegen) {
-    const conversionTool = 'KindleGen';
+    const useKindlegen = KINDLE_CONVERTER === 'kindlegen';
+    const conversionTool = useKindlegen ? 'KindleGen' : 'Kindling';
     const newFilename = filename.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.mobi');
     logger.info({ key, tool: conversionTool, mimetype }, 'Conversion started');
-    const convertedPath = await convertWithKindlegen(filePath);
+    const convertedPath = await (useKindlegen ? convertWithKindlegen : convertWithKindling)(
+      filePath
+    );
     logger.info({ key, tool: conversionTool }, 'Conversion succeeded');
     return { convertedPath, conversionTool, filename: newFilename };
   }

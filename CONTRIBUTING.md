@@ -18,7 +18,7 @@ cp .env.example .env
 pnpm dev        # watches SCSS and TypeScript; starts the server on :3001
 ```
 
-The optional conversion tools (kepubify, KindleGen, pdfCropMargins) are only needed if you're working on conversions — see the [README](README.md#prerequisites).
+The optional conversion tools (kepubify, kindling, pdfCropMargins) are only needed if you're working on conversions — see the [README](README.md#prerequisites).
 
 ## Before opening a pull request
 

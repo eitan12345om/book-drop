@@ -98,6 +98,11 @@ jobs:
           }
           check_page upload.js
           check_page download.js -A 'Mozilla/5.0 (Linux) AppleWebKit/538.1 Kobo Touch'
+      - name: Convert real books with the image's kindling
+        # The suite skips kindling if it can't find it, so check first that the image has it.
+        run: |
+          docker run --rm -v "$PWD/tests:/usr/src/app/tests:ro" book-drop:ci sh -c \
+            'kindling-cli --version && node --test tests/integration/'
       - if: failure()
         run: docker logs book-drop
 

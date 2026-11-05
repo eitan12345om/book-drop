@@ -16,7 +16,7 @@ Supported formats: EPUB, MOBI, AZW3, PDF, CBZ, CBR, HTML, TXT, PNG, JPG.
 Optional conversions (requires external tools — see below):
 
 - EPUB → KEPUB (Kobo, via kepubify) — better typography and font control
-- EPUB → MOBI (Kindle, via KindleGen) — Kindle doesn't support EPUB natively
+- EPUB → MOBI (Kindle, via [kindling](https://github.com/ciscoriordan/kindling)) — Kindle doesn't support EPUB natively. kindling replaces Amazon's discontinued KindleGen, which is still available with `KINDLE_CONVERTER=kindlegen`
 - PDF margin cropping (via pdfCropMargins) — fills more of the small screen
 - Update EPUB metadata from Google Books — patches title, author, publisher, etc. and shows a before/after diff on the download page (requires a `GOOGLE_BOOKS_API_KEY`)
 
@@ -27,7 +27,8 @@ Optional conversions (requires external tools — see below):
 - Node.js 26 or later
 - pnpm 12 (see [pnpm installation](https://pnpm.io/installation), or `pnpm self-update` from pnpm 11.10+)
 - _(Optional)_ [kepubify](https://pgaskin.net/kepubify/) in `PATH`
-- _(Optional)_ [KindleGen](http://web.archive.org/web/*/http://kindlegen.s3.amazonaws.com/kindlegen*) in `PATH`
+- _(Optional)_ [kindling](https://github.com/ciscoriordan/kindling) in `PATH` (`cargo install kindling-mobi`)
+- _(Optional)_ [KindleGen](http://web.archive.org/web/*/http://kindlegen.s3.amazonaws.com/kindlegen*) in `PATH`, if `KINDLE_CONVERTER=kindlegen`
 - _(Optional)_ [pdfCropMargins](https://github.com/abarker/pdfCropMargins) (`pip install pdfCropMargins`)
 
 ### Development
@@ -50,6 +51,7 @@ pnpm start      # runs dist/server.js
 pnpm test
 pnpm typecheck
 pnpm lint
+pnpm build && pnpm test:integration   # runs the real kindling; skipped if it isn't installed
 ```
 
 Uses Node.js's built-in test runner (`node:test`) — no extra test framework needed.
@@ -75,6 +77,7 @@ Copy `.env.example` to `.env` to customise these values.
 | `LOG_LEVEL`                  | `info`       | Pino log level (`trace`, `debug`, `info`, `warn`, `error`)                                                                            |
 | `UPLOAD_CLEANUP_INTERVAL_MS` | `3600000`    | How often the orphaned-file cleanup worker runs (ms); defaults to `MAX_EXPIRE_MS`                                                     |
 | `GOOGLE_BOOKS_API_KEY`       | _(unset)_    | Google Books API key for EPUB metadata enrichment; without it the API may rate-limit requests                                         |
+| `KINDLE_CONVERTER`           | `kindling`   | Tool behind the "Kindle format" option: `kindling` or `kindlegen`                                                                     |
 
 ## Docker
 
