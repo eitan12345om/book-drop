@@ -20,12 +20,17 @@ Optional conversions (requires external tools — see below):
 - PDF margin cropping (via pdfCropMargins) — fills more of the small screen
 - Update EPUB metadata from Google Books — patches title, author, publisher, etc. and shows a before/after diff on the download page (requires a `GOOGLE_BOOKS_API_KEY`)
 
-Both e-reader conversions run through [calibre](https://calibre-ebook.com/) by default. calibre
-copes with malformed EPUBs that the single-purpose tools reject — a dangling table-of-contents
-anchor, for instance, makes KindleGen discard an otherwise finished book. [kepubify](https://pgaskin.net/kepubify/)
-and [KindleGen](http://web.archive.org/web/*/http://kindlegen.s3.amazonaws.com/kindlegen*) are still
-selectable via `KOBO_CONVERTER` and `KINDLE_CONVERTER`. PDF cropping has no calibre equivalent:
-calibre lays out PDFs it generates rather than trimming the pages of an existing one.
+Kindle conversions run through [calibre](https://calibre-ebook.com/) by default. calibre copes
+with malformed EPUBs that KindleGen rejects — a dangling table-of-contents anchor, for
+instance, makes KindleGen discard an otherwise finished book — and runs natively where
+KindleGen, a 32-bit x86 binary, has to be emulated. [KindleGen](http://web.archive.org/web/*/http://kindlegen.s3.amazonaws.com/kindlegen*)
+is still selectable via `KINDLE_CONVERTER`.
+
+Kobo conversions stay on [kepubify](https://pgaskin.net/kepubify/) by default. It converts a
+typical book in a fraction of a second, where calibre takes several, and Kobo books are most
+of the conversions a busy instance does. calibre is selectable via `KOBO_CONVERTER` for books
+kepubify rejects. PDF cropping has no calibre equivalent: calibre lays out PDFs it generates
+rather than trimming the pages of an existing one.
 
 ## Running locally
 
@@ -33,8 +38,8 @@ calibre lays out PDFs it generates rather than trimming the pages of an existing
 
 - Node.js 26 or later
 - pnpm 12 (see [pnpm installation](https://pnpm.io/installation), or `pnpm self-update` from pnpm 11.10+)
-- _(Optional)_ [calibre](https://calibre-ebook.com/download) 8.0 or later, with `ebook-convert` in `PATH` — earlier versions cannot write KEPUB
-- _(Optional)_ [kepubify](https://pgaskin.net/kepubify/) in `PATH`, if `KOBO_CONVERTER=kepubify`
+- _(Optional)_ [calibre](https://calibre-ebook.com/download) 8.0 or later, with `ebook-convert` in `PATH` — earlier versions cannot write KEPUB, if `KOBO_CONVERTER=calibre`
+- _(Optional)_ [kepubify](https://pgaskin.net/kepubify/) in `PATH`
 - _(Optional)_ [KindleGen](http://web.archive.org/web/*/http://kindlegen.s3.amazonaws.com/kindlegen*) in `PATH`, if `KINDLE_CONVERTER=kindlegen`
 - _(Optional)_ [pdfCropMargins](https://github.com/abarker/pdfCropMargins) (`pip install pdfCropMargins`)
 
@@ -98,7 +103,7 @@ Copy `.env.example` to `.env` to customise these values.
 | `LOG_LEVEL`                  | `info`       | Pino log level (`trace`, `debug`, `info`, `warn`, `error`)                                                                                                     |
 | `UPLOAD_CLEANUP_INTERVAL_MS` | `3600000`    | How often the orphaned-file cleanup worker runs (ms); defaults to `MAX_EXPIRE_MS`                                                                              |
 | `GOOGLE_BOOKS_API_KEY`       | _(unset)_    | Google Books API key for EPUB metadata enrichment; without it the API may rate-limit requests                                                                  |
-| `KOBO_CONVERTER`             | `calibre`    | Tool behind the "Kobo format" option: `calibre` or `kepubify`                                                                                                  |
+| `KOBO_CONVERTER`             | `kepubify`   | Tool behind the "Kobo format" option: `kepubify` or `calibre`                                                                                                  |
 | `KINDLE_CONVERTER`           | `calibre`    | Tool behind the "Kindle format" option: `calibre` or `kindlegen`                                                                                               |
 | `KINDLE_OUTPUT_FORMAT`       | `azw3`       | Format calibre produces for Kindle: `azw3` or `mobi`. AZW3 suits modern Kindles; MOBI is for pre-2011 models. Ignored by `kindlegen`, which always writes MOBI |
 | `MAX_CONCURRENT_CONVERSIONS` | _(`CPUS`)_   | Conversions allowed to run at the same time; the rest queue. Defaults to `CPUS`, capped at 4                                                                   |
@@ -115,11 +120,12 @@ docker compose up -d
 
 The service will be available at `http://localhost:3001` (or whatever PORT you use).
 
-The image ships calibre plus kepubify and KindleGen, so the converter can be switched with
+The image ships calibre, kepubify and KindleGen, so either converter can be switched with
 an environment variable and no rebuild. calibre is by far the largest thing in it, adding
 around 800 MB (measured at roughly 1.4 GB unpacked with it, 650 MB without, on arm64). To
-trade flexibility for size, build with `--build-arg INSTALL_LEGACY_TOOLS=0` to drop the older
-tools, or `--build-arg INSTALL_CALIBRE=0` to keep only them.
+trade flexibility for size, build with `--build-arg INSTALL_KINDLEGEN=0` to drop KindleGen,
+or `--build-arg INSTALL_CALIBRE=0` to drop calibre, which then needs
+`KINDLE_CONVERTER=kindlegen`.
 
 Conversions are CPU-bound, so the container's CPU allowance is what decides how many books
 it can convert at once. Running more of them than there are CPUs does not add throughput, it

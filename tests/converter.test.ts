@@ -117,8 +117,8 @@ describe('convertWithPdfCropMargins', () => {
 });
 
 describe('backendFor', () => {
-  it('defaults both e-reader formats to calibre', () => {
-    assert.strictEqual(backendFor('kobo').tool, 'calibre');
+  it('defaults Kobo to kepubify, which is far faster, and Kindle to calibre', () => {
+    assert.strictEqual(backendFor('kobo').tool, 'Kepubify');
     assert.strictEqual(backendFor('kindle').tool, 'calibre');
   });
 
@@ -176,12 +176,13 @@ function backendsUnderEnv(env: Record<string, string>): Record<string, ResolvedB
 }
 
 describe('backend selection', () => {
-  it('hands each intent back to its single-purpose tool when configured to', () => {
+  it('switches each e-reader format to its other tool when configured to', () => {
     const resolved = backendsUnderEnv({
-      KOBO_CONVERTER: 'kepubify',
+      KOBO_CONVERTER: 'calibre',
       KINDLE_CONVERTER: 'kindlegen',
     });
-    assert.strictEqual(resolved.kobo.tool, 'Kepubify');
+    assert.strictEqual(resolved.kobo.tool, 'calibre');
+    assert.strictEqual(resolved.kobo.output, 'book.kepub.epub');
     assert.strictEqual(resolved.kindle.tool, 'KindleGen');
     assert.strictEqual(resolved.kindle.output, 'book.mobi');
   });
@@ -193,8 +194,8 @@ describe('backend selection', () => {
   });
 
   it('ignores an unrecognised converter rather than starting with no backend', () => {
-    const resolved = backendsUnderEnv({ KOBO_CONVERTER: 'kepubifyy' });
-    assert.strictEqual(resolved.kobo.tool, 'calibre');
+    const resolved = backendsUnderEnv({ KOBO_CONVERTER: 'calibree' });
+    assert.strictEqual(resolved.kobo.tool, 'Kepubify');
   });
 });
 

@@ -1,9 +1,9 @@
-# calibre is the default converter for both Kobo and Kindle. The single-purpose tools
-# it replaces are still installed by default so KOBO_CONVERTER / KINDLE_CONVERTER can be
-# switched back at runtime; build with INSTALL_LEGACY_TOOLS=0 to drop them, or
-# INSTALL_CALIBRE=0 for an image that only has the originals.
+# Kobo books go through kepubify and Kindle books through calibre by default. KindleGen,
+# which calibre replaces, is still installed so KINDLE_CONVERTER can be switched back at
+# runtime; build with INSTALL_KINDLEGEN=0 to drop it, or INSTALL_CALIBRE=0 for an image
+# without calibre (which then needs KINDLE_CONVERTER=kindlegen).
 ARG INSTALL_CALIBRE=1
-ARG INSTALL_LEGACY_TOOLS=1
+ARG INSTALL_KINDLEGEN=1
 ARG CALIBRE_VERSION=9.12.0
 
 # ── Stage 0: kepubify ─────────────────────────────────────────────────────────
@@ -34,12 +34,11 @@ FROM node:26-slim
 WORKDIR /usr/src/app
 
 ARG INSTALL_CALIBRE
-ARG INSTALL_LEGACY_TOOLS
+ARG INSTALL_KINDLEGEN
 ARG CALIBRE_VERSION
 
 # ── kepubify ────────────────────────────────────────────────────────────────
-# Staged via /tmp because COPY cannot be made conditional on a build argument.
-COPY --from=kepubify-builder /go/bin/kepubify /tmp/kepubify
+COPY --from=kepubify-builder /go/bin/kepubify /usr/local/bin/kepubify
 
 # ── pdfCropMargins ──────────────────────────────────────────────────────────
 # No calibre equivalent exists: calibre lays out PDFs it generates rather than
@@ -52,11 +51,10 @@ RUN apt-get update && \
     pipx install pdfCropMargins --pip-args="--only-binary=pymupdf" && \
     rm -rf /var/lib/apt/lists/*
 
-# ── kindlegen + kepubify (legacy, optional) ─────────────────────────────────
-# kindlegen: 32-bit i386 binary, so it needs libc6:i386 multiarch.
+# ── kindlegen (optional) ────────────────────────────────────────────────────
+# 32-bit i386 binary, so it needs libc6:i386 multiarch.
 RUN set -eux; \
-    if [ "${INSTALL_LEGACY_TOOLS}" = "1" ]; then \
-      install -m 0755 /tmp/kepubify /usr/local/bin/kepubify; \
+    if [ "${INSTALL_KINDLEGEN}" = "1" ]; then \
       dpkg --add-architecture i386; \
       apt-get update; \
       apt-get install -y --no-install-recommends libc6:i386; \
@@ -65,8 +63,7 @@ RUN set -eux; \
       mkdir kindlegen && tar xf kindlegen.tar.gz -C kindlegen; \
       install -m 0755 kindlegen/kindlegen /usr/local/bin/kindlegen; \
       rm -rf kindlegen kindlegen.tar.gz /var/lib/apt/lists/*; \
-    fi; \
-    rm -f /tmp/kepubify
+    fi
 
 # ── calibre (optional) ──────────────────────────────────────────────────────
 # Only the libraries libQt6Gui declares at load time are needed; calibre's own Qt,

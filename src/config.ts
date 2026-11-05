@@ -54,7 +54,7 @@ export const SSE_MAX_DURATION_MS = envInt('SSE_MAX_DURATION_MS', 30 * 60_000);
 export const KOBO_CONVERTER = envChoice(
   'KOBO_CONVERTER',
   ['calibre', 'kepubify'] as const,
-  'calibre'
+  'kepubify'
 );
 export const KINDLE_CONVERTER = envChoice(
   'KINDLE_CONVERTER',

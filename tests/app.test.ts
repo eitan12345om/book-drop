@@ -674,8 +674,8 @@ describe('POST /upload', () => {
   });
 
   it('returns 422, which the page treats as this file only, when the converter rejects the book', async () => {
-    const fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-ebook-convert-'));
-    await fs.writeFile(path.join(fakeBinDir, 'ebook-convert'), '#!/bin/sh\nexit 1\n', {
+    const fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-kepubify-'));
+    await fs.writeFile(path.join(fakeBinDir, 'kepubify'), '#!/bin/sh\nexit 1\n', {
       mode: 0o755,
     });
     const originalPath = process.env.PATH;
