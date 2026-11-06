@@ -157,34 +157,10 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
 
 export const KINDLING_WORK_DIR_PREFIX = '.kindling-';
 
-// kindling uses one core and the container gets one; a second slot only keeps small books
-// from waiting behind a big one.
 // A real book needs at most about 220 MB; the cap makes a hostile one fail in seconds.
-const KINDLING_MAX_CONCURRENT = 2;
 const KINDLING_MEMORY_LIMIT_BYTES = 384 * 1024 * 1024;
 // kindling unpacks the whole book to disk and won't write past the sizes the zip declares.
 const KINDLING_MAX_UNPACKED_BYTES = 256 * 1024 * 1024;
-
-let kindlingRunning = 0;
-const kindlingWaiting: (() => void)[] = [];
-
-async function withKindlingSlot<T>(fn: () => Promise<T>): Promise<T> {
-  if (kindlingRunning < KINDLING_MAX_CONCURRENT) {
-    kindlingRunning++;
-  } else {
-    await new Promise<void>((resolve) => kindlingWaiting.push(resolve));
-  }
-  try {
-    return await fn();
-  } finally {
-    const next = kindlingWaiting.shift();
-    if (next) {
-      next();
-    } else {
-      kindlingRunning--;
-    }
-  }
-}
 
 /** Sums the uncompressed sizes in a zip's central directory, which is at its end. */
 async function declaredUnpackedSize(zipPath: string): Promise<number> {
@@ -211,6 +187,10 @@ async function declaredUnpackedSize(zipPath: string): Promise<number> {
       entries = Number(end64.readBigUInt64LE(32));
       dirLength = Number(end64.readBigUInt64LE(40));
       dirStart = Number(end64.readBigUInt64LE(48));
+    }
+    // These come from the upload, so they must not decide how much the server allocates.
+    if (dirStart + dirLength > size) {
+      throw new Error('Corrupt zip central directory');
     }
     const dir = await read(dirStart, dirLength);
     let total = 0;
@@ -276,11 +256,9 @@ export async function convertWithKindling(inputPath: string): Promise<string> {
       '--doc-type',
       'ebok',
     ];
-    await withKindlingSlot(() =>
-      spawnProcess('kindling-cli', args, workDir!, {
-        memoryLimitBytes: KINDLING_MEMORY_LIMIT_BYTES,
-      })
-    );
+    await spawnProcess('kindling-cli', args, workDir, {
+      memoryLimitBytes: KINDLING_MEMORY_LIMIT_BYTES,
+    });
     await fs.rename(workOutput, outPath);
     return outPath;
   } finally {

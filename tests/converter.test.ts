@@ -154,6 +154,17 @@ exit 1
     await fs.rm(uploadDir, { recursive: true, force: true });
   });
 
+  it('rejects a zip whose directory claims to be larger than the file, without reading it', async () => {
+    const book = await epubClaiming(7);
+    book.writeUInt32LE(0xf0000000, book.lastIndexOf(Buffer.from('PK\x05\x06', 'latin1')) + 12);
+    const { uploadDir, input } = await stageUpload(undefined, book);
+    await withFakeTool('kindling-cli', '#!/bin/sh\nexit 0\n', async () => {
+      await assert.rejects(() => convertWithKindling(input), /Corrupt zip/);
+    });
+    assert.deepStrictEqual(await fs.readdir(uploadDir), []);
+    await fs.rm(uploadDir, { recursive: true, force: true });
+  });
+
   it('refuses an EPUB that unpacks to more than 256 MB without running kindling', async () => {
     const { uploadDir, input } = await stageUpload(undefined, await epubClaiming(300_000_000));
     const ranFile = `${uploadDir}-ran`;
@@ -170,27 +181,6 @@ exit 1
     await assert.rejects(fs.access(ranFile), { code: 'ENOENT' });
     assert.deepStrictEqual(await fs.readdir(uploadDir), []);
     await fs.rm(uploadDir, { recursive: true, force: true });
-  });
-
-  it('runs at most two conversions at once', async () => {
-    const runDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kindling-running-'));
-    const script = `#!/bin/sh
-mkdir "${runDir}/$$"
-ls "${runDir}" | wc -l >> "${runDir}.counts"
-sleep 0.3
-rmdir "${runDir}/$$"
-echo mobi > "$4"
-`;
-    const uploads = await Promise.all([1, 2, 3].map(() => stageUpload()));
-    await withFakeTool('kindling-cli', script, async () => {
-      await Promise.all(uploads.map(({ input }) => convertWithKindling(input)));
-    });
-    const counts = (await fs.readFile(`${runDir}.counts`, 'utf8')).trim().split(/\s+/).map(Number);
-    assert.strictEqual(counts.length, 3);
-    assert.strictEqual(Math.max(...counts), 2);
-    await Promise.all(uploads.map(({ uploadDir }) => fs.rm(uploadDir, { recursive: true })));
-    await fs.rm(`${runDir}.counts`);
-    await fs.rm(runDir, { recursive: true });
   });
 });
 

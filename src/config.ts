@@ -8,12 +8,6 @@ export function envInt(key: string, fallback: number): number {
   return isNaN(parsed) ? fallback : parsed;
 }
 
-/** Reads one of a fixed set of values from the environment, returning fallback if unset or unrecognised. */
-export function envChoice<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
-  const val = process.env[key]?.trim().toLowerCase();
-  return allowed.includes(val as T) ? (val as T) : fallback;
-}
-
 export const PORT = envInt('PORT', 3001);
 export const UPLOAD_DIR = process.env.UPLOAD_DIR ?? 'uploads';
 export const EXPIRE_DELAY_MS = envInt('EXPIRE_DELAY_MS', 300_000);
@@ -39,10 +33,7 @@ export const BOOKDROP_VERSION = /^[\w.+-]{1,64}$/.test(process.env.BOOKDROP_VERS
   ? process.env.BOOKDROP_VERSION!
   : 'dev';
 export const SSE_MAX_DURATION_MS = envInt('SSE_MAX_DURATION_MS', 30 * 60_000);
-export const KINDLE_CONVERTER = envChoice(
-  'KINDLE_CONVERTER',
-  ['kindling', 'kindlegen'] as const,
-  'kindling'
-);
+export const KINDLE_CONVERTER =
+  process.env.KINDLE_CONVERTER?.trim().toLowerCase() === 'kindlegen' ? 'kindlegen' : 'kindling';
 export const SSE_HEARTBEAT_MS = envInt('SSE_HEARTBEAT_MS', 25_000);
 export const UPLOAD_CLEANUP_INTERVAL_MS = envInt('UPLOAD_CLEANUP_INTERVAL_MS', MAX_EXPIRE_MS);
