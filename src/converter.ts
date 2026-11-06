@@ -18,6 +18,14 @@ async function deleteFile(filePath: string): Promise<void> {
   }
 }
 
+/** Converters parse untrusted files, so they get none of the server's secrets. */
+function converterEnv(): NodeJS.ProcessEnv {
+  const { PATH, HOME, LANG, TMPDIR } = process.env;
+  return Object.fromEntries(
+    Object.entries({ PATH, HOME, LANG, TMPDIR }).filter(([, value]) => value !== undefined)
+  );
+}
+
 /** Spawns a child process and resolves with its combined stdout+stderr output, or rejects on error or timeout. */
 function spawnProcess(
   cmd: string,
@@ -31,7 +39,7 @@ function spawnProcess(
     let output = '';
     let outputBytes = 0;
     let truncated = false;
-    const proc = spawn(cmd, args, { cwd });
+    const proc = spawn(cmd, args, { cwd, env: converterEnv() });
     const timer = setTimeout(() => {
       proc.kill();
       reject(new Error(`${cmd} timed out after ${timeoutMs} ms`));
@@ -52,10 +60,12 @@ function spawnProcess(
       clearTimeout(timer);
       reject(new Error(`${cmd} spawn error: ${err.message}`));
     });
-    proc.once('close', (code) => {
+    proc.once('close', (code, signal) => {
       clearTimeout(timer);
       if (isSuccess(code)) {
         resolve(output);
+      } else if (signal) {
+        reject(new Error(`${cmd} was killed by ${signal}\n${output}`));
       } else {
         reject(new Error(`${cmd} exited with code ${code}\n${output}`));
       }
@@ -130,6 +140,85 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
 
 export const KINDLING_WORK_DIR_PREFIX = '.kindling-';
 
+// Two conversions at a time, each held to 384 MB, fit beside the server in its 1 GB container.
+const KINDLING_MAX_CONCURRENT = 2;
+const KINDLING_MEMORY_LIMIT_BYTES = 384 * 1024 * 1024;
+// kindling unpacks the whole book to disk and won't write past the sizes the zip declares.
+const KINDLING_MAX_UNPACKED_BYTES = 256 * 1024 * 1024;
+
+let kindlingRunning = 0;
+const kindlingWaiting: (() => void)[] = [];
+
+async function withKindlingSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (kindlingRunning < KINDLING_MAX_CONCURRENT) {
+    kindlingRunning++;
+  } else {
+    await new Promise<void>((resolve) => kindlingWaiting.push(resolve));
+  }
+  try {
+    return await fn();
+  } finally {
+    const next = kindlingWaiting.shift();
+    if (next) {
+      next();
+    } else {
+      kindlingRunning--;
+    }
+  }
+}
+
+/** Sums the uncompressed sizes in a zip's central directory, which is at its end. */
+async function declaredUnpackedSize(zipPath: string): Promise<number> {
+  const file = await fs.open(zipPath, 'r');
+  try {
+    const { size } = await file.stat();
+    const read = async (position: number, length: number): Promise<Buffer> => {
+      const buf = Buffer.alloc(length);
+      await file.read(buf, 0, length, position);
+      return buf;
+    };
+    // The end record is 22 bytes plus a comment of up to 64 KB, after the zip64 locator.
+    const tailStart = Math.max(0, size - 22 - 0xffff - 20);
+    const tail = await read(tailStart, size - tailStart);
+    const end = tail.lastIndexOf(Buffer.from('PK\x05\x06', 'latin1'));
+    if (end < 0) {
+      throw new Error('Not a zip archive');
+    }
+    let entries = tail.readUInt16LE(end + 10);
+    let dirLength = tail.readUInt32LE(end + 12);
+    let dirStart = tail.readUInt32LE(end + 16);
+    if (end >= 20 && tail.readUInt32LE(end - 20) === 0x07064b50) {
+      const end64 = await read(Number(tail.readBigUInt64LE(end - 12)), 56);
+      entries = Number(end64.readBigUInt64LE(32));
+      dirLength = Number(end64.readBigUInt64LE(40));
+      dirStart = Number(end64.readBigUInt64LE(48));
+    }
+    const dir = await read(dirStart, dirLength);
+    let total = 0;
+    for (let i = 0, at = 0; i < entries; i++) {
+      if (dir.readUInt32LE(at) !== 0x02014b50) {
+        throw new Error('Corrupt zip central directory');
+      }
+      const nameLength = dir.readUInt16LE(at + 28);
+      const extraLength = dir.readUInt16LE(at + 30);
+      let entrySize = dir.readUInt32LE(at + 24);
+      if (entrySize === 0xffffffff) {
+        // The zip64 extra field leads with the real size when the 32-bit field can't hold it.
+        let extra = at + 46 + nameLength;
+        while (dir.readUInt16LE(extra) !== 0x0001) {
+          extra += 4 + dir.readUInt16LE(extra + 2);
+        }
+        entrySize = Number(dir.readBigUInt64LE(extra + 4));
+      }
+      total += entrySize;
+      at += 46 + nameLength + extraLength + dir.readUInt16LE(at + 32);
+    }
+    return total;
+  } finally {
+    await file.close();
+  }
+}
+
 /**
  * Converts an EPUB to MOBI using kindling, deleting the original on completion.
  *
@@ -141,31 +230,40 @@ export async function convertWithKindling(inputPath: string): Promise<string> {
   let workDir: string | undefined;
   let moved = false;
   try {
+    if ((await declaredUnpackedSize(inputPath)) > KINDLING_MAX_UNPACKED_BYTES) {
+      throw new ConversionError(
+        'EPUB declares more than the unpacked size limit',
+        'This EPUB is too large to convert for Kindle.'
+      );
+    }
     workDir = await fs.mkdtemp(join(dirname(inputPath), KINDLING_WORK_DIR_PREFIX));
     const workInput = join(workDir, 'in.epub');
     const workOutput = join(workDir, 'out.mobi');
     await fs.rename(inputPath, workInput);
     moved = true;
-    await spawnProcess(
+    const kindling = [
       'kindling-cli',
-      [
-        'build',
-        basename(workInput),
-        '-o',
-        basename(workOutput),
-        // MOBI6 plus KF8, as KindleGen wrote: every Kindle opens it and shows its cover.
-        '--legacy-mobi',
-        // Amazon's publishing checks refuse about one book in five, e.g. for having no cover.
-        '--no-validate',
-        '--no-embed-source',
-        // Full-resolution image copies can triple the size of an illustrated book.
-        '--no-hd-images',
-        // Files the book under Books with an ASIN, which the library needs to show a cover.
-        '--doc-type',
-        'ebok',
-      ],
-      workDir
-    );
+      'build',
+      basename(workInput),
+      '-o',
+      basename(workOutput),
+      // MOBI6 plus KF8, as KindleGen wrote: every Kindle opens it and shows its cover.
+      '--legacy-mobi',
+      // Amazon's publishing checks refuse about one book in five, e.g. for having no cover.
+      '--no-validate',
+      '--no-embed-source',
+      // Full-resolution image copies can triple the size of an illustrated book.
+      '--no-hd-images',
+      // Files the book under Books with an ASIN, which the library needs to show a cover.
+      '--doc-type',
+      'ebok',
+    ];
+    // prlimit is Linux-only; in development on other systems kindling runs without the cap.
+    const [cmd, ...args] =
+      process.platform === 'linux'
+        ? ['prlimit', `--as=${KINDLING_MEMORY_LIMIT_BYTES}`, '--', ...kindling]
+        : kindling;
+    await withKindlingSlot(() => spawnProcess(cmd, args, workDir!));
     await fs.rename(workOutput, outPath);
     return outPath;
   } finally {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import JSZip from 'jszip';
 import {
   ConversionError,
   convertWithKindlegen,
@@ -29,11 +30,24 @@ async function withFakeTool(name: string, script: string, fn: () => Promise<void
   }
 }
 
+/** A tiny EPUB whose zip directory claims its chapter unpacks to chapterSize bytes. */
+async function epubClaiming(chapterSize: number): Promise<Buffer> {
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/epub+zip');
+  zip.file('OEBPS/ch1.xhtml', '<html/>');
+  const book = await zip.generateAsync({ type: 'nodebuffer' });
+  book.writeUInt32LE(chapterSize, book.lastIndexOf(Buffer.from('PK\x01\x02', 'latin1')) + 24);
+  return book;
+}
+
 /** Stages an upload the way the upload route names them, in a fresh directory. */
-async function stageUpload(): Promise<{ uploadDir: string; input: string }> {
+async function stageUpload(
+  name = 'file-1700000000000-abc.epub',
+  book?: Buffer
+): Promise<{ uploadDir: string; input: string }> {
   const uploadDir = await fs.mkdtemp(path.join(os.tmpdir(), 'uploads-'));
-  const input = path.join(uploadDir, 'file-1700000000000-abc.epub');
-  await fs.writeFile(input, 'not really an epub');
+  const input = path.join(uploadDir, name);
+  await fs.writeFile(input, book ?? (await epubClaiming(7)));
   return { uploadDir, input };
 }
 
@@ -79,13 +93,16 @@ exit 2
 });
 
 describe('convertWithKindling', () => {
-  it('writes a MOBI beside the upload, built with the options BookDrop relies on', async () => {
+  it("writes a MOBI beside the upload, running kindling with BookDrop's options but not its secrets", async () => {
     const { uploadDir, input } = await stageUpload();
     const argsFile = path.join(uploadDir, '..', `${path.basename(uploadDir)}-args`);
+    const envFile = `${argsFile}-env`;
     const script = `#!/bin/sh
 printf '%s\\n' "$@" > "${argsFile}"
+env > "${envFile}"
 echo mobi > "$4"
 `;
+    process.env.GOOGLE_BOOKS_API_KEY = 'test-secret';
     await withFakeTool('kindling-cli', script, async () => {
       const output = await convertWithKindling(input);
 
@@ -103,15 +120,16 @@ echo mobi > "$4"
         '--doc-type',
         'ebok',
       ]);
+      assert.doesNotMatch(await fs.readFile(envFile, 'utf8'), /test-secret/);
     });
+    delete process.env.GOOGLE_BOOKS_API_KEY;
     await fs.rm(argsFile, { force: true });
+    await fs.rm(envFile, { force: true });
     await fs.rm(uploadDir, { recursive: true, force: true });
   });
 
   it('keeps the converted book when the EPUB was uploaded under another extension', async () => {
-    const uploadDir = await fs.mkdtemp(path.join(os.tmpdir(), 'uploads-'));
-    const input = path.join(uploadDir, 'file-1700000000000-abc.zip');
-    await fs.writeFile(input, 'not really an epub');
+    const { uploadDir, input } = await stageUpload('file-1700000000000-abc.zip');
     await withFakeTool('kindling-cli', '#!/bin/sh\necho mobi > "$4"\n', async () => {
       const output = await convertWithKindling(input);
 
@@ -130,10 +148,49 @@ echo 'Error(prcgen):E24000: Could not process input file'
 exit 1
 `;
     await withFakeTool('kindling-cli', script, async () => {
-      await assert.rejects(() => convertWithKindling(input), /kindling-cli exited with code 1/);
+      await assert.rejects(() => convertWithKindling(input), /exited with code 1/);
       assert.deepStrictEqual(await fs.readdir(uploadDir), []);
     });
     await fs.rm(uploadDir, { recursive: true, force: true });
+  });
+
+  it('refuses an EPUB that unpacks to more than 256 MB without running kindling', async () => {
+    const { uploadDir, input } = await stageUpload(undefined, await epubClaiming(300_000_000));
+    const ranFile = `${uploadDir}-ran`;
+    await withFakeTool('kindling-cli', `#!/bin/sh\ntouch "${ranFile}"\n`, async () => {
+      await assert.rejects(
+        () => convertWithKindling(input),
+        (err: ConversionError) => {
+          assert.ok(err instanceof ConversionError);
+          assert.match(err.userMessage, /too large to convert/);
+          return true;
+        }
+      );
+    });
+    await assert.rejects(fs.access(ranFile), { code: 'ENOENT' });
+    assert.deepStrictEqual(await fs.readdir(uploadDir), []);
+    await fs.rm(uploadDir, { recursive: true, force: true });
+  });
+
+  it('runs at most two conversions at once', async () => {
+    const runDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kindling-running-'));
+    const script = `#!/bin/sh
+mkdir "${runDir}/$$"
+ls "${runDir}" | wc -l >> "${runDir}.counts"
+sleep 0.3
+rmdir "${runDir}/$$"
+echo mobi > "$4"
+`;
+    const uploads = await Promise.all([1, 2, 3].map(() => stageUpload()));
+    await withFakeTool('kindling-cli', script, async () => {
+      await Promise.all(uploads.map(({ input }) => convertWithKindling(input)));
+    });
+    const counts = (await fs.readFile(`${runDir}.counts`, 'utf8')).trim().split(/\s+/).map(Number);
+    assert.strictEqual(counts.length, 3);
+    assert.strictEqual(Math.max(...counts), 2);
+    await Promise.all(uploads.map(({ uploadDir }) => fs.rm(uploadDir, { recursive: true })));
+    await fs.rm(`${runDir}.counts`);
+    await fs.rm(runDir, { recursive: true });
   });
 });
 
