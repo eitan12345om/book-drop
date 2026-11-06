@@ -49,18 +49,7 @@ jobs:
               continue
             fi
 
-            case "$name" in
-              calibre)
-                steps="Bump \`ARG CALIBRE_VERSION\` in the \`Dockerfile\`, and replace both \`sha256\` values with the output of:
-
-          \`\`\`bash
-          for arch in x86_64 arm64; do
-            curl -fsSL \"https://download.calibre-ebook.com/$latest/calibre-$latest-\$arch.txz\" | sha256sum
-          done
-          \`\`\`" ;;
-              *)
-                steps="Bump \`$name@v…\` in the \`Dockerfile\`." ;;
-            esac
+            steps="Bump \`$name@v…\` in the \`Dockerfile\`."
             body="$name is pinned to **$pinned** in the \`Dockerfile\`, but the latest release is **$latest** ([release notes](https://github.com/$repo/releases/tag/$tag)).
 
           $steps

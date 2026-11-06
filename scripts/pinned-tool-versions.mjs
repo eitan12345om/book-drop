@@ -3,7 +3,6 @@
 import fs from 'fs';
 
 const TOOLS = [
-  { name: 'calibre', repo: 'kovidgoyal/calibre', pattern: /^ARG CALIBRE_VERSION=(\S+)$/m },
   {
     name: 'kepubify',
     repo: 'pgaskin/kepubify',

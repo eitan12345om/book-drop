@@ -30,14 +30,11 @@ describe('pinned-tool-versions script', () => {
     await fsp.rm(tmpDir, { recursive: true, force: true });
   });
 
-  it('finds the calibre and kepubify pins in the Dockerfile', async () => {
+  it('finds every converter pin in the Dockerfile', async () => {
     const found = await pins();
     assert.deepStrictEqual(
       found.map(({ name, repo }) => [name, repo]),
-      [
-        ['calibre', 'kovidgoyal/calibre'],
-        ['kepubify', 'pgaskin/kepubify'],
-      ]
+      [['kepubify', 'pgaskin/kepubify']]
     );
     for (const { name, pinned } of found) {
       assert.match(pinned, /^\d+\.\d+\.\d+$/, `${name} pin: ${pinned}`);
@@ -48,20 +45,17 @@ describe('pinned-tool-versions script', () => {
     const dockerfile = path.join(tmpDir, 'Dockerfile');
     await fsp.writeFile(
       dockerfile,
-      [
-        'ARG CALIBRE_VERSION=1.2.3',
-        'RUN go install github.com/pgaskin/kepubify/v4/cmd/kepubify@v4.5.6',
-      ].join('\n')
+      'RUN go install github.com/pgaskin/kepubify/v4/cmd/kepubify@v4.5.6\n'
     );
     assert.deepStrictEqual(
       (await pins(dockerfile)).map((p) => p.pinned),
-      ['1.2.3', '4.5.6']
+      ['4.5.6']
     );
   });
 
   it('fails, naming the tool, when a pin is missing', async () => {
     const dockerfile = path.join(tmpDir, 'Dockerfile');
-    await fsp.writeFile(dockerfile, 'ARG CALIBRE_VERSION=1.2.3\n');
+    await fsp.writeFile(dockerfile, 'FROM node:26-slim\n');
     await assert.rejects(pins(dockerfile), (err: { code: number; stderr: string }) => {
       assert.strictEqual(err.code, 1);
       assert.match(err.stderr, /kepubify/);
