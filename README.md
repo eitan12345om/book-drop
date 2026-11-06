@@ -29,6 +29,7 @@ Optional conversions (requires external tools — see below):
 - _(Optional)_ [kepubify](https://pgaskin.net/kepubify/) in `PATH`
 - _(Optional)_ [KindleGen](http://web.archive.org/web/*/http://kindlegen.s3.amazonaws.com/kindlegen*) in `PATH`
 - _(Optional)_ [pdfCropMargins](https://github.com/abarker/pdfCropMargins) (`pip install pdfCropMargins`)
+- On Linux, `choom` from util-linux (included in most distributions), which converters are started through
 
 ### Development
 

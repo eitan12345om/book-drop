@@ -32,9 +32,10 @@ function spawnProcess(
     let outputBytes = 0;
     let truncated = false;
     // If memory runs out, the kernel kills a converter rather than the server and its sessions.
-    const [command, ...commandArgs] =
-      process.platform === 'linux' ? ['choom', '-n', '1000', '--', cmd, ...args] : [cmd, ...args];
-    const proc = spawn(command, commandArgs, { cwd });
+    const proc =
+      process.platform === 'linux'
+        ? spawn('choom', ['-n', '1000', '--', cmd, ...args], { cwd })
+        : spawn(cmd, args, { cwd });
     const timer = setTimeout(() => {
       proc.kill();
       reject(new Error(`${cmd} timed out after ${timeoutMs} ms`));
