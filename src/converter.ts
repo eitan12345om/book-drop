@@ -31,15 +31,30 @@ function spawnProcess(
   cmd: string,
   args: string[],
   cwd: string,
-  isSuccess: (code: number | null) => boolean = (code) => code === 0,
-  timeoutMs = 55_000
+  {
+    isSuccess = (code: number | null) => code === 0,
+    timeoutMs = 55_000,
+    memoryLimitBytes,
+  }: {
+    isSuccess?: (code: number | null) => boolean;
+    timeoutMs?: number;
+    /** Address space the process may use, so it fails instead of growing without bound. */
+    memoryLimitBytes?: number;
+  } = {}
 ): Promise<string> {
   const MAX_OUTPUT_BYTES = 100 * 1024;
   return new Promise((resolve, reject) => {
     let output = '';
     let outputBytes = 0;
     let truncated = false;
-    const proc = spawn(cmd, args, { cwd, env: converterEnv() });
+    const options = { cwd, env: converterEnv() };
+    // If memory runs out, the kernel kills a converter rather than the server and its sessions.
+    // choom and prlimit are Linux-only; elsewhere, as in development, converters run unrestricted.
+    const memoryCap = memoryLimitBytes ? ['prlimit', `--as=${memoryLimitBytes}`, '--'] : [];
+    const proc =
+      process.platform === 'linux'
+        ? spawn('choom', ['-n', '1000', '--', ...memoryCap, cmd, ...args], options)
+        : spawn(cmd, args, options);
     const timer = setTimeout(() => {
       proc.kill();
       reject(new Error(`${cmd} timed out after ${timeoutMs} ms`));
@@ -113,9 +128,11 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
       'kindlegen',
       [basename(inputPath), '-dont_append_source', '-c1', '-o', basename(outPath)],
       dirname(inputPath),
-      // kindlegen uses exit code 1 for success with warnings
-      (code) => code === 0 || code === 1,
-      KINDLEGEN_TIMEOUT_MS
+      {
+        // kindlegen uses exit code 1 for success with warnings
+        isSuccess: (code) => code === 0 || code === 1,
+        timeoutMs: KINDLEGEN_TIMEOUT_MS,
+      }
     );
     return outPath;
   } catch (err) {
@@ -140,7 +157,9 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
 
 export const KINDLING_WORK_DIR_PREFIX = '.kindling-';
 
-// Two conversions at a time, each held to 384 MB, fit beside the server in its 1 GB container.
+// kindling uses one core and the container gets one; a second slot only keeps small books
+// from waiting behind a big one.
+// A real book needs at most about 220 MB; the cap makes a hostile one fail in seconds.
 const KINDLING_MAX_CONCURRENT = 2;
 const KINDLING_MEMORY_LIMIT_BYTES = 384 * 1024 * 1024;
 // kindling unpacks the whole book to disk and won't write past the sizes the zip declares.
@@ -241,8 +260,7 @@ export async function convertWithKindling(inputPath: string): Promise<string> {
     const workOutput = join(workDir, 'out.mobi');
     await fs.rename(inputPath, workInput);
     moved = true;
-    const kindling = [
-      'kindling-cli',
+    const args = [
       'build',
       basename(workInput),
       '-o',
@@ -258,12 +276,11 @@ export async function convertWithKindling(inputPath: string): Promise<string> {
       '--doc-type',
       'ebok',
     ];
-    // prlimit is Linux-only; in development on other systems kindling runs without the cap.
-    const [cmd, ...args] =
-      process.platform === 'linux'
-        ? ['prlimit', `--as=${KINDLING_MEMORY_LIMIT_BYTES}`, '--', ...kindling]
-        : kindling;
-    await withKindlingSlot(() => spawnProcess(cmd, args, workDir!));
+    await withKindlingSlot(() =>
+      spawnProcess('kindling-cli', args, workDir!, {
+        memoryLimitBytes: KINDLING_MEMORY_LIMIT_BYTES,
+      })
+    );
     await fs.rename(workOutput, outPath);
     return outPath;
   } finally {
