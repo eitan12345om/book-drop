@@ -33,5 +33,7 @@ export const BOOKDROP_VERSION = /^[\w.+-]{1,64}$/.test(process.env.BOOKDROP_VERS
   ? process.env.BOOKDROP_VERSION!
   : 'dev';
 export const SSE_MAX_DURATION_MS = envInt('SSE_MAX_DURATION_MS', 30 * 60_000);
+export const KINDLE_CONVERTER =
+  process.env.KINDLE_CONVERTER?.trim().toLowerCase() === 'kindlegen' ? 'kindlegen' : 'kindling';
 export const SSE_HEARTBEAT_MS = envInt('SSE_HEARTBEAT_MS', 25_000);
 export const UPLOAD_CLEANUP_INTERVAL_MS = envInt('UPLOAD_CLEANUP_INTERVAL_MS', MAX_EXPIRE_MS);

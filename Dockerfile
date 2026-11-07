@@ -2,6 +2,14 @@
 FROM golang:alpine AS kepubify-builder
 RUN go install github.com/pgaskin/kepubify/v4/cmd/kepubify@v4.0.4
 
+# ── Stage 0: kindling ─────────────────────────────────────────────────────────
+# No Linux arm64 release binary is published, so it is built from the pinned crate.
+FROM rust:alpine AS kindling-builder
+ARG KINDLING_VERSION=0.46.2
+RUN apk add --no-cache musl-dev && \
+    CARGO_PROFILE_RELEASE_STRIP=true \
+    cargo install kindling-mobi --version "${KINDLING_VERSION}" --locked
+
 # ── Stage 1: Builder ─────────────────────────────────────────────────────────
 FROM node:26-slim AS builder
 
@@ -25,11 +33,13 @@ FROM node:26-slim
 
 WORKDIR /usr/src/app
 
-# ── kepubify ────────────────────────────────────────────────────────────────
+# ── kepubify + kindling ─────────────────────────────────────────────────────
 COPY --from=kepubify-builder /go/bin/kepubify /usr/local/bin/kepubify
+COPY --from=kindling-builder /usr/local/cargo/bin/kindling-cli /usr/local/bin/kindling-cli
 
 # ── kindlegen + pdfCropMargins ──────────────────────────────────────────────
-# kindlegen: 32-bit i386 binary (needs libc6:i386 multiarch + curl to fetch).
+# kindlegen: kept as a fallback (KINDLE_CONVERTER=kindlegen); a 32-bit i386 binary
+# (needs libc6:i386 multiarch + curl to fetch).
 # pdfCropMargins: pipx-managed venv; --only-binary=pymupdf avoids a source build.
 ENV PIPX_HOME=/opt/pipx
 ENV PIPX_BIN_DIR=/usr/local/bin

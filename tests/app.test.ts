@@ -1301,11 +1301,11 @@ describe('POST /upload — metadata with Kindle conversion', () => {
     global.fetch = async () =>
       Response.json({ items: [{ volumeInfo: { title: 'Fetched Title' } }] });
 
-    // Stands in for kindlegen: writes the EPUB's OPF as the "MOBI", so the output
-    // shows which metadata the EPUB had when it was converted.
-    fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-kindlegen-'));
-    const script = path.join(fakeBinDir, 'kindlegen');
-    await fs.writeFile(script, '#!/bin/sh\nunzip -p "$1" OEBPS/content.opf > "$5"\n');
+    // Stands in for kindling (build <input> -o <output> ...): writes the EPUB's OPF as the
+    // "MOBI", so the output shows which metadata the EPUB had when it was converted.
+    fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-kindling-'));
+    const script = path.join(fakeBinDir, 'kindling-cli');
+    await fs.writeFile(script, '#!/bin/sh\nunzip -p "$2" OEBPS/content.opf > "$4"\n');
     await fs.chmod(script, 0o755);
     originalPath = process.env.PATH;
     process.env.PATH = `${fakeBinDir}${path.delimiter}${originalPath}`;
@@ -1349,6 +1349,7 @@ describe('POST /upload — metadata with Kindle conversion', () => {
       .attach('file', epub, { filename: 'book.epub', contentType: 'application/epub+zip' });
 
     assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.conversionTool, 'Kindling');
     assert.doesNotMatch(res.text, /Metadata lookup failed/i);
     const [file] = keys.get(key)!.files;
     assert.strictEqual(file.name, 'book.mobi');
@@ -1356,55 +1357,6 @@ describe('POST /upload — metadata with Kindle conversion', () => {
       title: { before: 'Original Title', after: 'Fetched Title' },
     });
     assert.match(await fs.readFile(file.path, 'utf8'), /Fetched Title/);
-  });
-});
-
-// ---------------------------------------------------------------------------
-describe('POST /upload — KindleGen rejects the EPUB', () => {
-  let originalPath: string | undefined;
-  let fakeBinDir: string;
-
-  before(async () => {
-    fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-kindlegen-'));
-    const script = path.join(fakeBinDir, 'kindlegen');
-    await fs.writeFile(
-      script,
-      `#!/bin/sh
-echo 'Info(prcgen):I1047: Added metadata dc:Title "Oliver Twist"'
-echo 'Error(prcgen):E23006: Language not recognized in metadata. The dc:Language field is mandatory. Aborting.'
-exit 2
-`
-    );
-    await fs.chmod(script, 0o755);
-    originalPath = process.env.PATH;
-    process.env.PATH = `${fakeBinDir}${path.delimiter}${originalPath}`;
-  });
-
-  after(async () => {
-    process.env.PATH = originalPath;
-    await fs.rm(fakeBinDir, { recursive: true, force: true });
-  });
-
-  it("tells the uploader KindleGen's reason for rejecting the book", async () => {
-    const { app, key } = await generateKey('Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0');
-    const zip = new JSZip();
-    zip.file('mimetype', 'application/epub+zip');
-    const epub = await zip.generateAsync({ type: 'nodebuffer' });
-
-    const res = await request(app)
-      .post('/upload')
-      .set('X-Requested-With', 'XMLHttpRequest')
-      .field('key', key)
-      .field('kindlegen', '1')
-      .attach('file', epub, { filename: 'book.epub', contentType: 'application/epub+zip' });
-
-    assert.strictEqual(res.status, 500);
-    assert.strictEqual(
-      res.body.error,
-      "KindleGen couldn't convert this EPUB: Language not recognized in metadata. " +
-        'Try adding it with an ebook editor tool.'
-    );
-    assert.match(res.body.ref, /^[0-9A-F]{8}$/);
   });
 });
 
