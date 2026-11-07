@@ -5,7 +5,7 @@ RUN go install github.com/pgaskin/kepubify/v4/cmd/kepubify@v4.0.4
 # ── Stage 0: kindling ─────────────────────────────────────────────────────────
 # No Linux arm64 release binary is published, so it is built from the pinned crate.
 FROM rust:alpine AS kindling-builder
-ARG KINDLING_VERSION=0.46.1
+ARG KINDLING_VERSION=0.46.2
 RUN apk add --no-cache musl-dev && \
     CARGO_PROFILE_RELEASE_STRIP=true \
     cargo install kindling-mobi --version "${KINDLING_VERSION}" --locked
