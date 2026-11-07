@@ -112,15 +112,23 @@ describe('kindling conversions', { skip: installed ? false : 'kindling is not in
     assert.deepStrictEqual(await fs.readdir(uploadDir), existing);
   });
 
-  it('stops kindling at its memory cap on a book within the size limit', async () => {
-    const input = path.join(uploadDir, 'file-1700000000002-ghi.epub');
-    const zip = await JSZip.loadAsync(await bookWithoutCoverOrLanguage());
-    const chapter = Buffer.alloc(250_000_000, 'a');
-    zip.file('OEBPS/ch1.xhtml', chapter, { compression: 'STORE' });
-    await fs.writeFile(input, await zip.generateAsync({ type: 'nodebuffer' }));
-    const existing = (await fs.readdir(uploadDir)).filter((name) => name !== path.basename(input));
+  it(
+    'stops kindling at its memory cap on a book within the size limit',
+    {
+      skip: process.platform === 'linux' ? false : 'the memory cap is Linux-only',
+    },
+    async () => {
+      const input = path.join(uploadDir, 'file-1700000000002-ghi.epub');
+      const zip = await JSZip.loadAsync(await bookWithoutCoverOrLanguage());
+      const chapter = Buffer.alloc(250_000_000, 'a');
+      zip.file('OEBPS/ch1.xhtml', chapter, { compression: 'STORE' });
+      await fs.writeFile(input, await zip.generateAsync({ type: 'nodebuffer' }));
+      const existing = (await fs.readdir(uploadDir)).filter(
+        (name) => name !== path.basename(input)
+      );
 
-    await assert.rejects(() => convertWithKindling(input), /killed by SIGABRT/);
-    assert.deepStrictEqual(await fs.readdir(uploadDir), existing);
-  });
+      await assert.rejects(() => convertWithKindling(input), /killed by SIGABRT/);
+      assert.deepStrictEqual(await fs.readdir(uploadDir), existing);
+    }
+  );
 });
