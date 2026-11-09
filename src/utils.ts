@@ -6,7 +6,7 @@ import JSZip from 'jszip';
 import { transliterate } from 'transliteration';
 import { logger } from './logger.js';
 import type { MetadataDiff } from './types.js';
-import { GOOGLE_BOOKS_API_KEY, MAX_METADATA_ENTRY_BYTES } from './config.js';
+import { GOOGLE_BOOKS_API_KEY, MAX_METADATA_ENTRY_BYTES, MAX_ZIP_INDEX_BYTES } from './config.js';
 
 export const KEY_REGEX = /^[23456789ACDEFGHJKLMNPRSTUVWXYZ]{4}$/;
 
@@ -117,6 +117,9 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
     }
     if (dirOffset + dirSize > tailStart + end) {
       throw new Error('Corrupt zip index: it lies past the end of the file');
+    }
+    if (dirSize > MAX_ZIP_INDEX_BYTES) {
+      throw new Error('Zip index is too large to read');
     }
 
     const dir = Buffer.alloc(dirSize);

@@ -22,6 +22,7 @@ import {
   hasZipEndRecord,
   readZipEntries,
 } from '../src/utils.js';
+import { MAX_ZIP_INDEX_BYTES } from '../src/config.js';
 
 async function makeTempEpub(metadata: Record<string, string>): Promise<string> {
   const dcElements = Object.entries(metadata)
@@ -331,6 +332,17 @@ describe('readZipEntries', () => {
     const buf = await twoEntries().generateAsync({ type: 'nodebuffer' });
     buf.writeUInt16LE(0, endOffset(buf) + 10);
     await assert.rejects(read(buf));
+  });
+
+  it('throws on an index larger than any convertible EPUB needs, before reading it', async () => {
+    const dirSize = MAX_ZIP_INDEX_BYTES + 1;
+    const buf = Buffer.alloc(dirSize + 22);
+    const end = dirSize;
+    buf.writeUInt32LE(0x06054b50, end);
+    buf.writeUInt16LE(1, end + 10);
+    buf.writeUInt32LE(dirSize, end + 12);
+    buf.writeUInt32LE(0, end + 16);
+    await assert.rejects(read(buf), /too large/);
   });
 
   it('throws on a ZIP64 archive', async () => {
