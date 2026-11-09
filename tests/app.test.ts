@@ -87,6 +87,17 @@ async function generateKey(agent = 'Mozilla/5.0 TestBrowser') {
   return { app, keys, key: res.body.key as string, status: res.status };
 }
 
+// deleteFile() doesn't wait for its unlink, so a rejected upload's temp file can outlive the response.
+async function readUploadsOnceCountIs(count: number): Promise<string[]> {
+  const deadline = Date.now() + 2000;
+  let files = await fs.readdir('uploads');
+  while (files.length !== count && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    files = await fs.readdir('uploads');
+  }
+  return files;
+}
+
 describe('POST /generate', () => {
   it('returns 200 with a 4-character key', async () => {
     const { app } = createApp();
@@ -1114,9 +1125,7 @@ describe('POST /upload — temp file cleanup on rejection', () => {
       .field('key', key)
       .attach('file', Buffer.alloc(0), { filename: 'empty.txt', contentType: 'text/plain' });
 
-    await new Promise((resolve) => setImmediate(resolve));
-
-    const filesAfter = await fs.readdir('uploads');
+    const filesAfter = await readUploadsOnceCountIs(filesBefore.length);
     assert.strictEqual(res.status, 400);
     assert.strictEqual(
       filesAfter.length,
@@ -1144,9 +1153,7 @@ describe('POST /upload — temp file cleanup on rejection', () => {
       .field('key', key)
       .attach('file', Buffer.alloc(0), { filename: 'empty.txt', contentType: 'text/plain' });
 
-    await new Promise((resolve) => setImmediate(resolve));
-
-    const filesAfter = await fs.readdir('uploads');
+    const filesAfter = await readUploadsOnceCountIs(filesBefore.length + 1);
     assert.strictEqual(
       filesAfter.length,
       filesBefore.length + 1,
@@ -1391,8 +1398,7 @@ describe('POST /upload — session ends while the upload is processed', () => {
     assert.strictEqual(res.status, 410);
     assert.strictEqual(keys.has(key), false);
     assert.strictEqual(getDiskUsage(), diskBefore);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    assert.deepStrictEqual(await fs.readdir('uploads'), filesBefore);
+    assert.deepStrictEqual(await readUploadsOnceCountIs(filesBefore.length), filesBefore);
   });
 });
 
