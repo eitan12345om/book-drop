@@ -123,7 +123,8 @@ jobs:
       - name: Convert real books with the image's kindling
         # The suite skips kindling if it can't find it, so check first that the image has it.
         run: |
-          docker run --rm -v "$PWD/tests:/usr/src/app/tests:ro" book-drop:ci sh -c \
+          docker run --rm --init --cap-drop ALL --security-opt no-new-privileges:true \
+            --pids-limit 256 -v "$PWD/tests:/usr/src/app/tests:ro" book-drop:ci sh -c \
             'kindling-cli --version && node --test tests/integration/'
       - name: Publish the tested image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
