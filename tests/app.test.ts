@@ -855,6 +855,22 @@ describe('POST /generate — per-IP limit', () => {
       .set('X-Requested-With', 'XMLHttpRequest');
     assert.strictEqual(res.status, 429);
   });
+
+  it('counts sessions from every address in an IPv6 /56 together', async () => {
+    const { app, keys } = createApp();
+    const generate = (ip: string) =>
+      request(app)
+        .post('/generate')
+        .set('User-Agent', 'TestBrowser/1.0')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .set('CF-Connecting-IP', ip);
+    for (let i = 0; i < MAX_KEYS_PER_IP; i++) {
+      assert.strictEqual((await generate(`2001:db8:1:ab0${i}::1`)).status, 200);
+    }
+    assert.strictEqual((await generate('2001:db8:1:abff::9')).status, 429);
+    assert.strictEqual((await generate('2001:db8:1:ac00::1')).status, 200);
+    assert.strictEqual(new Set([...keys.values()].map((k) => k.network)).size, 2);
+  });
 });
 
 describe('POST /generate — capacity', () => {
@@ -863,6 +879,7 @@ describe('POST /generate — capacity', () => {
     const fakeInfo: KeyInfo = {
       created: new Date(),
       ip: '1.2.3.4',
+      network: '1.2.3.4',
       agent: 'test',
       files: [],
       urls: [],
@@ -1227,6 +1244,7 @@ describe('POST /generate — 503 body', () => {
     const fakeInfo: KeyInfo = {
       created: new Date(),
       ip: '1.2.3.4',
+      network: '1.2.3.4',
       agent: 'test',
       files: [],
       urls: [],

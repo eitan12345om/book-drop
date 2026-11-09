@@ -18,6 +18,7 @@ function makeKeyInfo(overrides: Partial<KeyInfo> = {}): KeyInfo {
   return {
     created: new Date(),
     ip: '127.0.0.1',
+    network: '127.0.0.1',
     agent: 'TestBrowser/1.0',
     files: [],
     urls: [],

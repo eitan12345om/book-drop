@@ -19,6 +19,7 @@ export interface FileInfo {
 export interface KeyInfo {
   created: Date;
   ip: string;
+  network: string;
   agent: string;
   files: FileInfo[];
   urls: string[];

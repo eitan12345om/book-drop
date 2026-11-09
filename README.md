@@ -72,7 +72,7 @@ Copy `.env.example` to `.env` to customise these values.
 | `MAX_DISK_BYTES`             | `1073741824` | Total upload directory size cap in bytes (1 GB); uploads returning 507 when exceeded                                                  |
 | `MAX_FILES_PER_KEY`          | `5`          | Max files staged per session key; further uploads return 400                                                                          |
 | `MAX_URLS_PER_KEY`           | `20`         | Max URLs staged per session key; further submissions return 400                                                                       |
-| `MAX_KEYS_PER_IP`            | `3`          | Max concurrent sessions per IP; further requests return 429                                                                           |
+| `MAX_KEYS_PER_IP`            | `3`          | Max concurrent sessions per IP (an IPv6 /56 counts as one IP, as do the rate limits); further requests return 429                     |
 | `RATE_LIMIT_WINDOW_MS`       | `900000`     | Rate-limit window for `/generate` (ms)                                                                                                |
 | `RATE_LIMIT_MAX`             | `20`         | Max key generations per window per IP                                                                                                 |
 | `LOG_LEVEL`                  | `info`       | Pino log level (`trace`, `debug`, `info`, `warn`, `error`)                                                                            |
