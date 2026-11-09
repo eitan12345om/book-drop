@@ -106,7 +106,7 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
       end = end === 0 ? -1 : tail.lastIndexOf(ZIP_END_SIGNATURE, end - 1);
     }
     if (end < 0) {
-      throw new Error('Zip end record not found');
+      throw new Error('Not a zip archive');
     }
 
     const count = tail.readUInt16LE(end + 10);
@@ -116,7 +116,7 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
       throw new Error('ZIP64 archives are not supported');
     }
     if (dirOffset + dirSize > tailStart + end) {
-      throw new Error('Zip index lies past the end of the file');
+      throw new Error('Corrupt zip index: it lies past the end of the file');
     }
 
     const dir = Buffer.alloc(dirSize);
@@ -125,7 +125,7 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
     let pos = 0;
     for (let i = 0; i < count; i++) {
       if (pos + ZIP_DIR_HEADER_SIZE > dirSize || dir.readUInt32LE(pos) !== ZIP_DIR_SIGNATURE) {
-        throw new Error('Malformed zip index');
+        throw new Error('Corrupt zip index');
       }
       const compressedSize = dir.readUInt32LE(pos + 20);
       const uncompressedSize = dir.readUInt32LE(pos + 24);
@@ -135,7 +135,7 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
       const nameStart = pos + ZIP_DIR_HEADER_SIZE;
       const nameEnd = nameStart + dir.readUInt16LE(pos + 28);
       if (nameEnd > dirSize) {
-        throw new Error('Malformed zip index');
+        throw new Error('Corrupt zip index');
       }
       entries.push({
         name: dir.toString('utf8', nameStart, nameEnd),
@@ -145,7 +145,7 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
       pos = nameEnd + dir.readUInt16LE(pos + 30) + dir.readUInt16LE(pos + 32);
     }
     if (pos !== dirSize) {
-      throw new Error('Zip index holds more or fewer entries than its end record counts');
+      throw new Error('Corrupt zip index: its entries and its end record disagree');
     }
     return entries;
   } finally {

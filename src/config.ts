@@ -27,6 +27,8 @@ export const MAX_FILES_PER_KEY = envInt('MAX_FILES_PER_KEY', 5);
 export const MAX_URLS_PER_KEY = envInt('MAX_URLS_PER_KEY', 20);
 export const MAX_CONVERT_ENTRIES = 10_000;
 export const MAX_CONVERT_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
+// kindling unpacks the whole book to disk and won't write past the sizes the zip declares.
+export const MAX_KINDLE_UNPACKED_BYTES = 256 * 1024 * 1024;
 export const MAX_METADATA_ENTRY_BYTES = 64 * 1024;
 export const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY ?? '';
 export const DISABLE_HSTS = process.env.DISABLE_HSTS === '1';

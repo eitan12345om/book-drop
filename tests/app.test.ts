@@ -1371,13 +1371,13 @@ describe('POST /upload — EPUBs too large to convert or read', () => {
       .file('OEBPS/content.opf', OPF);
   }
 
-  /** An EPUB whose index declares a 600 MiB chapter, which only takes a few bytes to send. */
-  async function hugeDeclaredEpub(): Promise<Buffer> {
+  /** An EPUB whose index declares a chapter this large, which only takes a few bytes to send. */
+  async function hugeDeclaredEpub(declaredBytes = 600 * 1024 * 1024): Promise<Buffer> {
     const buf = await baseEpub()
       .file('OEBPS/chapter.xhtml', 'x')
       .generateAsync({ type: 'nodebuffer' });
     const nameAt = buf.lastIndexOf(Buffer.from('OEBPS/chapter.xhtml'));
-    buf.writeUInt32LE(600 * 1024 * 1024, nameAt - 46 + 24);
+    buf.writeUInt32LE(declaredBytes, nameAt - 46 + 24);
     return buf;
   }
 
@@ -1416,6 +1416,16 @@ describe('POST /upload — EPUBs too large to convert or read', () => {
     const { res } = await upload(KINDLE, await hugeDeclaredEpub(), { kindlegen: '1' });
     assert.strictEqual(res.status, 422);
     assert.match(res.body.error, /Turn off \u201cKindle format\u201d/);
+  });
+
+  it('holds Kindle conversions to the 256 MiB that kindling will unpack', async () => {
+    const epub = await hugeDeclaredEpub(300 * 1024 * 1024);
+    const kindle = await upload(KINDLE, epub, { kindlegen: '1' });
+    assert.strictEqual(kindle.res.status, 422);
+    assert.match(kindle.res.body.error, /Turn off \u201cKindle format\u201d/);
+
+    const kobo = await upload(KOBO, epub, { kepubify: 'true' });
+    assert.notStrictEqual(kobo.res.status, 422, 'a Kobo conversion has the 512 MiB limit');
   });
 
   it('lets only one of two simultaneous conversions take the last file slot', async () => {

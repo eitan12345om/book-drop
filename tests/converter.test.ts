@@ -162,6 +162,19 @@ exit 1
     await fs.rm(uploadDir, { recursive: true, force: true });
   });
 
+  it('refuses an EPUB whose end record hides its entries, without running kindling', async () => {
+    const book = await epubClaiming(300_000_000);
+    book.writeUInt16LE(0, book.lastIndexOf(Buffer.from('PK\x05\x06', 'latin1')) + 10);
+    const { uploadDir, input } = await stageUpload(undefined, book);
+    const ranFile = `${uploadDir}-ran`;
+    await withFakeTool('kindling-cli', `#!/bin/sh\ntouch "${ranFile}"\n`, async () => {
+      await assert.rejects(() => convertWithKindling(input), /Corrupt zip/);
+    });
+    await assert.rejects(fs.access(ranFile), { code: 'ENOENT' });
+    assert.deepStrictEqual(await fs.readdir(uploadDir), []);
+    await fs.rm(uploadDir, { recursive: true, force: true });
+  });
+
   it('refuses an EPUB that unpacks to more than 256 MB without running kindling', async () => {
     const { uploadDir, input } = await stageUpload(undefined, await epubClaiming(300_000_000));
     const ranFile = `${uploadDir}-ran`;
