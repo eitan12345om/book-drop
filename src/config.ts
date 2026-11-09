@@ -1,4 +1,3 @@
-/** Reads an integer from the environment, returning fallback if absent or non-numeric. */
 export function envInt(key: string, fallback: number): number {
   const val = process.env[key];
   if (val === undefined) {

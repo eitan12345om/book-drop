@@ -1,23 +1,17 @@
 @use 'sass:map';
 @use 'tokens' as t;
 
-// Generate CSS custom properties from a token map.
 @mixin token-vars($map) {
   @each $name, $value in $map {
     --#{$name}: #{$value};
   }
 }
 
-// Return the light-mode fallback value for a token.
-// Use for compound property declarations alongside var():
-//   border: 1px solid token('border');
-//   border: 1px solid var(--border);
 @function token($name) {
   @return map.get(t.$light, $name);
 }
 
-// ─── Flex helpers with webkit prefixes (WebKit 536+) ─────────────────────────
-
+// -webkit- prefixes are required for WebKit 536+ e-reader browsers.
 @mixin flex($direction: row) {
   display: -webkit-flex;
   display: flex;
@@ -37,33 +31,25 @@
   #{$property}: $value;
 }
 
-// ─── Gap fallbacks (gap on flex unsupported before Chrome 84 / Safari 14.1) ──
-
-// Adds left margin to every child except the first — equivalent to row gap.
+// Flex gap is unsupported before Chrome 84 / Safari 14.1.
 @mixin flex-gap-row($size) {
   > * + * {
     margin-left: $size;
   }
 }
 
-// Adds top margin to every child except the first — equivalent to column gap.
 @mixin flex-gap-col($size) {
   > * + * {
     margin-top: $size;
   }
 }
 
-// ─── Apply a CSS property with plain fallback + var() override ────────────────
-
-// Apply a CSS property with a plain fallback (old browsers) and var() override (modern browsers).
 // Old browsers that don't understand var() drop that declaration and keep the fallback line.
 @mixin theme-prop($property, $token-name, $map: t.$light) {
   #{$property}: map.get($map, $token-name);
   #{$property}: var(--#{$token-name});
 }
 
-// Emit a border (or border-side) with plain fallback + var() override.
-// $side: null for all sides, or 'top' | 'right' | 'bottom' | 'left'.
 @mixin theme-border($token-name, $width: 1px, $style: solid, $side: null) {
   @if $side {
     border-#{$side}: $width $style token($token-name);
@@ -74,24 +60,17 @@
   }
 }
 
-// ─── Focus helpers ────────────────────────────────────────────────────────────
-
-// Standard 2px accent outline for :focus-visible rules.
 @mixin focus-ring {
   outline: 2px solid token('accent');
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-// Accent-coloured glow for input :focus rules (box-shadow only).
 @mixin focus-glow {
   box-shadow: 0 0 0 4px token('accent-glow');
   box-shadow: 0 0 0 4px var(--accent-glow);
 }
 
-// ─── Button base ─────────────────────────────────────────────────────────────
-
-// Base shape for square icon buttons (theme toggle, refresh).
 // Padding-based centering: (2.75rem button − 1rem icon) / 2 = 0.875rem.
 @mixin btn-icon-base {
   @include inline-flex;
@@ -110,9 +89,6 @@
   }
 }
 
-// ─── Input focus ─────────────────────────────────────────────────────────────
-
-// Standard focus state for text/url inputs.
 @mixin input-focus {
   &:focus {
     outline: none;
@@ -121,9 +97,6 @@
   }
 }
 
-// ─── Text truncation ─────────────────────────────────────────────────────────
-
-// Single-line truncation for flex children.
 @mixin truncate {
   flex: 1;
   min-width: 0;
@@ -131,8 +104,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-// ─── Responsive breakpoints ───────────────────────────────────────────────────
 
 @mixin breakpoint($name) {
   @media (max-width: map.get(t.$breakpoints, $name)) {

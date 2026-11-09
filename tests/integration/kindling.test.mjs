@@ -58,7 +58,6 @@ async function bookWithoutCoverOrLanguage() {
   return zip.generateAsync({ type: 'nodebuffer' });
 }
 
-/** Reads the EXTH metadata records from a MOBI's first record, keyed by record type. */
 function exthRecords(book) {
   const record0 = book.readUInt32BE(78);
   const mobiHeader = record0 + 16;

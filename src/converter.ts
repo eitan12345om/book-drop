@@ -3,10 +3,8 @@ import { spawn } from 'child_process';
 import { basename, dirname, extname, join } from 'path';
 import { logger } from './logger.js';
 
-/** KindleGen is much slower than the other converters, so it gets its own cap. */
 const KINDLEGEN_TIMEOUT_MS = 100_000;
 
-/** Deletes a file, silently ignoring ENOENT. */
 async function deleteFile(filePath: string): Promise<void> {
   try {
     await fs.unlink(filePath);
@@ -26,7 +24,6 @@ function converterEnv(): NodeJS.ProcessEnv {
   );
 }
 
-/** Spawns a child process and resolves with its combined stdout+stderr output, or rejects on error or timeout. */
 function spawnProcess(
   cmd: string,
   args: string[],
@@ -88,7 +85,7 @@ function spawnProcess(
   });
 }
 
-/** A conversion failure whose `userMessage` is safe to show to the uploader. */
+/** Only `userMessage` is safe to show to the uploader; `message` contains raw tool output. */
 export class ConversionError extends Error {
   constructor(
     message: string,
@@ -104,7 +101,7 @@ const KINDLEGEN_ERROR_MESSAGES: Record<string, string> = {
   E23006: 'Language not recognized in metadata. Try adding it with an ebook editor tool.',
 };
 
-/** Extracts the reason from KindleGen's `Error(<module>):E<code>: <reason>` line, if any. */
+// Matches KindleGen's `Error(<module>):E<code>: <reason>[ Aborting.]` line.
 function kindlegenErrorReason(output: string): string | null {
   const m = output.match(/^Error\([^)]*\):(E\d+):\s*(.+?)(?:\s*Aborting\.)?\s*$/m);
   if (!m) {
@@ -114,12 +111,10 @@ function kindlegenErrorReason(output: string): string | null {
   return KINDLEGEN_ERROR_MESSAGES[code] ?? reason;
 }
 
-/** Applies a series of string replacements to sanitize tool output before surfacing it to the user. */
 function sanitizeOutput(message: string, ...replacements: [string, string][]): string {
   return replacements.reduce((msg, [from, to]) => msg.replaceAll(from, to), message);
 }
 
-/** Converts an EPUB to MOBI using kindlegen, deleting the original on completion. */
 export async function convertWithKindlegen(inputPath: string): Promise<string> {
   const outPath = inputPath.replace(/\.epub$/i, '.mobi');
   const mobi8Path = inputPath.replace(/\.epub$/i, '.mobi8');
@@ -218,12 +213,8 @@ async function declaredUnpackedSize(zipPath: string): Promise<number> {
   }
 }
 
-/**
- * Converts an EPUB to MOBI using kindling, deleting the original on completion.
- *
- * kindling unpacks the book into a folder beside its input and leaves it there if it fails
- * or is killed, so it runs in a scratch folder that is removed whatever the outcome.
- */
+// kindling unpacks the book into a folder beside its input and leaves it there if it fails
+// or is killed, so it runs in a scratch folder that is removed whatever the outcome.
 export async function convertWithKindling(inputPath: string): Promise<string> {
   const outPath = join(dirname(inputPath), `${basename(inputPath, extname(inputPath))}.mobi`);
   let workDir: string | undefined;
@@ -271,7 +262,6 @@ export async function convertWithKindling(inputPath: string): Promise<string> {
   }
 }
 
-/** Converts an EPUB to Kobo's kepub format using kepubify, deleting the original on completion. */
 export async function convertWithKepubify(inputPath: string): Promise<string> {
   const outPath = inputPath.replace(/\.epub$/i, '.kepub.epub');
   try {
@@ -294,7 +284,6 @@ export async function convertWithKepubify(inputPath: string): Promise<string> {
   }
 }
 
-/** Crops white margins from a PDF using pdfcropmargins, deleting the original on completion. */
 export async function convertWithPdfCropMargins(inputPath: string): Promise<string> {
   const dir = dirname(inputPath);
   const base = basename(inputPath, '.pdf');

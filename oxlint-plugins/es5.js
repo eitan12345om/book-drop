@@ -1,6 +1,5 @@
 import { parse } from 'acorn';
 
-/** Returns acorn's error if source isn't plain ES5, or null if it parses. */
 export function es5SyntaxError(source) {
   try {
     parse(source, { ecmaVersion: 5 });

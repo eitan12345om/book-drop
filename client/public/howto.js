@@ -7,8 +7,8 @@ function initHowto() {
 
   openBtn.addEventListener('click', () => dialog.showModal());
 
-  // Backdrop click closes — but only when both mousedown and mouseup land on the
-  // dialog itself, so a text-drag that ends outside the content area doesn't close.
+  // Require both mousedown and mouseup on the backdrop, so a text-drag that ends outside
+  // the content area doesn't close the dialog.
   let downOnBackdrop = false;
   dialog.addEventListener('mousedown', (e) => {
     downOnBackdrop = e.target === dialog;

@@ -7,12 +7,12 @@ import type { KeyInfo } from './types.js';
 
 function getFileAgeMs(filePath: string, stat: Stats, now: number): number {
   const birthMs = Number(stat.birthtimeMs);
-  // birthtimeMs may be 0 on NFS/some filesystems — fall back to filename timestamp
+  // birthtimeMs is 0 on NFS and some other filesystems.
   if (birthMs > 0) {
     return now - birthMs;
   }
   const match = path.basename(filePath).match(/^file-(\d+)-/);
-  return match ? now - parseInt(match[1], 10) : 0; // 0 = unknown age, don't delete
+  return match ? now - parseInt(match[1], 10) : 0; // unknown age must never qualify for deletion
 }
 
 export async function cleanExpiredUploads(
