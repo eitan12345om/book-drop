@@ -69,12 +69,27 @@ jobs:
       - run: pnpm e2e
 
   docker:
-    runs-on: ubuntu-latest
+    # Production runs on arm64, so the image that passes these checks is the one that gets deployed.
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: docker build --build-arg "BOOKDROP_VERSION=${GITHUB_SHA::7}" -t book-drop:ci .
+      - id: version
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: book-drop:ci
+          build-args: BOOKDROP_VERSION=${{ steps.version.outputs.short }}
+          # Compiling kindling takes minutes; the cache skips it unless its pin changes.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       - name: Smoke-test the image
         run: |
           docker run -d --name book-drop -p 3001:3001 book-drop:ci
@@ -103,6 +118,15 @@ jobs:
         run: |
           docker run --rm -v "$PWD/tests:/usr/src/app/tests:ro" book-drop:ci sh -c \
             'kindling-cli --version && node --test tests/integration/'
+      - name: Publish the tested image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag book-drop:ci "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:$GITHUB_SHA"
       - if: failure()
         run: docker logs book-drop
 
@@ -155,4 +179,4 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: exit 0
+          script: deploy ${{ github.sha }}
