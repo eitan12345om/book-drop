@@ -78,18 +78,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - id: version
-        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          load: true
-          tags: book-drop:ci
-          build-args: BOOKDROP_VERSION=${{ steps.version.outputs.short }}
-          # Compiling kindling takes minutes; the cache skips it unless its pin changes.
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build the image
+        # Compiling kindling takes minutes; the registry cache skips it unless its pin changes.
+        # Only main writes the cache, so PRs can't poison what gets deployed.
+        env:
+          CACHE: ghcr.io/${{ github.repository }}:buildcache
+          GH_TOKEN: ${{ github.token }}
+          ON_MAIN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          docker buildx create --use --driver docker-container
+          cache_to=()
+          if [ "$ON_MAIN" = true ]; then
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            cache_to=(--cache-to "type=registry,ref=$CACHE,mode=max")
+          fi
+          docker buildx build --load -t book-drop:ci \
+            --build-arg "BOOKDROP_VERSION=${GITHUB_SHA::7}" \
+            --cache-from "type=registry,ref=$CACHE" "${cache_to[@]}" .
       - name: Smoke-test the image
         run: |
           docker run -d --name book-drop -p 3001:3001 book-drop:ci
