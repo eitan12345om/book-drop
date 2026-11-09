@@ -21,7 +21,7 @@ Optional conversions (requires external tools — see below):
 - EPUB → MOBI (Kindle, via [kindling](https://github.com/ciscoriordan/kindling)) — Kindle doesn't support EPUB natively. kindling replaces Amazon's discontinued KindleGen, which is still available with `KINDLE_CONVERTER=kindlegen`
 - PDF margin cropping (via pdfCropMargins) — fills more of the small screen
 
-EPUBs with more than 10,000 files inside, or more than 512 MiB uncompressed, are sent without conversion only.
+EPUBs with more than 10,000 files inside, or more than 512 MiB uncompressed (256 MiB for Kindle), are sent without conversion only.
 
 - Update EPUB metadata from Google Books — patches title, author, publisher, etc. and shows a before/after diff on the download page (requires a `GOOGLE_BOOKS_API_KEY`)
 

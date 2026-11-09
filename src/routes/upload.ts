@@ -28,6 +28,7 @@ import {
   UPLOAD_RATE_LIMIT_MAX,
   MAX_CONVERT_ENTRIES,
   MAX_CONVERT_UNCOMPRESSED_BYTES,
+  MAX_KINDLE_UNPACKED_BYTES,
 } from '../config.js';
 import { logger } from '../logger.js';
 import type { KeyInfo, MetadataDiff } from '../types.js';
@@ -82,10 +83,7 @@ export function sanitiseFilename(
 }
 
 /** Predicts the display filename after conversion without running it (pure function). */
-function predictConvertedFilename(
-  sanitised: string,
-  converter: EpubConversion | null
-): string {
+function predictConvertedFilename(sanitised: string, converter: EpubConversion | null): string {
   if (converter === 'Kindle') {
     return sanitised.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.mobi');
   }
@@ -134,8 +132,11 @@ function epubConverter(
   return null;
 }
 
-/** True if the EPUB's index is readable and within what the converters are trusted with. */
-async function fitsConversionLimits(filePath: string): Promise<boolean> {
+/** True if the EPUB's index is readable and within what the converter is trusted with. */
+async function fitsConversionLimits(
+  filePath: string,
+  conversion: EpubConversion
+): Promise<boolean> {
   let entries;
   try {
     entries = await readZipEntries(filePath);
@@ -143,7 +144,9 @@ async function fitsConversionLimits(filePath: string): Promise<boolean> {
     return false;
   }
   const declared = entries.reduce((sum, e) => sum + e.uncompressedSize, 0);
-  return entries.length <= MAX_CONVERT_ENTRIES && declared <= MAX_CONVERT_UNCOMPRESSED_BYTES;
+  const maxDeclared =
+    conversion === 'Kindle' ? MAX_KINDLE_UNPACKED_BYTES : MAX_CONVERT_UNCOMPRESSED_BYTES;
+  return entries.length <= MAX_CONVERT_ENTRIES && declared <= maxDeclared;
 }
 
 async function runConversion(
@@ -347,7 +350,7 @@ export function makeUploadRouter(
         });
 
         const converter = epubConverter(mimetype, device, conversionOptions);
-        if (converter && !(await fitsConversionLimits(req.file.path))) {
+        if (converter && !(await fitsConversionLimits(req.file.path, converter))) {
           logger.warn(
             { key, tool: converter, size: req.file.size },
             'Upload rejected: EPUB too large to convert'

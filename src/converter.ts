@@ -2,6 +2,8 @@ import fs from 'fs/promises';
 import { spawn } from 'child_process';
 import { basename, dirname, extname, join } from 'path';
 import { logger } from './logger.js';
+import { MAX_KINDLE_UNPACKED_BYTES } from './config.js';
+import { readZipEntries } from './utils.js';
 
 /** KindleGen is much slower than the other converters, so it gets its own cap. */
 const KINDLEGEN_TIMEOUT_MS = 100_000;
@@ -159,63 +161,11 @@ export const KINDLING_WORK_DIR_PREFIX = '.kindling-';
 
 // A real book needs at most about 220 MB; the cap makes a hostile one fail in seconds.
 const KINDLING_MEMORY_LIMIT_BYTES = 384 * 1024 * 1024;
-// kindling unpacks the whole book to disk and won't write past the sizes the zip declares.
-const KINDLING_MAX_UNPACKED_BYTES = 256 * 1024 * 1024;
 
-/** Sums the uncompressed sizes in a zip's central directory, which is at its end. */
+/** Sums the uncompressed sizes the zip's central directory declares. */
 async function declaredUnpackedSize(zipPath: string): Promise<number> {
-  const file = await fs.open(zipPath, 'r');
-  try {
-    const { size } = await file.stat();
-    const read = async (position: number, length: number): Promise<Buffer> => {
-      const buf = Buffer.alloc(length);
-      await file.read(buf, 0, length, position);
-      return buf;
-    };
-    // The end record is 22 bytes plus a comment of up to 64 KB, after the zip64 locator.
-    const tailStart = Math.max(0, size - 22 - 0xffff - 20);
-    const tail = await read(tailStart, size - tailStart);
-    const end = tail.lastIndexOf(Buffer.from('PK\x05\x06', 'latin1'));
-    if (end < 0) {
-      throw new Error('Not a zip archive');
-    }
-    let entries = tail.readUInt16LE(end + 10);
-    let dirLength = tail.readUInt32LE(end + 12);
-    let dirStart = tail.readUInt32LE(end + 16);
-    if (end >= 20 && tail.readUInt32LE(end - 20) === 0x07064b50) {
-      const end64 = await read(Number(tail.readBigUInt64LE(end - 12)), 56);
-      entries = Number(end64.readBigUInt64LE(32));
-      dirLength = Number(end64.readBigUInt64LE(40));
-      dirStart = Number(end64.readBigUInt64LE(48));
-    }
-    // These come from the upload, so they must not decide how much the server allocates.
-    if (dirStart + dirLength > size) {
-      throw new Error('Corrupt zip central directory');
-    }
-    const dir = await read(dirStart, dirLength);
-    let total = 0;
-    for (let i = 0, at = 0; i < entries; i++) {
-      if (dir.readUInt32LE(at) !== 0x02014b50) {
-        throw new Error('Corrupt zip central directory');
-      }
-      const nameLength = dir.readUInt16LE(at + 28);
-      const extraLength = dir.readUInt16LE(at + 30);
-      let entrySize = dir.readUInt32LE(at + 24);
-      if (entrySize === 0xffffffff) {
-        // The zip64 extra field leads with the real size when the 32-bit field can't hold it.
-        let extra = at + 46 + nameLength;
-        while (dir.readUInt16LE(extra) !== 0x0001) {
-          extra += 4 + dir.readUInt16LE(extra + 2);
-        }
-        entrySize = Number(dir.readBigUInt64LE(extra + 4));
-      }
-      total += entrySize;
-      at += 46 + nameLength + extraLength + dir.readUInt16LE(at + 32);
-    }
-    return total;
-  } finally {
-    await file.close();
-  }
+  const entries = await readZipEntries(zipPath);
+  return entries.reduce((sum, e) => sum + e.uncompressedSize, 0);
 }
 
 /**
@@ -229,7 +179,7 @@ export async function convertWithKindling(inputPath: string): Promise<string> {
   let workDir: string | undefined;
   let moved = false;
   try {
-    if ((await declaredUnpackedSize(inputPath)) > KINDLING_MAX_UNPACKED_BYTES) {
+    if ((await declaredUnpackedSize(inputPath)) > MAX_KINDLE_UNPACKED_BYTES) {
       throw new ConversionError(
         'EPUB declares more than the unpacked size limit',
         'This EPUB is too large to convert for Kindle.'
