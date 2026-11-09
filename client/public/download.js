@@ -1,5 +1,5 @@
-// NOTE: this file runs on old e-reader browsers (as old as Kobo WebKit 538.1), so it
-// must be plain ES5: `var` only, no `let` or `const`.
+// Runs on e-reader browsers as old as Kobo WebKit 538.1, so it must be plain ES5:
+// `var` only, no `let` or `const`.
 /* eslint-disable no-var */
 var POLL_INTERVAL_MS = 5000;
 var currentKey = null;
@@ -22,26 +22,22 @@ var uploadUrl = window.location.origin + '/';
 pageUrlLink.href = uploadUrl;
 pageUrlLink.textContent = uploadUrl;
 
-/** Updates the connection status indicator dot and label. */
 function setStatus(state, label) {
   statusDot.className =
     'dot' + (state === 'active' ? ' dot-active' : state === 'waiting' ? ' dot-waiting' : ' hidden');
   statusLabel.textContent = label;
 }
 
-/** Displays an error banner with the given message. */
 function showError(msg) {
   errorMsg.textContent = msg;
   errorMsg.classList.remove('hidden');
 }
 
-/** Hides the error banner. */
 function hideError() {
   errorMsg.classList.add('hidden');
   errorMsg.textContent = '';
 }
 
-/** Cancels the active polling interval. */
 function stopPolling() {
   if (pollTimer !== null) {
     clearInterval(pollTimer);
@@ -49,7 +45,6 @@ function stopPolling() {
   }
 }
 
-/** Closes the active SSE connection. */
 function stopSSE() {
   if (currentSSE !== null) {
     currentSSE.close();
@@ -57,7 +52,6 @@ function stopSSE() {
   }
 }
 
-/** Handles a parsed status payload from either SSE or poll. */
 function handleStatusPayload(data) {
   hideError();
   var files = data.files || [];
@@ -75,12 +69,10 @@ function handleStatusPayload(data) {
   renderDownloads(files, urls);
 }
 
-/** Opens an SSE connection for the given key; falls back to polling if SSE is unsupported or errors. */
 function startSSE(key) {
   stopSSE();
 
   if (typeof EventSource === 'undefined') {
-    // SSE not supported — start polling immediately
     poll();
     pollTimer = setInterval(poll, POLL_INTERVAL_MS);
     return;
@@ -118,7 +110,6 @@ function startSSE(key) {
 
   es.onerror = function () {
     stopSSE();
-    // Fall back to polling if the SSE connection drops
     if (currentKey) {
       poll();
       pollTimer = setInterval(poll, POLL_INTERVAL_MS);
@@ -126,7 +117,6 @@ function startSSE(key) {
   };
 }
 
-/** Renders the download card with links for all staged files and any URLs, or hides it if empty. */
 function renderDownloads(files, urls) {
   var hasFiles = files && files.length > 0;
   var hasUrls = urls && urls.length > 0;
@@ -168,7 +158,7 @@ function renderDownloads(files, urls) {
       a.appendChild(span);
       row.appendChild(a);
 
-      // Delete button — IIFE captures entry and file.name for the async click handler
+      // In ES5 the click handler needs this IIFE to capture this iteration's values.
       (function (entryEl, fileName) {
         var btn = document.createElement('button');
         btn.className = 'btn-delete';
@@ -259,7 +249,6 @@ function renderDownloads(files, urls) {
   downloadCard.classList.remove('hidden');
 }
 
-/** Polls the status endpoint once and updates the UI based on the response. */
 function poll() {
   if (!currentKey) {
     return;
@@ -298,7 +287,6 @@ function poll() {
   xhr.send();
 }
 
-/** Requests a new session key from the server and begins SSE. */
 function requestKey() {
   stopPolling();
   stopSSE();
@@ -347,7 +335,6 @@ function requestKey() {
   xhr.send();
 }
 
-/** Shows the QR code image for the given key. */
 function updateQR(key) {
   if (!qrImg || !qrFigure) {
     return;
@@ -360,7 +347,6 @@ function updateQR(key) {
   }
 }
 
-/** Hides the QR code and divider. */
 function hideQR() {
   if (qrFigure) {
     qrFigure.style.visibility = 'hidden';

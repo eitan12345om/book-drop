@@ -78,7 +78,6 @@ export function sanitiseFilename(
   return filename;
 }
 
-/** Predicts the display filename after conversion without running it (pure function). */
 function predictConvertedFilename(
   sanitised: string,
   mimetype: string,
@@ -94,7 +93,6 @@ function predictConvertedFilename(
   return sanitised;
 }
 
-/** Returns name unchanged, or appends (2), (3), … until unique among existingNames. */
 function uniqueFilename(name: string, existingNames: string[]): string {
   if (!existingNames.includes(name)) {
     return name;
@@ -199,8 +197,7 @@ export function makeUploadRouter(
   router.post('/upload', requireXhr, uploadLimiter, (req, res) => {
     upload.single('file')(req, res, async (err) => {
       if (err) {
-        // LIMIT_FILE_SIZE leaves a partial file on disk; clean it up before responding.
-        // fileFilter errors set req.file to undefined (no disk write), so this is a no-op there.
+        // LIMIT_FILE_SIZE leaves a partial file on disk.
         if (req.file) {
           deleteFile(req.file.path);
         }

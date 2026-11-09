@@ -1,8 +1,6 @@
 @use 'tokens' as t;
 @use 'mixins' as m;
 
-// ─── Fields ───────────────────────────────────────────────────────────────────
-
 .field-label {
   display: block;
   font-size: t.$font-base;
@@ -15,8 +13,6 @@
   @include m.theme-prop(color, 'text-muted');
   margin: 0.3rem 0 0;
 }
-
-// ─── Key input ────────────────────────────────────────────────────────────────
 
 .key-input {
   font-family: t.$font-mono;
@@ -37,8 +33,6 @@
   @include m.input-focus;
 }
 
-// ─── URL input ────────────────────────────────────────────────────────────────
-
 .url-input {
   width: 100%;
   padding: 0.6rem 0.85rem;
@@ -53,8 +47,6 @@
     box-shadow t.$duration;
   @include m.input-focus;
 }
-
-// ─── Drop zone ────────────────────────────────────────────────────────────────
 
 .zone {
   @include m.theme-border('border', 2px, dashed);
@@ -156,14 +148,11 @@
   margin-top: 0.65rem;
 }
 
-// ─── Options ──────────────────────────────────────────────────────────────────
-
-// Fallback for browsers without grid (e.g. old Kobo): items stack as blocks with margin
+// Fallback for browsers without grid (e.g. old Kobo).
 .options-grid > * + * {
   margin-top: 0.6rem;
 }
 
-// Modern browsers: 2-column grid; @supports resets the fallback margin
 @supports (display: grid) {
   .options-grid {
     display: grid;
@@ -255,8 +244,6 @@
   line-height: 1.4;
 }
 
-// ─── Submit button ────────────────────────────────────────────────────────────
-
 .btn-secondary {
   display: inline-block;
   padding: 0.35rem 0.9rem;
@@ -304,8 +291,6 @@
   }
 }
 
-// ─── Status message ───────────────────────────────────────────────────────────
-
 @keyframes ellipsis {
   0% {
     content: '';
@@ -352,8 +337,6 @@
     animation: ellipsis 1.2s step-end infinite;
   }
 }
-
-// ─── File queue ───────────────────────────────────────────────────────────────
 
 .file-queue {
   list-style: none;
@@ -425,8 +408,6 @@
   }
 }
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
-
 .progress-wrap {
   height: 4px;
   @include m.theme-prop(background, 'border');
@@ -436,15 +417,12 @@
 
   .progress-fill {
     height: 100%;
-    // --progress is set dynamically by JS; 0% is the initial fallback
     width: var(--progress, 0%);
     @include m.theme-prop(background, 'accent');
     border-radius: 2px;
     transition: width 0.2s ease;
   }
 }
-
-// ─── Recently sent history ────────────────────────────────────────────────────
 
 details#history {
   &.card {
@@ -536,8 +514,6 @@ details#history {
   white-space: nowrap;
 }
 
-// ─── Toast notifications ───────────────────────────────────────────────────────
-
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -588,8 +564,6 @@ details#history {
     toast-out 0.3s ease 2.7s forwards;
 }
 
-// ─── How it works modal ──────────────────────────────────────────────────────
-
 @keyframes howto-in {
   from {
     opacity: 0;
@@ -602,7 +576,6 @@ details#history {
 }
 
 .howto-dialog {
-  // Reset native <dialog> chrome
   padding: 0;
   border: none;
   background: transparent;
@@ -639,7 +612,7 @@ details#history {
   font-size: t.$font-lg;
   font-weight: 600;
   margin: 0 0 0.9rem;
-  padding-right: 2rem; // leave room for close button
+  padding-right: 2rem;
   @include m.theme-prop(color, 'text');
 }
 

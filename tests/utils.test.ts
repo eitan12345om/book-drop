@@ -22,9 +22,6 @@ import {
   hasZipEndRecord,
 } from '../src/utils.js';
 
-// ── EPUB metadata helpers ────────────────────────────────────────────────────
-
-/** Builds a minimal valid EPUB ZIP at a temp path with the given DC metadata fields. */
 async function makeTempEpub(metadata: Record<string, string>): Promise<string> {
   const dcElements = Object.entries(metadata)
     .map(([k, v]) => `    <dc:${k}>${v}</dc:${k}>`)
@@ -360,7 +357,6 @@ describe('doTransliterate', () => {
   it('replaces non-ASCII characters in the stem while preserving the extension', () => {
     const result = doTransliterate('Ünïcödé-title.epub');
     assert.ok(result.endsWith('.epub'), `Expected .epub extension, got: ${result}`);
-    // Only ASCII characters should remain after transliteration
     assert.strictEqual(/[^\u0021-\u007E\s.]/u.test(result), false);
   });
 
@@ -410,8 +406,6 @@ describe('deleteFile', () => {
     unlinkMock.mock.restore();
   });
 });
-
-// ── extractSharedUrl (Web Share Target) ──────────────────────────────────────
 
 describe('extractSharedUrl', () => {
   it('returns a valid url from the dedicated url field', () => {

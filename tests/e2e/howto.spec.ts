@@ -12,7 +12,6 @@ test('first visit auto-opens the how-it-works modal', async ({ page }) => {
 test('does not auto-open on subsequent visits', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#howto-dialog')).toHaveAttribute('open', '');
-  // Close via Escape
   await page.keyboard.press('Escape');
   await expect(page.locator('#howto-dialog')).not.toHaveAttribute('open', '');
 
@@ -52,7 +51,6 @@ test('close (x) button closes the modal', async ({ page }) => {
 
 test('does not auto-open when ?key= is in the URL', async ({ page }) => {
   await page.goto('/?key=ABCD');
-  // Give the script time to evaluate
   await expect(page.locator('#keyinput')).toHaveValue('ABCD');
   await expect(page.locator('#howto-dialog')).not.toHaveAttribute('open', '');
 });

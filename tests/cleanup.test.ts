@@ -32,9 +32,8 @@ function makeFileInfo(overrides: Partial<FileInfo> = {}): FileInfo {
   };
 }
 
-const MAX_AGE = 60_000; // 1 minute
+const MAX_AGE = 60_000;
 
-// now far enough in the future that any just-created file is "expired"
 function expiredNow() {
   return Date.now() + MAX_AGE + 1;
 }
@@ -89,7 +88,6 @@ describe('cleanExpiredUploads', () => {
     await fsp.writeFile(filePath, 'data');
     const keys = new Map<string, KeyInfo>();
 
-    // now = Date.now() → file was just created, age ≈ 0
     await cleanExpiredUploads(tmpDir, keys, MAX_AGE, Date.now());
 
     await assert.doesNotReject(fsp.access(filePath));
@@ -135,10 +133,6 @@ describe('cleanExpiredUploads', () => {
     await fsp.writeFile(freshFile, 'data');
     const keys = new Map<string, KeyInfo>();
 
-    // Run once far in the future (both files expire), then run again at "now"
-    // Better: create fresh file after the expiry check uses birthtimeMs,
-    // so we split into two separate checks via two separate calls.
-    // Simplest: just run at Date.now() — neither file is expired.
     await cleanExpiredUploads(tmpDir, keys, MAX_AGE, Date.now());
 
     await assert.doesNotReject(fsp.access(expiredFile));
@@ -146,10 +140,8 @@ describe('cleanExpiredUploads', () => {
   });
 
   it('falls back to filename timestamp when birthtimeMs is 0', async () => {
-    // Can't force birthtimeMs to 0 on real filesystems, so test that a file
-    // with a parseable filename timestamp is NOT deleted when the timestamp says it's fresh.
-    // The filename timestamp path is exercised on NFS/legacy kernels; here we verify
-    // the logic doesn't crash and doesn't spuriously delete.
+    // birthtimeMs can't be forced to 0 on real filesystems, so this only checks that
+    // a fresh filename timestamp doesn't cause a spurious delete.
     const filePath = path.join(tmpDir, `file-${Date.now()}-fresh.epub`);
     await fsp.writeFile(filePath, 'data');
     const keys = new Map<string, KeyInfo>();
@@ -167,15 +159,11 @@ describe('cleanExpiredUploads', () => {
     await assert.doesNotReject(cleanExpiredUploads(tmpDir, keys, MAX_AGE, expiredNow()));
   });
 
-  it('does not delete file with no parseable timestamp (name-only, treated as unknown age)', async () => {
-    // A file without the expected naming pattern falls back to birthtimeMs (which is
-    // recent), so it won't be deleted even with an expiredNow.
-    // This confirms oddly named files aren't spuriously removed.
+  it('falls back to birthtimeMs for a file with no parseable filename timestamp', async () => {
     const filePath = path.join(tmpDir, 'mystery-file.epub');
     await fsp.writeFile(filePath, 'data');
     const keys = new Map<string, KeyInfo>();
 
-    // File just created, birthtimeMs is recent → age < MAX_AGE
     await cleanExpiredUploads(tmpDir, keys, MAX_AGE, Date.now());
 
     await assert.doesNotReject(fsp.access(filePath));

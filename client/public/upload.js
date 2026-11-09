@@ -51,7 +51,6 @@ const progressFill = document.getElementById('progress-fill');
 const pageUrlLink = document.getElementById('page-url');
 const optionsNote = document.getElementById('options-note');
 
-/** Per-file upload limit in bytes, carried in a meta tag because it is a server-side setting; 0 if absent. */
 const MAX_FILE_SIZE =
   parseInt(document.querySelector('meta[name="max-file-size"]')?.content, 10) || 0;
 
@@ -118,13 +117,11 @@ const OPTIONS = [
 const BUG_REPORT_URL = 'https://github.com/eitan12345om/book-drop/issues/new';
 const appVersion = document.getElementById('app-version')?.textContent ?? 'unknown';
 
-/** Device type of the key in the key field, from /device/:key; null until known. */
 let detectedDevice = null;
 
 const MUTUALLY_EXCLUSIVE = ['kepubify', 'kindlegen'];
 const OPTIONS_STORAGE_KEY = 'bookdrop-options';
 
-/** Renders the conversion option checkboxes into the options grid. */
 function buildOptionsGrid() {
   const optionsGrid = document.getElementById('options-grid');
   OPTIONS.forEach(({ id, name, label, tag, description, defaultChecked, enabledExtensions }) => {
@@ -168,13 +165,11 @@ function buildOptionsGrid() {
   });
 }
 
-/** Returns lowercased extension including the leading dot, or '' if none. */
 function getExtension(name) {
   const i = name.lastIndexOf('.');
   return i >= 0 && i < name.length - 1 ? name.slice(i).toLowerCase() : '';
 }
 
-/** Returns the shared extension across files (lowercased, with dot), or null if mixed/missing. */
 function commonExtension(files) {
   if (files.length === 0) {
     return null;
@@ -186,12 +181,6 @@ function commonExtension(files) {
   return files.every((f) => getExtension(f.name) === first) ? first : null;
 }
 
-/**
- * Enables or disables options based on the selected files.
- * Single file or multiple files of the same extension → options gated by that extension.
- * Multiple files with mixed extensions → all extension-restricted options disabled
- * (server skips inapplicable conversions per file, but disabling avoids silent no-ops).
- */
 function updateOptionAvailability(files) {
   const ext = commonExtension(files);
 
@@ -250,7 +239,6 @@ function updateOptionAvailability(files) {
   });
 }
 
-/** Wires mutual-exclusion behaviour so checking one format option unchecks the other. */
 function wireMutualExclusion() {
   MUTUALLY_EXCLUSIVE.forEach((id) => {
     document.getElementById(id).addEventListener('change', (e) => {
@@ -270,26 +258,23 @@ let currentUploadId = 0;
 // Bumped by every selection change, so a slower pending file check can't overwrite a newer one.
 let handleFilesId = 0;
 
-/** Returns a human-readable file size string. */
 function formatSize(bytes) {
   return bytes > 1024 * 1024
     ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
     : `${Math.ceil(bytes / 1024)} KB`;
 }
 
-/** Returns the upload limit as a round figure, e.g. "100 MB"; mirrors formatLimit() in src/utils.ts. */
+// Must match formatLimit() in src/utils.ts.
 function formatLimit(bytes) {
   return bytes >= 1024 * 1024
     ? `${+(bytes / (1024 * 1024)).toFixed(1)} MB`
     : `${Math.ceil(bytes / 1024)} KB`;
 }
 
-/** Enables the submit button when one or more files are selected or a URL is entered. */
 function updateSubmitState() {
   submitBtn.disabled = selectedFiles.length === 0 && !urlInput.value.trim();
 }
 
-/** Updates UI to reflect the currently selected files, or clears if empty. */
 function setFiles(files) {
   handleFilesId++;
   selectedFiles = files.slice();
@@ -350,7 +335,6 @@ function setFiles(files) {
   updateOptionAvailability(files);
 }
 
-/** Updates the status badge for file at index in the queue list. */
 function setFileQueueStatus(index, text, modifier) {
   const el = document.getElementById(`fq-status-${index}`);
   if (!el) {
@@ -360,20 +344,14 @@ function setFileQueueStatus(index, text, modifier) {
   el.className = `fq-status${modifier ? ` fq-${modifier}` : ''}`;
 }
 
-/** Hides remove buttons in the queue (during upload). */
 function lockFileQueue() {
   fileQueue.querySelectorAll('.fq-remove').forEach((btn) => btn.classList.add('hidden'));
 }
 
-/** Shows remove buttons in the queue (after upload fails). */
 function unlockFileQueue() {
   fileQueue.querySelectorAll('.fq-remove').forEach((btn) => btn.classList.remove('hidden'));
 }
 
-/**
- * Resets the form for a new upload without clearing the file queue.
- * Used after a successful multi-file upload so completed rows stay visible.
- */
 function resetFormAfterUpload() {
   handleFilesId++;
   selectedFiles = [];
@@ -390,7 +368,6 @@ const HISTORY_KEY = 'bookdrop-sent';
 const HISTORY_MAX = 5;
 const HISTORY_TTL_MS = 60 * 60 * 1000;
 
-/** Adds filenames from successful upload results to session history. */
 function addToHistory(results) {
   const existing = readHistory();
   const now = Date.now();
@@ -420,7 +397,6 @@ function readHistory() {
   }
 }
 
-/** Returns a short relative time string like "2 min ago" or "just now". */
 function relativeTime(sentAt) {
   const mins = Math.floor((Date.now() - sentAt) / 60_000);
   if (mins < 1) {
@@ -433,7 +409,6 @@ function relativeTime(sentAt) {
   return `${hrs} hr ago`;
 }
 
-/** Renders the recently-sent history section. */
 function renderHistory() {
   const entries = readHistory();
   if (entries.length === 0) {
@@ -459,10 +434,7 @@ function renderHistory() {
 const ZIP_END_RECORD_SIZE = 22;
 const ZIP_END_SEARCH_BYTES = ZIP_END_RECORD_SIZE + 0xffff;
 
-/**
- * Returns false only if an .epub file is readable and lacks a zip end record.
- * Unreadable files pass so the upload path can report its own, more specific error.
- */
+// Unreadable files pass so the upload path can report its own, more specific error.
 async function hasEpubEndRecord(file) {
   if (!file.name.toLowerCase().endsWith('.epub')) {
     return true;
@@ -501,10 +473,6 @@ const SIGNATURES = [
 ];
 const SIGNATURE_BYTES = 58;
 
-/**
- * Returns the file as is if its name has a supported extension. Otherwise, if its first bytes
- * show a supported format, returns a copy named with that format's extension added.
- */
 async function withDetectedExtension(file) {
   if (ACCEPTED_EXTENSIONS.includes(getExtension(file.name))) {
     return file;
@@ -529,7 +497,6 @@ async function withDetectedExtension(file) {
   });
 }
 
-/** Returns why a file can't be uploaded ('format', 'size', or 'epub'), or null if it can. */
 async function rejectionReason(file) {
   if (!ACCEPTED_EXTENSIONS.includes(getExtension(file.name))) {
     return 'format';
@@ -551,7 +518,6 @@ const ALLOWED_FORMATS_LINE = `Allowed: ${ACCEPTED_EXTENSIONS.join(', ')}`;
 const MISSING_EXTENSION_HINT =
   'If this is a book, its name may be missing its extension (such as .epub). Try choosing it from Files.';
 
-/** Builds one error message covering every file that couldn't be added. */
 function rejectionMessage(rejected) {
   if (rejected.length === 1) {
     const { file, reason } = rejected[0];
@@ -583,10 +549,6 @@ function rejectionMessage(rejected) {
   }
   return lines.join('\n');
 }
-/**
- * Stages every acceptable file from a FileList and reports the rest in one message.
- * If none are acceptable, the previous selection is kept.
- */
 async function handleFiles(files) {
   const id = ++handleFilesId;
   if (!files || files.length === 0) {
@@ -633,7 +595,6 @@ dropZone.addEventListener('drop', (e) => {
 fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 urlInput.addEventListener('input', updateSubmitState);
 
-/** Builds a brief success summary string suitable for a toast. */
 function buildSuccessToast(results) {
   const files = results.filter((r) => r.filename);
   const urlAdded = results.some((r) => !r.filename && r.url);
@@ -646,7 +607,6 @@ function buildSuccessToast(results) {
   return urlAdded ? `${sent}, URL added` : sent;
 }
 
-/** Shows a self-dismissing toast notification for 3 seconds. */
 function showToast(message) {
   const toast = document.createElement('div');
   toast.className = 'toast';
@@ -657,7 +617,6 @@ function showToast(message) {
   }, 2700);
 }
 
-/** Displays a status message of the given type ('info', 'success', or 'error'). */
 function showStatus(type, message) {
   statusMsg.textContent = message;
   statusMsg.className = `status-msg status-${type}`;
@@ -667,30 +626,16 @@ function showStatus(type, message) {
   }
 }
 
-/** Hides the status message. */
 function hideStatus() {
   statusMsg.classList.add('hidden');
 }
 
-/** Updates the progress bar visibility and fill percentage. */
 function setProgress(value, visible) {
   progressWrap.classList.toggle('hidden', !visible);
   progressWrap.setAttribute('aria-valuenow', value);
   progressFill.style.setProperty('--progress', `${value}%`);
 }
 
-/**
- * Wraps a single XHR upload attempt in a Promise.
- * Resolves with the XHR on load (caller checks xhr.status).
- * Rejects on network-level error.
- */
-/**
- * Turns the per-request upload results into a single human-friendly string.
- *
- * Single file:  "Sent to Kobo\n• book.epub"
- * Multi-file:   "3 files sent to Kobo\n• book1.epub\n• book2.epub — converted with Kepubify"
- * URL-only results ("URL added: …") are appended after the file summary.
- */
 function formatSuccessMessages(results) {
   const fileResults = results.filter((r) => r.filename);
   const urlResults = results.filter((r) => !r.filename && r.url);
@@ -732,7 +677,6 @@ function formatSuccessMessages(results) {
   return lines.join('\n');
 }
 
-/** Parses a JSON response body, or returns null if it isn't JSON. */
 function readJson(xhr) {
   try {
     return JSON.parse(xhr.responseText);
@@ -741,16 +685,12 @@ function readJson(xhr) {
   }
 }
 
-/** Returns the parsed result of a successful upload response. */
 function readResult(xhr) {
   return readJson(xhr) ?? {};
 }
 
-/**
- * Returns the error to show for a failed upload response. The server answers with JSON
- * ({ error }), but a proxy in front of it (e.g. Cloudflare rejecting an oversized body)
- * answers with an HTML page, which must not be shown verbatim.
- */
+// A proxy in front of the server (e.g. Cloudflare rejecting an oversized body) answers
+// with an HTML page, which must not be shown verbatim.
 function uploadErrorMessage(xhr, fallback) {
   const body = readJson(xhr);
   if (typeof body?.error === 'string') {
@@ -764,13 +704,9 @@ function uploadErrorMessage(xhr, fallback) {
   return `${fallback} (HTTP ${xhr.status}) Please try again in a moment.`;
 }
 
-/** Statuses that refuse only this file, so the rest of a multi-file upload can go ahead. */
 const FILE_SPECIFIC_STATUSES = new Set([413, 422, 500]);
 
-/**
- * Builds a link to a new GitHub bug report, prefilled with what the page knows about a failure.
- * Leaves out the filename, since book titles can be private.
- */
+// Leaves out the filename, since book titles can be private.
 function bugReportUrl({ file, message, ref }) {
   const options = OPTIONS.filter(({ id }) => document.getElementById(id).checked).map(
     ({ label }) => label
@@ -792,7 +728,6 @@ function bugReportUrl({ file, message, ref }) {
   return `${BUG_REPORT_URL}?${params}`;
 }
 
-/** Appends a failure's reference and a link to report it to the status message. */
 function appendReportLink(failure) {
   const link = document.createElement('a');
   link.href = bugReportUrl(failure);
@@ -802,7 +737,6 @@ function appendReportLink(failure) {
   statusMsg.append(`\nReference: ${failure.ref} \u00b7 `, link);
 }
 
-/** Builds one error message for the files in an upload that weren't sent. */
 function uploadFailureMessage(failures, unsent, total) {
   if (total === 1) {
     return failures[0].message;
@@ -838,10 +772,6 @@ function attemptUpload(formData, onProgress) {
   });
 }
 
-/**
- * Builds FormData for a single file upload.
- * Pass file=null for URL-only posts.
- */
 function buildFormData(key, urlVal, file) {
   const formData = new FormData();
   formData.set('key', key);
@@ -859,11 +789,7 @@ function buildFormData(key, urlVal, file) {
   return formData;
 }
 
-/**
- * Uploads a single file with one retry on network failure.
- * On Android, cloud-storage files can fail mid-stream; buffering first avoids that.
- * Throws with message 'read' if the file can't be read into memory.
- */
+// On Android, cloud-storage files can fail mid-stream; buffering into memory before the retry avoids that.
 async function uploadOneFile(key, urlVal, file, onProgress) {
   let xhr;
   try {
@@ -1101,7 +1027,6 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   }
 });
 
-/** Checks if a file was shared via the Web Share Target API and pre-populates the drop zone. */
 async function checkPendingShare() {
   if (!('caches' in window)) {
     return;
@@ -1119,7 +1044,6 @@ async function checkPendingShare() {
   await handleFiles([file]);
 }
 
-/** Saves current checkbox states to localStorage, skipping disabled checkboxes. */
 function saveOptions() {
   const state = {};
   OPTIONS.forEach(({ id }) => {
@@ -1133,7 +1057,6 @@ function saveOptions() {
   } catch {}
 }
 
-/** Returns saved option states from localStorage, or null if none. */
 function loadSavedOptions() {
   try {
     const raw = localStorage.getItem(OPTIONS_STORAGE_KEY);
@@ -1143,7 +1066,6 @@ function loadSavedOptions() {
   }
 }
 
-/** Applies a state object to checkboxes and updates defaultChecked so re-enables respect the preference. */
 function applyOptions(state) {
   OPTIONS.forEach(({ id }) => {
     if (id in state) {
@@ -1156,7 +1078,6 @@ function applyOptions(state) {
   });
 }
 
-/** Sets a conversion checkbox by id, triggering mutual-exclusion side-effects. */
 function setOption(id, checked) {
   const el = document.getElementById(id);
   if (el && el.checked !== checked) {
@@ -1165,7 +1086,6 @@ function setOption(id, checked) {
   }
 }
 
-/** Queries the device type for a key and autoselects the matching conversion option. */
 function lookupDevice(key) {
   fetch(`/device/${key}`)
     .then(function (r) {
@@ -1199,7 +1119,6 @@ document.getElementById('keyinput').addEventListener('input', function (e) {
 buildOptionsGrid();
 wireMutualExclusion();
 
-// Restore saved option preferences from localStorage, then wire change listeners to persist updates.
 (function () {
   const savedState = loadSavedOptions();
   if (savedState) {
@@ -1216,7 +1135,6 @@ wireMutualExclusion();
 checkPendingShare();
 renderHistory();
 
-// Pre-fill key from ?key= URL parameter (e.g. when arriving via QR code scan)
 (function () {
   const params = new URLSearchParams(location.search);
   const urlKey = params.get('key');
@@ -1234,9 +1152,7 @@ renderHistory();
   }
 })();
 
-// Pre-fill the URL field from ?shared_url= (Web Share Target — a link shared into BookDrop).
-// The server (or service worker) derives this from the share's url/text fields; the value is
-// re-validated server-side on upload, so we only need to drop it into the field here.
+// shared_url is untrusted; the server re-validates it on upload.
 (function () {
   const shared = new URLSearchParams(location.search).get('shared_url');
   if (!shared) {

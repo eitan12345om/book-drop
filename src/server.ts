@@ -26,8 +26,7 @@ async function main(): Promise<void> {
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 
-  // Handle Expect: 100-continue — send the interim response before Express
-  // reads the body, so large uploads aren't streamed before validation.
+  // Send 100 Continue before Express reads the body, so large uploads aren't streamed before validation.
   server.on('checkContinue', (req: http.IncomingMessage, res: http.ServerResponse) => {
     res.writeContinue();
     app(req as express.Request, res as express.Response, () => {});

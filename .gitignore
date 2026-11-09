@@ -1,46 +1,34 @@
-# Dependencies
 node_modules
 
-# Build output
 dist
 *.js.map
 
-# Compiled CSS and source maps — generated from client/scss/ by pnpm build:css / dev
 client/public/base.css
 client/public/upload.css
 client/public/download.css
 client/public/*.css.map
 
-# Environment — never commit real secrets
 .env
 .env.local
 .env.*.local
 
-# Uploaded files
 uploads
 
-# Test coverage
 coverage
 
-# Playwright
 playwright-report
 test-results
 
-# Test / build artifacts
 static
 
-# IDE
 .idea
 .vscode
 *.iml
 
-# macOS
 .DS_Store
 
-# Logs
 *.log
 logs
 
-# Temp
 .tmp
 docker-compose.override.yml

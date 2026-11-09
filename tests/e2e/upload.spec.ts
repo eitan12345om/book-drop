@@ -132,7 +132,6 @@ test('autoselects kepubify when key belongs to a Kobo device', async ({ page }) 
   const key = (await apiRes.json()).key as string;
 
   await page.goto('/');
-  // kepubify is checked by default; fill a non-Kobo key first to clear it, then fill the Kobo key
   await page.locator('#kindlegen').check();
   await expect(page.locator('#kepubify')).not.toBeChecked();
   await page.locator('#keyinput').fill(key);
@@ -220,7 +219,6 @@ test('uploads multiple files sequentially and both appear on download page', asy
 }) => {
   const koboUA = 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36';
 
-  // Open Kobo download page first so it generates its own key
   const koboCtx = await browser.newContext({
     userAgent: koboUA,
     baseURL: `http://localhost:${process.env.E2E_PORT ?? '3001'}`,
@@ -232,7 +230,6 @@ test('uploads multiple files sequentially and both appear on download page', asy
   });
   const key = (await koboPage.locator('#key-display').textContent())?.trim() as string;
 
-  // Upload two files to that key from the upload page
   const uploadCtx = await browser.newContext({
     baseURL: `http://localhost:${process.env.E2E_PORT ?? '3001'}`,
     storageState: SUPPRESS_HOWTO_STORAGE,
@@ -251,7 +248,6 @@ test('uploads multiple files sequentially and both appear on download page', asy
   });
   await uploadCtx.close();
 
-  // Both download links should appear on the Kobo page (via SSE/polling)
   await expect(koboPage.locator('#download-list a')).toHaveCount(2, { timeout: 10_000 });
   const names = await koboPage
     .locator('#download-list a')
@@ -359,7 +355,7 @@ test('removing a file re-evaluates option availability', async ({ page }) => {
     { name: 'doc.pdf', mimeType: 'application/pdf', buffer: Buffer.from('fake pdf') },
   ]);
   await expect(page.locator('#kepubify')).toBeDisabled();
-  // Remove the .pdf — queue order matches setInputFiles order, so pdf is index 1
+  // Queue order matches setInputFiles order, so the .pdf is index 1.
   await page.locator('#file-queue li[data-index="1"] .fq-remove').click();
   await expect(page.locator('#kepubify')).toBeEnabled();
   await expect(page.locator('#options-note')).toBeHidden();
@@ -423,9 +419,7 @@ test('shows animated processing state while server processes upload', async ({ p
     buffer: Buffer.from('hello ebook'),
   });
 
-  // Delay the server response so we can observe the intermediate processing state.
-  // route.fulfill() owns the full response, giving a window between upload completion
-  // and response delivery where is-processing should be visible.
+  // The delay opens a window between upload completion and response where is-processing is visible.
   await page.route('/upload', async (route) => {
     await new Promise((r) => setTimeout(r, 2_000));
     await route.fulfill({
@@ -454,11 +448,10 @@ test('re-enables submit button and shows actionable hint after a network-level u
     buffer: Buffer.from('hello ebook'),
   });
 
-  // Abort the upload at the network level to trigger the XHR error handler.
   await page.route('/upload', (route) => route.abort());
   await page.locator('#submit-btn').click();
 
-  // Allow extra time: the handler retries once (arrayBuffer + second XHR) before giving up
+  // Extra time: the handler retries once (arrayBuffer + second XHR) before giving up.
   await expect(page.locator('#status-msg')).toHaveClass(/status-error/, { timeout: 10_000 });
   await expect(page.locator('#submit-btn')).toBeEnabled();
 });
@@ -523,7 +516,6 @@ test('rejects a cut-off EPUB before uploading it', async ({ page }) => {
   expect(uploads).toBe(0);
 });
 
-// Some Android pickers hand the page a file whose name has lost its extension.
 test('delivers an EPUB whose name lost its extension under a .epub name', async ({ browser }) => {
   const baseURL = `http://localhost:${process.env.E2E_PORT ?? '3001'}`;
   const koboCtx = await browser.newContext({
@@ -885,7 +877,6 @@ test('remove button in queue removes file from selection', async ({ page }) => {
   await expect(page.locator('#file-queue li')).toHaveCount(2);
   await page.locator('#file-queue li').nth(0).locator('.fq-remove').click();
 
-  // After removing first file, single file remains — queue hides, zone shows filename
   await expect(page.locator('#file-queue')).toBeHidden();
   await expect(page.locator('#zone-file-name')).toHaveText('second.epub');
 });
@@ -921,7 +912,6 @@ test('updates file queue status during upload', async ({ browser }) => {
     ignoreCase: true,
   });
 
-  // After all uploads complete the queue stays visible showing ✓ done rows
   await expect(uploadPage.locator('#file-queue')).toBeVisible();
   await expect(uploadPage.locator('#file-queue .fq-status.fq-done')).toHaveCount(2);
 
@@ -964,7 +954,6 @@ test('history is capped at 5 entries', async ({ page }) => {
   await page.goto('/');
   await page.locator('#keyinput').fill(key);
 
-  // Seed 6 uploads via sessionStorage directly, then render
   await page.evaluate(() => {
     const entries = Array.from({ length: 6 }, (_, i) => ({
       name: `book${i + 1}.epub`,
@@ -1054,7 +1043,6 @@ test('history clears between browser sessions', async ({ browser }) => {
   await expect(page1.locator('#history')).toBeVisible({ timeout: 10_000 });
   await ctx1.close();
 
-  // New browser context = new sessionStorage
   const ctx2 = await browser.newContext({
     baseURL: `http://localhost:${process.env.E2E_PORT ?? '3001'}`,
     storageState: SUPPRESS_HOWTO_STORAGE,

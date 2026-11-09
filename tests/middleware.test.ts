@@ -27,7 +27,6 @@ function makeApp(middleware: express.RequestHandler) {
   return app;
 }
 
-// ---------------------------------------------------------------------------
 describe('makeRequireKey', () => {
   it('returns 400 for an invalid key format', async () => {
     const app = makeApp(makeRequireKey(new Map()));
@@ -53,7 +52,6 @@ describe('makeRequireKey', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('makeRequireMatchingAgent', () => {
   it('returns 400 for an invalid key format', async () => {
     const app = makeApp(makeRequireMatchingAgent(new Map()));
@@ -87,7 +85,6 @@ describe('makeRequireMatchingAgent', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('requireXhr', () => {
   function makeXhrApp() {
     const app = express();

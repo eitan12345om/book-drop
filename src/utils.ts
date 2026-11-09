@@ -10,7 +10,6 @@ import { GOOGLE_BOOKS_API_KEY } from './config.js';
 
 export const KEY_REGEX = /^[23456789ACDEFGHJKLMNPRSTUVWXYZ]{4}$/;
 
-/** Returns true if k is a valid 4-character session key. */
 export function isValidKey(k: string): boolean {
   return KEY_REGEX.test(k);
 }
@@ -53,7 +52,6 @@ const ZIP_END_RECORD_SIZE = 22;
 // The end record is followed by a comment of at most 65,535 bytes.
 const ZIP_END_SEARCH_BYTES = ZIP_END_RECORD_SIZE + 0xffff;
 
-/** Returns true if the file ends with a zip end-of-central-directory record, as every complete EPUB does. */
 export async function hasZipEndRecord(filePath: string): Promise<boolean> {
   const handle = await fsp.open(filePath, 'r');
   try {
@@ -70,7 +68,6 @@ export async function hasZipEndRecord(filePath: string): Promise<boolean> {
   }
 }
 
-/** Returns the user-facing error for a file that claims to be an EPUB but isn't a complete zip. */
 export function invalidEpubMessage(filename: string): string {
   return `\u201c${filename}\u201d isn\u2019t a valid EPUB file. It may be damaged or not fully downloaded. Try downloading it again.`;
 }
@@ -85,7 +82,6 @@ const EREADER_PATTERNS: ReadonlyArray<[Ereader, RegExp]> = [
   ['Tolino', /tolino/i],
 ];
 
-/** Returns the e-reader family a user-agent belongs to, or null if it isn't a recognised e-reader. */
 export function detectEreader(agent: string): Ereader | null {
   for (const [name, pattern] of EREADER_PATTERNS) {
     if (pattern.test(agent)) {
@@ -95,19 +91,16 @@ export function detectEreader(agent: string): Ereader | null {
   return null;
 }
 
-/** Returns true if the user-agent string looks like an e-reader browser. */
 export function isEreaderAgent(agent: string): boolean {
   return detectEreader(agent) !== null || agent.includes('eReader');
 }
 
-/** Returns a size limit as a round figure for display, e.g. "100 MB". */
 export function formatLimit(bytes: number): string {
   return bytes >= 1024 * 1024
     ? `${+(bytes / (1024 * 1024)).toFixed(1)} MB`
     : `${Math.ceil(bytes / 1024)} KB`;
 }
 
-/** Returns true if raw is a valid http or https URL. */
 export function isValidUrl(raw: string): boolean {
   try {
     const { protocol } = new URL(raw);
@@ -131,15 +124,9 @@ function trimTrailingPunctuation(s: string): string {
   return s.slice(0, end);
 }
 
-/**
- * Extracts a shareable http(s) URL from Web Share Target fields.
- * Prefers the dedicated `url` field; falls back to the first http(s) URL found in
- * `text` (many Android apps, including Chrome, put a shared link in `text`, not `url`).
- * Trailing punctuation is trimmed. Returns null when no valid, in-bounds URL is present.
- *
- * NOTE: A minimal copy of this logic lives in client/public/sw.js (a service worker
- * can't import from src/). Keep the two in sync — this is the canonical, tested one.
- */
+// Many Android apps, including Chrome, put a shared link in `text`, not `url`.
+// A copy of this logic lives in client/public/sw.js (a service worker can't import
+// from src/). Keep the two in sync; this one is canonical and tested.
 export function extractSharedUrl(fields: { url?: unknown; text?: unknown }): string | null {
   const url = typeof fields.url === 'string' ? fields.url.trim() : '';
   if (url && url.length <= MAX_SHARED_URL_LENGTH && isValidUrl(url)) {
@@ -156,17 +143,16 @@ export function extractSharedUrl(fields: { url?: unknown; text?: unknown }): str
   return null;
 }
 
-/** Returns the real client IP, preferring Cloudflare's CF-Connecting-IP header over req.ip. */
+// CF-Connecting-IP is client-controlled unless every request passes through Cloudflare;
+// exposed directly, any client can spoof it to bypass the per-IP rate limits.
 export function clientIp(req: express.Request): string {
   return (req.headers['cf-connecting-ip'] as string) ?? req.ip ?? 'unknown';
 }
 
-/** Returns a short ID that ties an error shown to a user to its log entry. */
 export function newErrorRef(): string {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
 }
 
-/** Schedules an async unlink of filePath, logging non-ENOENT errors. */
 export function deleteFile(filePath: string): void {
   fs.unlink(filePath, (err) => {
     if (err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -177,13 +163,11 @@ export function deleteFile(filePath: string): void {
 
 const DC_FIELDS = ['title', 'creator', 'publisher', 'date', 'description', 'subject'] as const;
 
-/** Extracts the text content of a single Dublin Core element from an OPF string. */
 function extractDcField(opf: string, field: string): string {
   const m = opf.match(new RegExp(`<dc:${field}[^>]*>([^<]*)<\\/dc:${field}>`, 'i'));
   return m ? m[1].trim() : '';
 }
 
-/** Replaces or inserts a Dublin Core element value in an OPF string. */
 function setDcField(opf: string, field: string, value: string): string {
   const escaped = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const pattern = new RegExp(`(<dc:${field}[^>]*>)[^<]*(<\\/dc:${field}>)`, 'i');
@@ -193,7 +177,6 @@ function setDcField(opf: string, field: string, value: string): string {
   return opf.replace(/(<\/metadata>)/i, `    <dc:${field}>${escaped}</dc:${field}>\n    $1`);
 }
 
-/** Reads the OPF path from META-INF/container.xml in a loaded JSZip. */
 async function getOpfPath(zip: JSZip): Promise<string> {
   const container = await zip.file('META-INF/container.xml')?.async('string');
   if (!container) {
@@ -206,7 +189,6 @@ async function getOpfPath(zip: JSZip): Promise<string> {
   return m[1];
 }
 
-/** Reads Dublin Core metadata fields from an EPUB file. */
 export async function readEpubMetadata(filePath: string): Promise<Record<string, string>> {
   const buf = await fsp.readFile(filePath);
   const zip = await JSZip.loadAsync(buf);
@@ -218,7 +200,6 @@ export async function readEpubMetadata(filePath: string): Promise<Record<string,
   return Object.fromEntries(DC_FIELDS.map((f) => [f, extractDcField(opf, f)]));
 }
 
-/** Patches Dublin Core metadata fields in an EPUB file in-place. */
 export async function writeEpubMetadata(
   filePath: string,
   metadata: Record<string, string>
@@ -238,7 +219,6 @@ export async function writeEpubMetadata(
   await fsp.writeFile(filePath, out);
 }
 
-/** Fetches book metadata from the Google Books API by title and/or author. Throws if no match. */
 export async function fetchGoogleBooksMetadata(
   title: string,
   author: string
@@ -291,7 +271,6 @@ export async function fetchGoogleBooksMetadata(
   return result;
 }
 
-/** Fetches metadata from Google Books and applies it to an EPUB, returning a diff of changes. */
 export async function updateEpubMetadata(filePath: string): Promise<MetadataDiff> {
   const before = await readEpubMetadata(filePath);
   const fetched = await fetchGoogleBooksMetadata(before.title ?? '', before.creator ?? '');
@@ -306,7 +285,6 @@ export async function updateEpubMetadata(filePath: string): Promise<MetadataDiff
   return diff;
 }
 
-/** Transliterates non-ASCII characters in the filename stem while preserving the extension. */
 export function doTransliterate(filename: string): string {
   const parts = filename.split('.');
   const ext = `.${parts.splice(-1).join('.')}`;
