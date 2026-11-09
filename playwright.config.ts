@@ -27,6 +27,7 @@ export default defineConfig({
       UPLOAD_DIR: '.tmp/bookdrop-e2e-uploads',
       MAX_KEYS_PER_IP: '50',
       RATE_LIMIT_MAX: '200',
+      UPLOAD_RATE_LIMIT_MAX: '200',
       DISABLE_HSTS: '1',
       PORT,
     },

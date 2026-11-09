@@ -697,6 +697,24 @@ describe('POST /upload', () => {
     assert.match(keys.get(key)!.files[0].name, /^[\x20-\x7e]+$/);
   });
 
+  it('stages an EPUB under the .epub name the upload page gave it', async () => {
+    const { app, keys, key } = await generateKey('Kobo/1.0 Test');
+    const epub = await new JSZip()
+      .file('mimetype', 'application/epub+zip')
+      .file('OEBPS/chapter.xhtml', '<p>x</p>')
+      .generateAsync({ type: 'nodebuffer' });
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', epub, {
+        filename: 'Example (example.sk).epub',
+        contentType: 'application/octet-stream',
+      });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(keys.get(key)!.files[0].name, 'Example (example.sk).epub');
+  });
+
   it('returns 422 for an EPUB whose download was cut off', async () => {
     const { app, key } = await generateKey();
     const zip = new JSZip()

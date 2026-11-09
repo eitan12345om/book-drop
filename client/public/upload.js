@@ -485,10 +485,53 @@ async function hasEpubEndRecord(file) {
   }
 }
 
+// An EPUB's first zip entry must be an uncompressed "mimetype" file with no extra header
+// field, so its name always starts at byte 30 and its content at byte 38.
+const SIGNATURES = [
+  {
+    ext: '.epub',
+    parts: [
+      [0, 'PK\x03\x04'],
+      [30, 'mimetypeapplication/epub+zip'],
+    ],
+  },
+  { ext: '.pdf', parts: [[0, '%PDF-']] },
+  { ext: '.png', parts: [[0, '\x89PNG\r\n\x1a\n']] },
+  { ext: '.jpg', parts: [[0, '\xff\xd8\xff']] },
+];
+const SIGNATURE_BYTES = 58;
+
+/**
+ * Returns the file as is if its name has a supported extension. Otherwise, if its first bytes
+ * show a supported format, returns a copy named with that format's extension added.
+ */
+async function withDetectedExtension(file) {
+  if (ACCEPTED_EXTENSIONS.includes(getExtension(file.name))) {
+    return file;
+  }
+  let bytes;
+  try {
+    bytes = new Uint8Array(await file.slice(0, SIGNATURE_BYTES).arrayBuffer());
+  } catch {
+    return file;
+  }
+  const match = SIGNATURES.find(({ parts }) =>
+    parts.every(([offset, text]) =>
+      Array.from(text).every((char, i) => bytes[offset + i] === char.charCodeAt(0))
+    )
+  );
+  if (!match) {
+    return file;
+  }
+  return new File([file], file.name + match.ext, {
+    type: file.type,
+    lastModified: file.lastModified,
+  });
+}
+
 /** Returns why a file can't be uploaded ('format', 'size', or 'epub'), or null if it can. */
 async function rejectionReason(file) {
-  const ext = `.${file.name.split('.').pop().toLowerCase()}`;
-  if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+  if (!ACCEPTED_EXTENSIONS.includes(getExtension(file.name))) {
     return 'format';
   }
   if (MAX_FILE_SIZE && file.size > MAX_FILE_SIZE) {
@@ -505,13 +548,15 @@ function sizeMessage(file) {
 }
 
 const ALLOWED_FORMATS_LINE = `Allowed: ${ACCEPTED_EXTENSIONS.join(', ')}`;
+const MISSING_EXTENSION_HINT =
+  'If this is a book, its name may be missing its extension (such as .epub). Try choosing it from Files.';
 
 /** Builds one error message covering every file that couldn't be added. */
 function rejectionMessage(rejected) {
   if (rejected.length === 1) {
     const { file, reason } = rejected[0];
     if (reason === 'format') {
-      return `Unsupported format: ${file.name}\n${ALLOWED_FORMATS_LINE}`;
+      return `Unsupported format: ${file.name}\n${ALLOWED_FORMATS_LINE}\n${MISSING_EXTENSION_HINT}`;
     }
     if (reason === 'size') {
       return sizeMessage(file);
@@ -529,7 +574,7 @@ function rejectionMessage(rejected) {
     }
   }
   if (rejected.some((r) => r.reason === 'format')) {
-    lines.push(ALLOWED_FORMATS_LINE);
+    lines.push(ALLOWED_FORMATS_LINE, MISSING_EXTENSION_HINT);
   }
   if (rejected.some((r) => r.reason === 'epub')) {
     lines.push(
@@ -548,7 +593,7 @@ async function handleFiles(files) {
     setFiles([]);
     return;
   }
-  const list = Array.from(files);
+  const list = await Promise.all(Array.from(files).map(withDetectedExtension));
   const reasons = await Promise.all(list.map(rejectionReason));
   if (id !== handleFilesId) {
     return;

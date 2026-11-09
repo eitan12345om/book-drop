@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { SUPPRESS_HOWTO_STORAGE } from '../../playwright.config';
-import { fakeEpub } from './fakeEpub';
+import { fakeEpub, realEpub } from './fakeEpub';
 
 test('shows upload page for desktop user-agent', async ({ page }) => {
   await page.goto('/');
@@ -523,6 +523,130 @@ test('rejects a cut-off EPUB before uploading it', async ({ page }) => {
   expect(uploads).toBe(0);
 });
 
+// Some Android pickers hand the page a file whose name has lost its extension.
+test('delivers an EPUB whose name lost its extension under a .epub name', async ({ browser }) => {
+  const baseURL = `http://localhost:${process.env.E2E_PORT ?? '3001'}`;
+  const koboCtx = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Linux; Kobo Touch 4.39) AppleWebKit/537.36',
+    baseURL,
+  });
+  const koboPage = await koboCtx.newPage();
+  await koboPage.goto('/');
+  await expect(koboPage.locator('#key-display')).not.toHaveText('\u2013\u2013\u2013\u2013', {
+    timeout: 5_000,
+  });
+  const key = (await koboPage.locator('#key-display').textContent())?.trim() as string;
+
+  const uploadCtx = await browser.newContext({ baseURL, storageState: SUPPRESS_HOWTO_STORAGE });
+  const uploadPage = await uploadCtx.newPage();
+  await uploadPage.goto('/');
+  await uploadPage.locator('#keyinput').fill(key);
+  await expect(uploadPage.locator('#kepubify')).toBeChecked({ timeout: 5_000 });
+  await uploadPage.locator('#kepubify').uncheck();
+  await uploadPage.locator('#file-input').setInputFiles({
+    name: 'Example (example.sk)',
+    mimeType: '',
+    buffer: await realEpub(),
+  });
+  await expect(uploadPage.locator('#zone-file-name')).toHaveText('Example (example.sk).epub');
+  await expect(uploadPage.locator('#status-msg')).not.toHaveClass(/status-error/);
+  await uploadPage.locator('#submit-btn').click();
+  await expect(uploadPage.locator('.toast')).toContainText('Sent to', { timeout: 10_000 });
+  await uploadCtx.close();
+
+  await expect(
+    koboPage.locator('#download-list a', { hasText: 'Example (example.sk).epub' })
+  ).toBeVisible({ timeout: 10_000 });
+  await koboCtx.close();
+});
+
+for (const { ext, bytes } of [
+  { ext: '.pdf', bytes: Buffer.from('%PDF-1.7\n%\u00e2\u00e3\n1 0 obj\n') },
+  { ext: '.png', bytes: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]) },
+  { ext: '.jpg', bytes: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46]) },
+]) {
+  test(`adds ${ext} to a ${ext.slice(1).toUpperCase()} whose name lost its extension`, async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page
+      .locator('#file-input')
+      .setInputFiles({ name: 'Scan 12', mimeType: '', buffer: bytes });
+    await expect(page.locator('#zone-file-name')).toHaveText(`Scan 12${ext}`);
+    await expect(page.locator('#status-msg')).not.toHaveClass(/status-error/);
+  });
+}
+
+test('offers EPUB options for an EPUB whose name lost its extension and sends the new name', async ({
+  page,
+}) => {
+  await page.route('/device/ABCD', (route) => route.fulfill({ json: { device: 'Kobo' } }));
+  let sentName = '';
+  await page.route('/upload', (route) => {
+    sentName = (route.request().postData() ?? '').match(/filename="([^"]+)"/)?.[1] ?? '';
+    return route.fulfill({
+      json: { device: 'Kobo', filename: sentName, conversionTool: null, url: null },
+    });
+  });
+
+  await page.goto('/');
+  await page.locator('#keyinput').fill('ABCD');
+  await expect(page.locator('#kepubify')).toBeChecked();
+  await page.locator('#file-input').setInputFiles({
+    name: 'Example (example.sk)',
+    mimeType: '',
+    buffer: await realEpub(),
+  });
+  await expect(page.locator('#kepubify')).toBeEnabled();
+  await expect(page.locator('#kindlegen')).toBeEnabled();
+  await expect(page.locator('#fetchmetadata')).toBeEnabled();
+  await page.locator('#submit-btn').click();
+
+  await expect(page.locator('.toast')).toContainText('Sent to Kobo');
+  expect(sentName).toBe('Example (example.sk).epub');
+});
+
+test('rejects a cut-off EPUB whose name lost its extension', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles({
+    name: 'Example (example.sk)',
+    mimeType: '',
+    buffer: (await realEpub()).subarray(0, 120),
+  });
+
+  await expect(page.locator('#status-msg')).toHaveClass(/status-error/);
+  await expect(page.locator('#status-msg')).toHaveText(
+    '“Example (example.sk).epub” isn’t a valid EPUB file. It may be damaged or not fully downloaded. Try downloading it again.'
+  );
+});
+
+test('keeps the name of a file that already has a supported extension', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles({
+    name: 'book.pdf',
+    mimeType: 'application/pdf',
+    buffer: await realEpub(),
+  });
+  await expect(page.locator('#zone-file-name')).toHaveText('book.pdf');
+});
+
+test('explains a missing extension when a file can’t be recognised', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-input').setInputFiles({
+    name: 'README',
+    mimeType: '',
+    buffer: Buffer.from('Just some notes.'),
+  });
+
+  await expect(page.locator('#status-msg')).toHaveClass(/status-error/);
+  await expect(page.locator('#status-msg')).toHaveText(
+    'Unsupported format: README\n' +
+      'Allowed: .epub, .mobi, .azw3, .pdf, .txt, .html, .cbz, .cbr, .png, .jpg, .jpeg\n' +
+      'If this is a book, its name may be missing its extension (such as .epub). Try choosing it from Files.'
+  );
+  await expect(page.locator('#submit-btn')).toBeDisabled();
+});
+
 test('lists every file left out of a selection in one message', async ({ page }) => {
   await page.goto('/');
   await page.locator('#file-input').setInputFiles([
@@ -538,6 +662,7 @@ test('lists every file left out of a selection in one message', async ({ page })
   await expect(status).toContainText('• “bad.epub” isn’t a valid EPUB file.');
   await expect(status).toContainText('• “song.mp3” is an unsupported format.');
   await expect(status).toContainText('Allowed: .epub');
+  await expect(status).toContainText('If this is a book, its name may be missing its extension');
   await expect(status).toContainText('Invalid EPUB files may be damaged or not fully downloaded.');
 });
 
