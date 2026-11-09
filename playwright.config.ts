@@ -22,7 +22,14 @@ export default defineConfig({
     storageState: SUPPRESS_HOWTO_STORAGE,
   },
   webServer: {
-    command: `cross-env UPLOAD_DIR=.tmp/bookdrop-e2e-uploads MAX_KEYS_PER_IP=50 RATE_LIMIT_MAX=200 DISABLE_HSTS=1 PORT=${PORT} tsx src/server.ts`,
+    command: 'tsx src/server.ts',
+    env: {
+      UPLOAD_DIR: '.tmp/bookdrop-e2e-uploads',
+      MAX_KEYS_PER_IP: '50',
+      RATE_LIMIT_MAX: '200',
+      DISABLE_HSTS: '1',
+      PORT,
+    },
     url: BASE_URL,
     reuseExistingServer: false,
   },
