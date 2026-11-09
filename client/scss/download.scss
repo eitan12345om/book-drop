@@ -2,8 +2,6 @@
 @use 'tokens' as t;
 @use 'mixins' as m;
 
-// ─── Key display ──────────────────────────────────────────────────────────────
-
 .key-wrap {
   @include m.flex;
   @include m.webkit(align-items, center);
@@ -20,8 +18,6 @@
   -webkit-user-select: all;
   user-select: all;
 }
-
-// ─── Refresh button ───────────────────────────────────────────────────────────
 
 .btn-icon {
   @include m.btn-icon-base;
@@ -42,8 +38,6 @@
     cursor: not-allowed;
   }
 }
-
-// ─── Status row ───────────────────────────────────────────────────────────────
 
 .status-row {
   @include m.flex;
@@ -97,14 +91,11 @@
   }
 }
 
-// ─── Download list ────────────────────────────────────────────────────────────
-
 .download-list {
   @include m.flex(column);
   @include m.flex-gap-col(0.5rem);
 }
 
-// Standalone item (URL links — no delete button)
 .download-item {
   @include m.flex;
   @include m.webkit(align-items, center);
@@ -136,14 +127,11 @@
   }
 }
 
-// ─── File entry (download link + delete button) ───────────────────────────────
-
 .download-entry {
   @include m.theme-border('border');
   border-radius: t.$radius-sm;
   overflow: hidden;
 
-  // Override standalone .download-item styles when inside .download-entry
   .download-item {
     @include m.webkit(flex, 1 1 0%);
     min-width: 0;
@@ -199,8 +187,6 @@
   }
 }
 
-// ─── Metadata diff ────────────────────────────────────────────────────────────
-
 .metadata-diff {
   padding: 0.6rem 1rem 0.75rem;
   @include m.theme-border('border', 1px, solid, 'top');
@@ -238,8 +224,6 @@
   word-break: break-word;
 }
 
-// ─── Key card two-column layout ───────────────────────────────────────────────
-
 .key-card-inner {
   @include m.flex;
   @include m.webkit(align-items, center);
@@ -249,8 +233,6 @@
 .key-card-right {
   min-width: 0;
 }
-
-// ─── QR code ──────────────────────────────────────────────────────────────────
 
 #qr-figure {
   @include m.webkit(flex-shrink, 0);
@@ -277,16 +259,12 @@
   @include m.webkit(align-self, center);
 }
 
-// ─── Error ────────────────────────────────────────────────────────────────────
-
 .error-msg {
   text-align: center;
   @include m.theme-prop(color, 'error-text');
   font-size: t.$font-base;
   margin: 0 0 1rem;
 }
-
-// ─── Responsive: stack key card vertically on small screens ───────────────────
 
 @include m.breakpoint('md') {
   .key-card-inner {

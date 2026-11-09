@@ -125,9 +125,9 @@ describe('expireKey', () => {
     const keys = new Map<string, KeyInfo>();
     keys.set('AAAA', makeKeyInfo());
     expireKey('AAAA', keys);
-    mock.timers.tick(EXPIRE_DELAY_MS - 5000); // advance but not expired
-    expireKey('AAAA', keys); // reset timer
-    mock.timers.tick(5000); // would have expired if not reset
+    mock.timers.tick(EXPIRE_DELAY_MS - 5000);
+    expireKey('AAAA', keys);
+    mock.timers.tick(5000);
     assert.ok(keys.has('AAAA'));
     mock.timers.tick(EXPIRE_DELAY_MS);
     assert.strictEqual(keys.has('AAAA'), false);

@@ -2,8 +2,6 @@
 @use 'tokens' as t;
 @use 'mixins' as m;
 
-// ─── Theme variable blocks ────────────────────────────────────────────────────
-
 :root {
   color-scheme: light;
   @include m.token-vars(t.$light);
@@ -21,20 +19,15 @@
   @include m.token-vars(t.$dark);
 }
 
-// E-reader: override accent to black (grayscale e-ink), hide toggle
 html.ereader {
   @include m.token-vars(t.$ereader);
 }
-
-// ─── Reset ────────────────────────────────────────────────────────────────────
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
-
-// ─── Base elements ────────────────────────────────────────────────────────────
 
 button {
   cursor: pointer;
@@ -68,15 +61,11 @@ a {
   }
 }
 
-// ─── Layout ───────────────────────────────────────────────────────────────────
-
 .wrapper {
   max-width: 640px;
   margin: 0 auto;
   padding: 2.5rem 1.25rem 5rem;
 }
-
-// ─── Page header ──────────────────────────────────────────────────────────────
 
 .page-header {
   position: relative;
@@ -105,8 +94,6 @@ a {
   }
 }
 
-// ─── Card ─────────────────────────────────────────────────────────────────────
-
 .card {
   @include m.theme-prop(background, 'surface');
   @include m.theme-border('border');
@@ -124,8 +111,6 @@ a {
   @include m.theme-prop(color, 'text-muted');
   margin: 0 0 1.1rem;
 }
-
-// ─── Theme toggle ─────────────────────────────────────────────────────────────
 
 .btn-theme {
   @include m.btn-icon-base;
@@ -154,8 +139,6 @@ a {
   }
 }
 
-// ─── Help button ──────────────────────────────────────────────────────────────
-
 .btn-help {
   @include m.btn-icon-base;
   @include m.theme-prop(color, 'text-muted');
@@ -169,36 +152,30 @@ a {
   }
 }
 
-// ─── E-reader overrides ───────────────────────────────────────────────────────
-
 html.ereader {
-  // Hide the theme toggle (useless on e-ink)
   .btn-theme {
     display: none;
   }
 
-  // Remove shadows (e-ink can't render depth); darken border for e-ink visibility
   .card {
     box-shadow: none;
     @include m.theme-prop(border-color, 'border', t.$ereader);
   }
 
-  // Muted text is too light on e-ink — use near-black for readability
   .instructions p {
     @include m.theme-prop(color, 'text-muted', t.$ereader);
   }
 
-  // Links: use black as fallback for browsers without CSS variable support
+  // Fallback for e-reader browsers without CSS variable support.
   a {
     @include m.theme-prop(color, 'accent', t.$ereader);
   }
 
-  // Touch navigation doesn't need focus rings — suppress them on e-ink
   a:focus-visible {
     outline: none;
   }
 
-  // Disable all animations — e-ink screens refresh slowly and animations cause flickering
+  // E-ink screens refresh slowly; animations cause flickering.
   *,
   *::before,
   *::after {
@@ -206,8 +183,6 @@ html.ereader {
     animation: none !important;
   }
 }
-
-// ─── Reduced motion ───────────────────────────────────────────────────────────
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -217,8 +192,6 @@ html.ereader {
     animation-duration: 0.01ms !important;
   }
 }
-
-// ─── Utilities ────────────────────────────────────────────────────────────────
 
 .hidden {
   display: none;
@@ -236,8 +209,6 @@ html.ereader {
   border: 0;
 }
 
-// ─── Instructions ─────────────────────────────────────────────────────────────
-
 .instructions {
   margin-top: 1rem;
 
@@ -252,8 +223,6 @@ html.ereader {
     }
   }
 }
-
-// ─── Footer ───────────────────────────────────────────────────────────────────
 
 .page-footer {
   @include m.flex(column);

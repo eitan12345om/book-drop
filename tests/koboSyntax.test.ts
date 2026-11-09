@@ -29,7 +29,7 @@ function attribute(attrs: string, name: string): string | undefined {
   return match ? (match[1] ?? match[2] ?? match[3]) : undefined;
 }
 
-/** External scripts a page loads, plus its inline scripts padded so line numbers match the HTML. */
+// Inline scripts are padded so reported line numbers match the HTML.
 function pageScripts(html: string, htmlName: string): { fileName: string; source: string }[] {
   const scripts: { fileName: string; source: string }[] = [];
   for (const match of html.matchAll(SCRIPT_TAG)) {

@@ -16,7 +16,6 @@ import {
 // spawn immediately emits ENOENT; if it is installed, it exits quickly with a non-zero
 // code (file not found). Either way the converter rejects and the test passes.
 
-/** Runs fn with an executable called name, made from script, first on PATH. */
 async function withFakeTool(name: string, script: string, fn: () => Promise<void>): Promise<void> {
   const fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), `fake-${name}-`));
   await fs.writeFile(path.join(fakeBinDir, name), script, { mode: 0o755 });
@@ -40,7 +39,6 @@ async function epubClaiming(chapterSize: number): Promise<Buffer> {
   return book;
 }
 
-/** Stages an upload the way the upload route names them, in a fresh directory. */
 async function stageUpload(
   name = 'file-1700000000000-abc.epub',
   book?: Buffer
@@ -57,7 +55,6 @@ describe('convertWithKindlegen', () => {
       () => convertWithKindlegen('/tmp/_book-drop_test.epub'),
       (err: Error) => {
         assert.ok(err instanceof Error);
-        // Error message is sanitized: always contains the tool name
         assert.ok(
           err.message.toLowerCase().includes('kindlegen'),
           `Expected 'kindlegen' in error: ${err.message}`

@@ -53,15 +53,12 @@ const connect = (app: Application) => {
   return supertest.agent(testServer).set(TEST_APP_HEADER, id);
 };
 
-// Pre-sets `X-Forwarded-Proto: https` so requests pass the HSTS gate.
-// Mirrors production, where a TLS-terminating proxy sets this header and
-// `app.set('trust proxy', 1)` makes `req.secure === true`.
+// Without this header every request fails the HSTS gate with a 400.
 const request = (app: Application) => connect(app).set('X-Forwarded-Proto', 'https');
 
 before(async () => {
   await new Promise<void>((resolve) => testServer.listen(0, '127.0.0.1', resolve));
   await fs.mkdir('uploads', { recursive: true });
-  // Create minimal stub HTML files so the route tests don't depend on a build
   await fs.mkdir(STATIC_DIR, { recursive: true });
   await fs.mkdir(VIEWS_DIR, { recursive: true });
   await fs.writeFile(
@@ -90,7 +87,6 @@ async function generateKey(agent = 'Mozilla/5.0 TestBrowser') {
   return { app, keys, key: res.body.key as string, status: res.status };
 }
 
-// ---------------------------------------------------------------------------
 describe('POST /generate', () => {
   it('returns 200 with a 4-character key', async () => {
     const { app } = createApp();
@@ -154,7 +150,6 @@ describe('POST /generate', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('GET /status/:key', () => {
   it('returns 404 for an unknown key', async () => {
     const { app } = createApp();
@@ -199,7 +194,6 @@ describe('GET /status/:key', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('DELETE /file/:key', () => {
   it('returns 400 for an unknown key', async () => {
     const { app } = createApp();
@@ -230,7 +224,6 @@ describe('DELETE /file/:key', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('DELETE /file/:key/:filename', () => {
   it('returns 404 for an unknown key', async () => {
     const { app } = createApp();
@@ -341,7 +334,6 @@ describe('DELETE /file/:key/:filename', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('POST /upload', () => {
   it('rejects an unknown key', async () => {
     const { app } = createApp();
@@ -431,7 +423,6 @@ describe('POST /upload', () => {
 
   it('accepts a PNG image (no conversion needed)', async () => {
     const { app, keys, key } = await generateKey();
-    // Minimal valid 1×1 PNG
     const png = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
       'base64'
@@ -448,7 +439,6 @@ describe('POST /upload', () => {
 
   it('accepts a JPEG image including the .jpeg extension', async () => {
     const { app, keys, key } = await generateKey();
-    // Minimal valid JPEG (1×1)
     const jpeg = Buffer.from(
       '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAn/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAGfAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAQUCf//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQMBAT8Bf//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQIBAT8Bf//Z',
       'base64'
@@ -537,7 +527,6 @@ describe('POST /upload', () => {
   it('returns 400 when pendingUploads already fills the slot (TOCTOU guard)', async () => {
     const { app, keys, key } = await generateKey();
     const info = keys.get(key)!;
-    // Simulate MAX_FILES_PER_KEY in-flight uploads with no committed files
     info.pendingUploads = MAX_FILES_PER_KEY;
     const res = await request(app)
       .post('/upload')
@@ -644,7 +633,6 @@ describe('POST /upload', () => {
 
   it('returns 500 with a generic message when conversion fails', async () => {
     // Relies on kepubify not being installed in the test environment.
-    // An EPUB uploaded with kepubify=true to a Kobo user agent triggers kepubify conversion.
     const { app, key } = await generateKey('Kobo/1.0 Test');
     const res = await request(app)
       .post('/upload')
@@ -745,7 +733,6 @@ describe('POST /upload', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('GET /', () => {
   it('serves the upload page for a regular browser', async () => {
     const { app } = createApp({ staticDir: STATIC_DIR, viewsDir: VIEWS_DIR });
@@ -797,7 +784,6 @@ describe('GET /receive', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('CSP / nonce injection', () => {
   it('sets Cache-Control: no-store on HTML responses', async () => {
     const { app } = createApp({ staticDir: STATIC_DIR, viewsDir: VIEWS_DIR });
@@ -813,11 +799,9 @@ describe('CSP / nonce injection', () => {
     const { app } = createApp({ staticDir: STATIC_DIR, viewsDir: VIEWS_DIR });
     const res = await request(app).get('/').set('User-Agent', 'Mozilla/5.0 Chrome/120');
     assert.strictEqual(res.status, 200);
-    // Extract nonce from HTML (nonce="<value>")
     const nonceMatch = res.text.match(/nonce="([^"]+)"/);
     assert.ok(nonceMatch, 'HTML should contain a nonce attribute');
     const nonce = nonceMatch[1];
-    // CSP header (report-only or enforced) should reference the same nonce
     const cspHeader =
       res.headers['content-security-policy-report-only'] ?? res.headers['content-security-policy'];
     assert.ok(cspHeader, 'CSP header must be present');
@@ -825,7 +809,6 @@ describe('CSP / nonce injection', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('POST /generate — per-IP limit', () => {
   it('returns 429 when MAX_KEYS_PER_IP is reached from the same IP', async () => {
     const { app } = createApp();
@@ -845,7 +828,6 @@ describe('POST /generate — per-IP limit', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('POST /generate — capacity', () => {
   it('returns 503 when MAX_ACTIVE_KEYS is reached', async () => {
     const { app, keys } = createApp();
@@ -871,7 +853,6 @@ describe('POST /generate — capacity', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('GET /:filename', () => {
   it('serves a staged file when key and filename match', async () => {
     const agent = 'TestBrowser/1.0';
@@ -1002,7 +983,6 @@ describe('GET /:filename', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('GET /:filename — download timer', () => {
   afterEach(() => {
     mock.timers.reset();
@@ -1060,7 +1040,6 @@ describe('GET /:filename — download timer', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('sanitiseFilename', () => {
   it('reduces Kindle filenames to ASCII, so downloads to Kindle keep their named attachment', () => {
     const name = sanitiseFilename('三体 – Liu Cixin.epub', {
@@ -1071,7 +1050,6 @@ describe('sanitiseFilename', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('POST /upload — disk limit', () => {
   it('returns 507 when disk usage is at the limit', async () => {
     const { app, key } = await generateKey();
@@ -1092,7 +1070,6 @@ describe('POST /upload — disk limit', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('POST /upload — unsupported file type', () => {
   it('returns 400 for a file with an unsupported extension', async () => {
     const { app, key } = await generateKey();
@@ -1108,10 +1085,7 @@ describe('POST /upload — unsupported file type', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('POST /upload — temp file cleanup on rejection', () => {
-  // Empty files are written to disk by multer (0-byte write), then rejected post-write.
-  // Verifies the deleteFile call keeps the uploads dir clean after a validation failure.
   it('removes the temp file when an empty file is rejected', async () => {
     const { app, key } = await generateKey();
     const filesBefore = await fs.readdir('uploads');
@@ -1122,7 +1096,6 @@ describe('POST /upload — temp file cleanup on rejection', () => {
       .field('key', key)
       .attach('file', Buffer.alloc(0), { filename: 'empty.txt', contentType: 'text/plain' });
 
-    // Give the async deleteFile callback a tick to complete
     await new Promise((resolve) => setImmediate(resolve));
 
     const filesAfter = await fs.readdir('uploads');
@@ -1134,13 +1107,10 @@ describe('POST /upload — temp file cleanup on rejection', () => {
     );
   });
 
-  // Verifies that a file written to disk during a successful upload passes through cleanly,
-  // and that the upload dir count matches after a sequence of accept + reject.
   it('does not accumulate temp files across a mix of accepted and rejected uploads', async () => {
     const { app, key } = await generateKey();
     const filesBefore = await fs.readdir('uploads');
 
-    // Accepted upload — file is kept (counted in info.files, not in uploads as orphan)
     await request(app)
       .post('/upload')
       .set('X-Requested-With', 'XMLHttpRequest')
@@ -1150,7 +1120,6 @@ describe('POST /upload — temp file cleanup on rejection', () => {
         contentType: 'text/plain',
       });
 
-    // Rejected upload (empty file) — temp file must be deleted
     await request(app)
       .post('/upload')
       .set('X-Requested-With', 'XMLHttpRequest')
@@ -1160,7 +1129,6 @@ describe('POST /upload — temp file cleanup on rejection', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const filesAfter = await fs.readdir('uploads');
-    // Only the accepted file should remain (filesBefore + 1)
     assert.strictEqual(
       filesAfter.length,
       filesBefore.length + 1,
@@ -1169,7 +1137,6 @@ describe('POST /upload — temp file cleanup on rejection', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('GET /device/:key', () => {
   it('returns unknown for an invalid key format', async () => {
     const { app } = createApp();
@@ -1221,7 +1188,6 @@ describe('GET /device/:key', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('malformed URLs', () => {
   it('returns 400 for invalid UTF-8 percent-encoding without stack trace', async () => {
     const { app } = createApp();
@@ -1230,7 +1196,6 @@ describe('malformed URLs', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('POST /generate — 503 body', () => {
   it('returns "Server busy" body when MAX_ACTIVE_KEYS is reached', async () => {
     const { app, keys } = createApp();
@@ -1257,7 +1222,6 @@ describe('POST /generate — 503 body', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('POST /upload — metadata failure feedback', () => {
   let originalFetch: typeof global.fetch;
 
@@ -1290,7 +1254,6 @@ describe('POST /upload — metadata failure feedback', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('POST /upload — metadata with Kindle conversion', () => {
   let originalFetch: typeof global.fetch;
   let originalPath: string | undefined;
@@ -1360,7 +1323,6 @@ describe('POST /upload — metadata with Kindle conversion', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('POST /upload — session ends while the upload is processed', () => {
   let originalFetch: typeof global.fetch;
 
@@ -1374,7 +1336,6 @@ describe('POST /upload — session ends while the upload is processed', () => {
 
   it('discards the file and leaves disk usage unchanged', async () => {
     const { app, keys, key } = await generateKey();
-    // The e-reader taps refresh (or the key hard-expires) while metadata is being fetched
     global.fetch = async () => {
       removeKey(key, keys);
       return Response.json({ items: [{ volumeInfo: { title: 'Fetched Title' } }] });
@@ -1412,13 +1373,11 @@ describe('POST /upload — session ends while the upload is processed', () => {
     assert.strictEqual(res.status, 410);
     assert.strictEqual(keys.has(key), false);
     assert.strictEqual(getDiskUsage(), diskBefore);
-    // deleteFile is fire-and-forget; give the unlink a moment to land
     await new Promise((resolve) => setTimeout(resolve, 50));
     assert.deepStrictEqual(await fs.readdir('uploads'), filesBefore);
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('CSRF — X-Requested-With header required on mutations', () => {
   it('POST /generate returns 403 without X-Requested-With header', async () => {
     const { app } = createApp();
@@ -1466,7 +1425,6 @@ describe('CSRF — X-Requested-With header required on mutations', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 describe('GET /events/:key', () => {
   const agent = 'Kobo/4.0 TestDevice';
   let app: ReturnType<typeof createApp>['app'];
@@ -1599,10 +1557,9 @@ describe('GET /events/:key', () => {
       }).then((res) => res.body!.getReader());
     try {
       const first = await open();
-      await first.read(); // initial snapshot
+      await first.read();
       const second = await open();
-      await second.read(); // initial snapshot
-      // The server ends the first stream when the second connects; wait for it to close.
+      await second.read();
       while (!(await first.read()).done) {
         // drain
       }

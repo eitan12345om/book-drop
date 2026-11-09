@@ -16,7 +16,6 @@ import { makeUploadRouter } from './routes/upload.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Creates and returns the Express application and the active keys map. */
 export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
   const STATIC_DIR = options?.staticDir ?? path.join(__dirname, '../client/public');
   const VIEWS_DIR = options?.viewsDir ?? path.join(__dirname, '../client/views');
@@ -116,11 +115,9 @@ export function createApp(options?: { staticDir?: string; viewsDir?: string }) {
   app.use(makeKeysRouter(keys, sseClients, notifySSE));
   app.use(makeUploadRouter(keys, notifySSE));
 
-  // Web Share Target. A service worker normally handles /share client-side; this is
-  // the fallback when it isn't yet controlling the page. Shared files can't be recovered
-  // here (no session), but a shared link can — extract it and hand it to the upload page.
-  // multer().none() parses the multipart text fields; a stray file field or an oversized
-  // field errors, which we treat as "no url" (req.body may hold fields parsed before the error).
+  // Fallback for Web Share Target when the service worker isn't controlling the page yet;
+  // shared files can't be recovered here (no session), only links. On a parse error,
+  // req.body may hold fields parsed before it, so it is ignored.
   const parseShare = multer({ limits: { fieldSize: 64 * 1024 } }).none();
   app.post('/share', (req, res) => {
     parseShare(req, res, (err?: unknown) => {

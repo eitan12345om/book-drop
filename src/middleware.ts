@@ -7,7 +7,6 @@ import { logger } from './logger.js';
 import type { KeyInfo } from './types.js';
 import { RATE_LIMIT_WINDOW_MS } from './config.js';
 
-/** Creates a rate limiter keyed by real client IP (CF-Connecting-IP → req.ip). */
 export function makeLimiter(
   max: number,
   extras?: Partial<Parameters<typeof rateLimit>[0]>
@@ -22,7 +21,6 @@ export function makeLimiter(
   });
 }
 
-/** Reads an HTML file from viewsDir, injects nonce and any extra placeholder replacements, sends with no-store cache headers. */
 export async function serveHtml(
   viewsDir: string,
   file: string,
@@ -49,7 +47,7 @@ export async function serveHtml(
   }
 }
 
-/** Rejects requests that lack the X-Requested-With: XMLHttpRequest header (CSRF protection). */
+// CSRF protection: cross-origin forms can't set this header.
 export const requireXhr: express.RequestHandler = (req, res, next) => {
   if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {
     res.status(403).json({ error: 'Forbidden.' });
@@ -58,7 +56,6 @@ export const requireXhr: express.RequestHandler = (req, res, next) => {
   next();
 };
 
-/** Returns a function that pushes the current key state as an SSE event to the connected client. */
 export function makeNotifySSE(sseClients: Map<string, express.Response>) {
   return function notifySSE(key: string, info: KeyInfo): void {
     const sse = sseClients.get(key);
@@ -76,11 +73,6 @@ export function makeNotifySSE(sseClients: Map<string, express.Response>) {
   };
 }
 
-/**
- * Middleware factory: validates the `:key` route param and looks it up in the keys map.
- * On success attaches `res.locals.key` (string) and `res.locals.keyInfo` (KeyInfo).
- * Sends 400 for invalid format, 404 for unknown key.
- */
 export function makeRequireKey(keys: Map<string, KeyInfo>): express.RequestHandler {
   return function requireKey(req, res, next) {
     const key = (req.params.key as string | undefined)?.toUpperCase() ?? '';
@@ -99,10 +91,6 @@ export function makeRequireKey(keys: Map<string, KeyInfo>): express.RequestHandl
   };
 }
 
-/**
- * Middleware factory: like requireKey, but also verifies the request user-agent matches
- * the one that registered the key. Sends 403 on mismatch.
- */
 export function makeRequireMatchingAgent(keys: Map<string, KeyInfo>): express.RequestHandler {
   return function requireMatchingAgent(req, res, next) {
     const key = (req.params.key as string | undefined)?.toUpperCase() ?? '';

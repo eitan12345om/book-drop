@@ -1,4 +1,3 @@
-// Light mode color tokens
 $light: (
   'bg': #f5f4f1,
   'surface': #ffffff,
@@ -23,7 +22,6 @@ $light: (
   'error-text': #991b1b,
 );
 
-// Dark mode color tokens
 $dark: (
   'bg': #0c0a09,
   'surface': #1c1917,
@@ -49,7 +47,6 @@ $dark: (
   'error-text': #fca5a5,
 );
 
-// E-reader overrides (grayscale e-ink)
 $ereader: (
   'accent': #000000,
   'accent-hover': #333333,
@@ -65,26 +62,22 @@ $ereader: (
   'dot-waiting-glow': transparent,
 );
 
-// Static tokens — same across all themes, no CSS variable needed
 $radius-sm: 6px;
 $radius: 10px;
 $radius-lg: 14px;
 $shadow:
   0 1px 3px rgba(0, 0, 0, 0.07),
   0 1px 2px rgba(0, 0, 0, 0.04);
-$duration: 0.12s; // standard transition duration
+$duration: 0.12s;
 $font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
 
-// Font scale
-$font-xs: 0.72rem; // card titles, tags, badges
-$font-sm: 0.8rem; // hints, captions, secondary text
-$font-base: 0.875rem; // body text, field labels, buttons
-$font-lg: 1rem; // primary inputs, zone labels
-$font-xl: 1.6rem; // page heading (h1)
+$font-xs: 0.72rem;
+$font-sm: 0.8rem;
+$font-base: 0.875rem;
+$font-lg: 1rem;
+$font-xl: 1.6rem;
 
-// Responsive breakpoints
 $breakpoints: (
   'sm': 480px,
-  // options grid: 2-col → 1-col
-  'md': 600px, // key card: horizontal → vertical stack
+  'md': 600px,
 );

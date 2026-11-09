@@ -3,8 +3,6 @@ import { defineConfig } from '@playwright/test';
 const PORT = process.env.E2E_PORT ?? '3001';
 const BASE_URL = `http://localhost:${PORT}`;
 
-// Suppress the first-visit "How it works" modal by default in every test context;
-// individual specs that need the first-visit flow re-create a fresh context.
 export const SUPPRESS_HOWTO_STORAGE = {
   cookies: [],
   origins: [

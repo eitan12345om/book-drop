@@ -2,8 +2,8 @@ const SHARE_CACHE = 'bookdrop-share';
 const PENDING_KEY = '/pending-share';
 const MAX_SHARED_URL_LENGTH = 2048;
 
-// Minimal mirror of extractSharedUrl() in src/utils.ts — a service worker can't
-// import from src/, so keep the two in sync. The canonical, tested version is in src/.
+// Mirror of extractSharedUrl() in src/utils.ts (a service worker can't import from src/).
+// Keep the two in sync; the src/ version is canonical and tested.
 function extractSharedUrl(url, text) {
   const isHttp = (s) => {
     try {
@@ -57,7 +57,6 @@ self.addEventListener('fetch', (event) => {
         return Response.redirect('/', 303);
       }
 
-      // No file — this was a link/text share (e.g. an article shared from a browser).
       const shared = extractSharedUrl(formData.get('url'), formData.get('text'));
       return Response.redirect(shared ? `/?shared_url=${encodeURIComponent(shared)}` : '/', 303);
     })()

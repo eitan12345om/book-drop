@@ -26,7 +26,6 @@ export function getEffectiveDiskUsage(): number {
   return diskUsageBytes + pendingDiskBytes;
 }
 
-/** Cancels all download timers, unlinks all staged files, subtracts their sizes, and empties info.files. */
 export function clearFiles(info: KeyInfo): void {
   if (info.files.length > 1) {
     logger.warn({ count: info.files.length }, 'Clearing multiple staged files');
@@ -49,7 +48,6 @@ export function clearFiles(info: KeyInfo): void {
 export const KEY_CHARS = '23456789ACDEFGHJKLMNPRSTUVWXYZ';
 export const KEY_LENGTH = 4;
 
-/** Generates a random session key from KEY_CHARS. */
 export function randomKey(): string {
   return Array.from(
     { length: KEY_LENGTH },
@@ -57,7 +55,6 @@ export function randomKey(): string {
   ).join('');
 }
 
-/** Generates a key that does not collide with any existing key in the map, or returns null if too many attempts fail. */
 export function generateUniqueKey(keys: Map<string, KeyInfo>): string | null {
   let attempts = 0;
   let key: string;
@@ -70,7 +67,6 @@ export function generateUniqueKey(keys: Map<string, KeyInfo>): string | null {
   return key;
 }
 
-/** Removes a key from the map, cancels its timers, and deletes its staged files. */
 export function removeKey(key: string, keys: Map<string, KeyInfo>): void {
   const info = keys.get(key);
   if (!info) {
@@ -85,7 +81,6 @@ export function removeKey(key: string, keys: Map<string, KeyInfo>): void {
   logger.info({ key }, 'Key removed');
 }
 
-/** Resets the inactivity expiry timer for a key and updates its alive timestamp. */
 export function expireKey(key: string, keys: Map<string, KeyInfo>): void {
   const info = keys.get(key);
   if (!info) {

@@ -111,7 +111,7 @@ test.describe('Upload page (desktop)', () => {
       mimeType: 'application/epub+zip',
       buffer: fakeEpub(),
     });
-    await page.locator('#keyinput').fill('AB'); // invalid — not 4 chars
+    await page.locator('#keyinput').fill('AB');
     await page.locator('#submit-btn').click();
     await expect(page.locator('#status-msg')).toBeFocused();
     await expect(page.locator('#status-msg')).toContainText('4-character key');
@@ -120,7 +120,6 @@ test.describe('Upload page (desktop)', () => {
   test('heading hierarchy: one h1 and h2 for each card section', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toHaveCount(1);
-    // Device key, Ebook files, URL, Conversion options + "How it works" inside #howto-dialog
     await expect(page.locator('h2')).toHaveCount(5);
   });
 });
