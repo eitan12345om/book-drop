@@ -2,7 +2,6 @@ import fs from 'fs/promises';
 import { spawn } from 'child_process';
 import { basename, dirname, extname, join } from 'path';
 import { logger } from './logger.js';
-import { MAX_KINDLE_UNPACKED_BYTES } from './config.js';
 import { readZipEntries } from './utils.js';
 
 const KINDLEGEN_TIMEOUT_MS = 100_000;
@@ -156,6 +155,8 @@ export const KINDLING_WORK_DIR_PREFIX = '.kindling-';
 
 // A real book needs at most about 220 MB; the cap makes a hostile one fail in seconds.
 const KINDLING_MEMORY_LIMIT_BYTES = 384 * 1024 * 1024;
+// kindling unpacks the whole book to disk and won't write past the sizes the zip declares.
+export const KINDLING_MAX_UNPACKED_BYTES = 256 * 1024 * 1024;
 
 /** Sums the uncompressed sizes the zip's central directory declares. */
 async function declaredUnpackedSize(zipPath: string): Promise<number> {
@@ -170,7 +171,7 @@ export async function convertWithKindling(inputPath: string): Promise<string> {
   let workDir: string | undefined;
   let moved = false;
   try {
-    if ((await declaredUnpackedSize(inputPath)) > MAX_KINDLE_UNPACKED_BYTES) {
+    if ((await declaredUnpackedSize(inputPath)) > KINDLING_MAX_UNPACKED_BYTES) {
       throw new ConversionError(
         'EPUB declares more than the unpacked size limit',
         'This EPUB is too large to convert for Kindle.'

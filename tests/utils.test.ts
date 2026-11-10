@@ -21,8 +21,8 @@ import {
   updateEpubMetadata,
   hasZipEndRecord,
   readZipEntries,
+  MAX_ZIP_INDEX_BYTES,
 } from '../src/utils.js';
-import { MAX_ZIP_INDEX_BYTES } from '../src/config.js';
 
 async function makeTempEpub(metadata: Record<string, string>): Promise<string> {
   const dcElements = Object.entries(metadata)

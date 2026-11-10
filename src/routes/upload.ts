@@ -17,6 +17,7 @@ import {
   convertWithKindling,
   convertWithKepubify,
   convertWithPdfCropMargins,
+  KINDLING_MAX_UNPACKED_BYTES,
 } from '../converter.js';
 import {
   KINDLE_CONVERTER,
@@ -26,9 +27,6 @@ import {
   MAX_URLS_PER_KEY,
   UPLOAD_DIR,
   UPLOAD_RATE_LIMIT_MAX,
-  MAX_CONVERT_ENTRIES,
-  MAX_CONVERT_UNCOMPRESSED_BYTES,
-  MAX_KINDLE_UNPACKED_BYTES,
 } from '../config.js';
 import { logger } from '../logger.js';
 import type { KeyInfo, MetadataDiff } from '../types.js';
@@ -129,6 +127,9 @@ function epubConverter(
   return null;
 }
 
+const MAX_CONVERT_ENTRIES = 10_000;
+const MAX_CONVERT_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
+
 async function fitsConversionLimits(
   filePath: string,
   conversion: EpubConversion
@@ -141,7 +142,7 @@ async function fitsConversionLimits(
   }
   const declared = entries.reduce((sum, e) => sum + e.uncompressedSize, 0);
   const maxDeclared =
-    conversion === 'Kindle' ? MAX_KINDLE_UNPACKED_BYTES : MAX_CONVERT_UNCOMPRESSED_BYTES;
+    conversion === 'Kindle' ? KINDLING_MAX_UNPACKED_BYTES : MAX_CONVERT_UNCOMPRESSED_BYTES;
   return entries.length <= MAX_CONVERT_ENTRIES && declared <= maxDeclared;
 }
 
