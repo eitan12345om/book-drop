@@ -57,7 +57,7 @@ const ZIP_DIR_HEADER_SIZE = 46;
 /** Value of a size, offset or count field whose real value is in a ZIP64 record. */
 const ZIP64_U16 = 0xffff;
 const ZIP64_U32 = 0xffffffff;
-// About 400 bytes for each of the 10,000 entries a convertible EPUB may have; a real EPUB's
+// About 400 bytes for each of the 10,000 entries a Kindle conversion allows; a real EPUB's
 // index needs about 120 per entry.
 export const MAX_ZIP_INDEX_BYTES = 4 * 1024 * 1024;
 

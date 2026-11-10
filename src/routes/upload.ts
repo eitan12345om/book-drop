@@ -127,7 +127,8 @@ function epubConverter(
   return null;
 }
 
-const MAX_CONVERT_ENTRIES = 10_000;
+// kepubify v5 streams the book, so only kindling needs a cap on the number of entries.
+const MAX_KINDLE_ENTRIES = 10_000;
 const MAX_CONVERT_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
 
 async function fitsConversionLimits(
@@ -141,9 +142,10 @@ async function fitsConversionLimits(
     return false;
   }
   const declared = entries.reduce((sum, e) => sum + e.uncompressedSize, 0);
-  const maxDeclared =
-    conversion === 'Kindle' ? KINDLING_MAX_UNPACKED_BYTES : MAX_CONVERT_UNCOMPRESSED_BYTES;
-  return entries.length <= MAX_CONVERT_ENTRIES && declared <= maxDeclared;
+  if (conversion === 'Kobo') {
+    return declared <= MAX_CONVERT_UNCOMPRESSED_BYTES;
+  }
+  return entries.length <= MAX_KINDLE_ENTRIES && declared <= KINDLING_MAX_UNPACKED_BYTES;
 }
 
 async function runConversion(

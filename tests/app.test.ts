@@ -1405,8 +1405,19 @@ describe('POST /upload — EPUBs too large to convert or read', () => {
     return { res, keys, key };
   }
 
-  it('refuses a Kobo conversion of an EPUB with too many entries', async () => {
-    const { res } = await upload(KOBO, await manyEntriesEpub(), { kepubify: 'true' });
+  it('refuses a Kindle conversion of an EPUB with too many entries, but not a Kobo one', async () => {
+    const epub = await manyEntriesEpub();
+    const kindle = await upload(KINDLE, epub, { kindlegen: '1' });
+    assert.strictEqual(kindle.res.status, 422);
+    assert.match(kindle.res.body.error, /book\.epub/);
+    assert.match(kindle.res.body.error, /Turn off \u201cKindle format\u201d/);
+
+    const kobo = await upload(KOBO, epub, { kepubify: 'true' });
+    assert.notStrictEqual(kobo.res.status, 422, 'a Kobo conversion has no entry limit');
+  });
+
+  it('refuses a Kobo conversion of an EPUB declaring more than 512 MiB', async () => {
+    const { res } = await upload(KOBO, await hugeDeclaredEpub(), { kepubify: 'true' });
     assert.strictEqual(res.status, 422);
     assert.match(res.body.error, /book\.epub/);
     assert.match(res.body.error, /Turn off \u201cKobo format\u201d/);
