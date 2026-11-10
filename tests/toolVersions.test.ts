@@ -53,6 +53,15 @@ describe('pinned-tool-versions script', () => {
     );
   });
 
+  it('finds kepubify installed from the module root, as v5 is laid out', async () => {
+    const dockerfile = path.join(tmpDir, 'Dockerfile');
+    await fsp.writeFile(dockerfile, 'RUN go install github.com/pgaskin/kepubify/v5@v5.6.7\n');
+    assert.deepStrictEqual(
+      (await pins(dockerfile)).map((p) => p.pinned),
+      ['5.6.7']
+    );
+  });
+
   it('fails, naming the tool, when a pin is missing', async () => {
     const dockerfile = path.join(tmpDir, 'Dockerfile');
     await fsp.writeFile(dockerfile, 'FROM node:26-slim\n');
