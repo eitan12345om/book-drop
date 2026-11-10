@@ -17,6 +17,7 @@ import {
   convertWithKindling,
   convertWithKepubify,
   convertWithPdfCropMargins,
+  KINDLING_MAX_UNPACKED_BYTES,
 } from '../converter.js';
 import {
   KINDLE_CONVERTER,
@@ -38,6 +39,7 @@ import {
   doTransliterate,
   updateEpubMetadata,
   hasZipEndRecord,
+  readZipEntries,
   invalidEpubMessage,
   detectEreader,
   newErrorRef,
@@ -78,16 +80,11 @@ export function sanitiseFilename(
   return filename;
 }
 
-function predictConvertedFilename(
-  sanitised: string,
-  mimetype: string,
-  device: Ereader | null,
-  options: { kindlegen: boolean; kepubify: boolean; pdfcropmargins: boolean }
-): string {
-  if (mimetype === TYPE_EPUB && device === 'Kindle' && options.kindlegen) {
+function predictConvertedFilename(sanitised: string, converter: EpubConversion | null): string {
+  if (converter === 'Kindle') {
     return sanitised.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.mobi');
   }
-  if (mimetype === TYPE_EPUB && device === 'Kobo' && options.kepubify) {
+  if (converter === 'Kobo') {
     return sanitised.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.kepub.epub');
   }
   return sanitised;
@@ -109,15 +106,57 @@ function uniqueFilename(name: string, existingNames: string[]): string {
 
 const FILE_TOO_LARGE = `File too large — the limit is ${formatLimit(MAX_FILE_SIZE)} per file.`;
 
+type ConversionOptions = { kindlegen: boolean; kepubify: boolean; pdfcropmargins: boolean };
+
+type EpubConversion = 'Kindle' | 'Kobo';
+
+function epubConverter(
+  mimetype: string,
+  device: Ereader | null,
+  options: ConversionOptions
+): EpubConversion | null {
+  if (mimetype !== TYPE_EPUB) {
+    return null;
+  }
+  if (device === 'Kindle' && options.kindlegen) {
+    return 'Kindle';
+  }
+  if (device === 'Kobo' && options.kepubify) {
+    return 'Kobo';
+  }
+  return null;
+}
+
+// kepubify v5 streams the book, so only kindling needs a cap on the number of entries.
+const MAX_KINDLE_ENTRIES = 10_000;
+const MAX_CONVERT_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
+
+async function fitsConversionLimits(
+  filePath: string,
+  conversion: EpubConversion
+): Promise<boolean> {
+  let entries;
+  try {
+    entries = await readZipEntries(filePath);
+  } catch {
+    return false;
+  }
+  const declared = entries.reduce((sum, e) => sum + e.uncompressedSize, 0);
+  if (conversion === 'Kobo') {
+    return declared <= MAX_CONVERT_UNCOMPRESSED_BYTES;
+  }
+  return entries.length <= MAX_KINDLE_ENTRIES && declared <= KINDLING_MAX_UNPACKED_BYTES;
+}
+
 async function runConversion(
   filePath: string,
   filename: string,
   mimetype: string,
-  device: Ereader | null,
-  options: { kindlegen: boolean; kepubify: boolean; pdfcropmargins: boolean },
+  converter: EpubConversion | null,
+  options: ConversionOptions,
   key: string
 ): Promise<{ convertedPath: string; conversionTool: string | null; filename: string }> {
-  if (mimetype === TYPE_EPUB && device === 'Kindle' && options.kindlegen) {
+  if (converter === 'Kindle') {
     const useKindlegen = KINDLE_CONVERTER === 'kindlegen';
     const conversionTool = useKindlegen ? 'KindleGen' : 'Kindling';
     const newFilename = filename.replace(/\.kepub\.epub$/i, '.epub').replace(/\.epub$/i, '.mobi');
@@ -128,7 +167,7 @@ async function runConversion(
     logger.info({ key, tool: conversionTool }, 'Conversion succeeded');
     return { convertedPath, conversionTool, filename: newFilename };
   }
-  if (mimetype === TYPE_EPUB && device === 'Kobo' && options.kepubify) {
+  if (converter === 'Kobo') {
     const conversionTool = 'Kepubify';
     const newFilename = filename
       .replace(/\.kepub\.epub$/i, '.epub')
@@ -296,14 +335,6 @@ export function makeUploadRouter(
           return;
         }
 
-        if (info.files.length + info.pendingUploads >= MAX_FILES_PER_KEY) {
-          res.status(400).json({
-            error: `File limit reached - this session supports up to ${MAX_FILES_PER_KEY} files`,
-          });
-          deleteFile(req.file.path);
-          return;
-        }
-
         const conversionOptions = {
           kindlegen: !!req.body?.kindlegen,
           kepubify: !!req.body?.kepubify,
@@ -316,7 +347,30 @@ export function makeUploadRouter(
           isKindle: device === 'Kindle',
         });
 
-        const predicted = predictConvertedFilename(sanitised, mimetype, device, conversionOptions);
+        const converter = epubConverter(mimetype, device, conversionOptions);
+        if (converter && !(await fitsConversionLimits(req.file.path, converter))) {
+          logger.warn(
+            { key, tool: converter, size: req.file.size },
+            'Upload rejected: EPUB too large to convert'
+          );
+          const option = `${converter} format`;
+          res.status(422).json({
+            error: `\u201c${req.file.originalname}\u201d is too large to convert. Turn off \u201c${option}\u201d and send it again.`,
+          });
+          deleteFile(req.file.path);
+          return;
+        }
+
+        // No await between this check and reserving the slot below.
+        if (info.files.length + info.pendingUploads >= MAX_FILES_PER_KEY) {
+          res.status(400).json({
+            error: `File limit reached - this session supports up to ${MAX_FILES_PER_KEY} files`,
+          });
+          deleteFile(req.file.path);
+          return;
+        }
+
+        const predicted = predictConvertedFilename(sanitised, converter);
         const finalName = uniqueFilename(predicted, [
           ...info.files.map((f) => f.name),
           ...info.pendingFilenames,
@@ -348,7 +402,7 @@ export function makeUploadRouter(
               req.file.path,
               sanitised,
               mimetype,
-              device,
+              converter,
               conversionOptions,
               key
             ));

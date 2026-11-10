@@ -20,6 +20,8 @@ Optional conversions (requires external tools — see below):
 - PDF margin cropping (via pdfCropMargins) — fills more of the small screen
 - Update EPUB metadata from Google Books — patches title, author, publisher, etc. and shows a before/after diff on the download page (requires a `GOOGLE_BOOKS_API_KEY`)
 
+EPUBs over 512 MiB uncompressed are sent without conversion only. For Kindle, the limit is 256 MiB and 10,000 files inside.
+
 ## Running locally
 
 ### Prerequisites

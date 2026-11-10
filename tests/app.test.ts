@@ -1366,6 +1366,186 @@ describe('POST /upload — metadata with Kindle conversion', () => {
   });
 });
 
+describe('POST /upload — EPUBs too large to convert or read', () => {
+  const KOBO = 'Mozilla/5.0 (Linux; Kobo Touch 4.39)';
+  const KINDLE = 'Mozilla/5.0 (X11; Linux armv7l) Kindle/3.0';
+  const CONTAINER = `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`;
+  const OPF = `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Original Title</dc:title>
+  </metadata>
+</package>`;
+
+  function baseEpub(): JSZip {
+    return new JSZip()
+      .file('mimetype', 'application/epub+zip', { compression: 'STORE' })
+      .file('META-INF/container.xml', CONTAINER)
+      .file('OEBPS/content.opf', OPF);
+  }
+
+  /** An EPUB whose index declares a chapter this large, which only takes a few bytes to send. */
+  async function hugeDeclaredEpub(declaredBytes = 600 * 1024 * 1024): Promise<Buffer> {
+    const buf = await baseEpub()
+      .file('OEBPS/chapter.xhtml', 'x')
+      .generateAsync({ type: 'nodebuffer' });
+    const nameAt = buf.lastIndexOf(Buffer.from('OEBPS/chapter.xhtml'));
+    buf.writeUInt32LE(declaredBytes, nameAt - 46 + 24);
+    return buf;
+  }
+
+  async function manyEntriesEpub(): Promise<Buffer> {
+    const zip = baseEpub();
+    for (let i = 0; i < 10_000; i++) {
+      zip.file(`OEBPS/images/${i}.png`, '');
+    }
+    return zip.generateAsync({ type: 'nodebuffer' });
+  }
+
+  async function upload(agent: string, epub: Buffer, fields: Record<string, string>) {
+    const { app, keys, key } = await generateKey(agent);
+    let req = request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key);
+    for (const [name, value] of Object.entries(fields)) {
+      req = req.field(name, value);
+    }
+    const res = await req.attach('file', epub, {
+      filename: 'book.epub',
+      contentType: 'application/epub+zip',
+    });
+    return { res, keys, key };
+  }
+
+  it('refuses a Kindle conversion of an EPUB with too many entries, but not a Kobo one', async () => {
+    const epub = await manyEntriesEpub();
+    const kindle = await upload(KINDLE, epub, { kindlegen: '1' });
+    assert.strictEqual(kindle.res.status, 422);
+    assert.match(kindle.res.body.error, /book\.epub/);
+    assert.match(kindle.res.body.error, /Turn off \u201cKindle format\u201d/);
+
+    const kobo = await upload(KOBO, epub, { kepubify: 'true' });
+    assert.notStrictEqual(kobo.res.status, 422, 'a Kobo conversion has no entry limit');
+  });
+
+  it('refuses a Kobo conversion of an EPUB declaring more than 512 MiB', async () => {
+    const { res } = await upload(KOBO, await hugeDeclaredEpub(), { kepubify: 'true' });
+    assert.strictEqual(res.status, 422);
+    assert.match(res.body.error, /book\.epub/);
+    assert.match(res.body.error, /Turn off \u201cKobo format\u201d/);
+  });
+
+  it('refuses a Kindle conversion of an EPUB declaring more than 512 MiB', async () => {
+    const { res } = await upload(KINDLE, await hugeDeclaredEpub(), { kindlegen: '1' });
+    assert.strictEqual(res.status, 422);
+    assert.match(res.body.error, /Turn off \u201cKindle format\u201d/);
+  });
+
+  it('holds Kindle conversions to the 256 MiB that kindling will unpack', async () => {
+    const epub = await hugeDeclaredEpub(300 * 1024 * 1024);
+    const kindle = await upload(KINDLE, epub, { kindlegen: '1' });
+    assert.strictEqual(kindle.res.status, 422);
+    assert.match(kindle.res.body.error, /Turn off \u201cKindle format\u201d/);
+
+    const kobo = await upload(KOBO, epub, { kepubify: 'true' });
+    assert.notStrictEqual(kobo.res.status, 422, 'a Kobo conversion has the 512 MiB limit');
+  });
+
+  it('lets only one of two simultaneous conversions take the last file slot', async () => {
+    const { app, keys, key } = await generateKey(KOBO);
+    keys.get(key)!.files = Array.from({ length: MAX_FILES_PER_KEY - 1 }, (_, i) => ({
+      name: `staged-${i}.epub`,
+      path: `/tmp/nonexistent-${i}.epub`,
+      size: 0,
+      uploaded: new Date(),
+      downloadTimer: null,
+    }));
+    const epub = await baseEpub().generateAsync({ type: 'nodebuffer' });
+    const send = () =>
+      request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .field('key', key)
+        .field('kepubify', 'true')
+        .attach('file', epub, { filename: 'book.epub', contentType: 'application/epub+zip' });
+
+    // Conversions must succeed, or the first upload frees its slot before the second arrives.
+    const fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-kepubify-'));
+    await fs.writeFile(path.join(fakeBinDir, 'kepubify'), '#!/bin/sh\ncp "$5" "$4"\n');
+    await fs.chmod(path.join(fakeBinDir, 'kepubify'), 0o755);
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${fakeBinDir}${path.delimiter}${originalPath}`;
+    try {
+      const statuses = (await Promise.all([send(), send()])).map((r) => r.status);
+      assert.deepStrictEqual(statuses.sort(), [200, 400]);
+      assert.strictEqual(keys.get(key)!.files.length, MAX_FILES_PER_KEY);
+    } finally {
+      process.env.PATH = originalPath;
+      await fs.rm(fakeBinDir, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts the same EPUBs when no conversion is asked for', async () => {
+    for (const epub of [await manyEntriesEpub(), await hugeDeclaredEpub()]) {
+      const { res, keys, key } = await upload(KOBO, epub, {});
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(keys.get(key)!.files.length, 1);
+    }
+  });
+
+  describe('metadata', () => {
+    let originalFetch: typeof global.fetch;
+    let fetched = false;
+
+    before(() => {
+      originalFetch = global.fetch;
+      global.fetch = async () => {
+        fetched = true;
+        return Response.json({ items: [{ volumeInfo: { title: 'Fetched Title' } }] });
+      };
+    });
+
+    after(() => {
+      global.fetch = originalFetch;
+    });
+
+    // Stored uncompressed, so the padding counts in full against the compressed-size limit.
+    const padding = `<!-- ${'x'.repeat(70 * 1024)} -->`;
+    const cases: [string, JSZip][] = [
+      [
+        'container.xml',
+        baseEpub().file('META-INF/container.xml', CONTAINER + padding, { compression: 'STORE' }),
+      ],
+      ['OPF', baseEpub().file('OEBPS/content.opf', OPF + padding, { compression: 'STORE' })],
+    ];
+
+    for (const [name, zip] of cases) {
+      it(`skips the lookup when the ${name} is over 64 KiB compressed`, async () => {
+        fetched = false;
+        const epub = await zip.generateAsync({ type: 'nodebuffer' });
+        const { res } = await upload(KOBO, epub, { fetchmetadata: '1' });
+        assert.strictEqual(res.status, 200);
+        assert.strictEqual(res.body.metadataFailed, true);
+        assert.strictEqual(fetched, false, 'Google Books was queried');
+      });
+    }
+
+    it('still looks up metadata for an ordinary EPUB', async () => {
+      fetched = false;
+      const epub = await baseEpub().generateAsync({ type: 'nodebuffer' });
+      const { res } = await upload(KOBO, epub, { fetchmetadata: '1' });
+      assert.strictEqual(res.body.metadataFailed, false);
+      assert.strictEqual(fetched, true);
+    });
+  });
+});
+
 describe('POST /upload — session ends while the upload is processed', () => {
   let originalFetch: typeof global.fetch;
 

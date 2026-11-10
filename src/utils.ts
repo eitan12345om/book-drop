@@ -53,6 +53,15 @@ const ZIP_END_RECORD_SIZE = 22;
 // The end record is followed by a comment of at most 65,535 bytes.
 const ZIP_END_SEARCH_BYTES = ZIP_END_RECORD_SIZE + 0xffff;
 
+const ZIP_DIR_SIGNATURE = 0x02014b50;
+const ZIP_DIR_HEADER_SIZE = 46;
+/** Value of a size, offset or count field whose real value is in a ZIP64 record. */
+const ZIP64_U16 = 0xffff;
+const ZIP64_U32 = 0xffffffff;
+// About 400 bytes for each of the 10,000 entries a Kindle conversion allows; a real EPUB's
+// index needs about 120 per entry.
+export const MAX_ZIP_INDEX_BYTES = 4 * 1024 * 1024;
+
 export async function hasZipEndRecord(filePath: string): Promise<boolean> {
   const handle = await fsp.open(filePath, 'r');
   try {
@@ -64,6 +73,88 @@ export async function hasZipEndRecord(filePath: string): Promise<boolean> {
       return false;
     }
     return buf.lastIndexOf(ZIP_END_SIGNATURE, length - ZIP_END_RECORD_SIZE) !== -1;
+  } finally {
+    await handle.close();
+  }
+}
+
+export interface ZipEntry {
+  name: string;
+  compressedSize: number;
+  /** As the archive declares it; nothing checks it against the data. */
+  uncompressedSize: number;
+}
+
+/**
+ * Lists a zip's entries from its central directory without inflating anything.
+ * Throws if the file has no end record, its index is inconsistent, or it is ZIP64.
+ */
+export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
+  const handle = await fsp.open(filePath, 'r');
+  try {
+    const { size } = await handle.stat();
+    const tailStart = Math.max(0, size - ZIP_END_SEARCH_BYTES);
+    const tail = Buffer.alloc(size - tailStart);
+    await handle.read(tail, 0, tail.length, tailStart);
+
+    // The real end record is the one whose comment runs exactly to the end of the file.
+    let end = tail.length - ZIP_END_RECORD_SIZE;
+    while (
+      end >= 0 &&
+      !(
+        tail.readUInt32LE(end) === ZIP_END_SIGNATURE.readUInt32LE(0) &&
+        end + ZIP_END_RECORD_SIZE + tail.readUInt16LE(end + 20) === tail.length
+      )
+    ) {
+      // A negative offset would make lastIndexOf search from the end again.
+      end = end === 0 ? -1 : tail.lastIndexOf(ZIP_END_SIGNATURE, end - 1);
+    }
+    if (end < 0) {
+      throw new Error('Not a zip archive');
+    }
+
+    const count = tail.readUInt16LE(end + 10);
+    const dirSize = tail.readUInt32LE(end + 12);
+    const dirOffset = tail.readUInt32LE(end + 16);
+    if (count === ZIP64_U16 || dirSize === ZIP64_U32 || dirOffset === ZIP64_U32) {
+      throw new Error('ZIP64 archives are not supported');
+    }
+    if (dirOffset + dirSize > tailStart + end) {
+      throw new Error('Corrupt zip index: it lies past the end of the file');
+    }
+    if (dirSize > MAX_ZIP_INDEX_BYTES) {
+      throw new Error('Zip index is too large to read');
+    }
+
+    const dir = Buffer.alloc(dirSize);
+    await handle.read(dir, 0, dirSize, dirOffset);
+    const entries: ZipEntry[] = [];
+    let pos = 0;
+    for (let i = 0; i < count; i++) {
+      if (pos + ZIP_DIR_HEADER_SIZE > dirSize || dir.readUInt32LE(pos) !== ZIP_DIR_SIGNATURE) {
+        throw new Error('Corrupt zip index');
+      }
+      const compressedSize = dir.readUInt32LE(pos + 20);
+      const uncompressedSize = dir.readUInt32LE(pos + 24);
+      if (compressedSize === ZIP64_U32 || uncompressedSize === ZIP64_U32) {
+        throw new Error('ZIP64 archives are not supported');
+      }
+      const nameStart = pos + ZIP_DIR_HEADER_SIZE;
+      const nameEnd = nameStart + dir.readUInt16LE(pos + 28);
+      if (nameEnd > dirSize) {
+        throw new Error('Corrupt zip index');
+      }
+      entries.push({
+        name: dir.toString('utf8', nameStart, nameEnd),
+        compressedSize,
+        uncompressedSize,
+      });
+      pos = nameEnd + dir.readUInt16LE(pos + 30) + dir.readUInt16LE(pos + 32);
+    }
+    if (pos !== dirSize) {
+      throw new Error('Corrupt zip index: its entries and its end record disagree');
+    }
+    return entries;
   } finally {
     await handle.close();
   }
@@ -280,7 +371,18 @@ export async function fetchGoogleBooksMetadata(
   return result;
 }
 
+const MAX_METADATA_ENTRY_BYTES = 64 * 1024;
+
 export async function updateEpubMetadata(filePath: string): Promise<MetadataDiff> {
+  // JSZip inflates an entry in full before anything can check its size.
+  const oversized = (await readZipEntries(filePath)).find(
+    (e) =>
+      (e.name === 'META-INF/container.xml' || e.name.toLowerCase().endsWith('.opf')) &&
+      e.compressedSize > MAX_METADATA_ENTRY_BYTES
+  );
+  if (oversized) {
+    throw new Error(`EPUB metadata entry too large: ${oversized.name}`);
+  }
   const before = await readEpubMetadata(filePath);
   const fetched = await fetchGoogleBooksMetadata(before.title ?? '', before.creator ?? '');
   await writeEpubMetadata(filePath, fetched);
