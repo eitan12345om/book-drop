@@ -6,7 +6,7 @@ const TOOLS = [
   {
     name: 'kepubify',
     repo: 'pgaskin/kepubify',
-    pattern: /github\.com\/pgaskin\/kepubify\/v\d+\/cmd\/kepubify@v(\S+)/,
+    pattern: /github\.com\/pgaskin\/kepubify\/v\d+(?:\/cmd\/kepubify)?@v(\S+)/,
   },
 ];
 

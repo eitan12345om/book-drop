@@ -1,5 +1,5 @@
 FROM golang:alpine AS kepubify-builder
-RUN go install github.com/pgaskin/kepubify/v4/cmd/kepubify@v4.0.4
+RUN go install github.com/pgaskin/kepubify/v5@v5.0.0
 
 # No Linux arm64 release binary is published, so it is built from the pinned crate.
 FROM rust:alpine AS kindling-builder
