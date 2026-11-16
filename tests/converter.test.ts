@@ -10,6 +10,7 @@ import {
   convertWithKindling,
   convertWithKepubify,
   convertWithPdfCropMargins,
+  failureMessage,
 } from '../src/converter.js';
 
 // These tests pass a non-existent file to each converter. If the tool is not installed,
@@ -48,6 +49,57 @@ async function stageUpload(
   await fs.writeFile(input, book ?? (await epubClaiming(7)));
   return { uploadDir, input };
 }
+
+async function userMessageFor(
+  tool: string,
+  output: string,
+  convert: (input: string) => Promise<string>,
+  name?: string
+): Promise<string> {
+  const { uploadDir, input } = await stageUpload(name);
+  let message = '';
+  try {
+    await withFakeTool(tool, `#!/bin/sh\ncat <<'EOF'\n${output}\nEOF\nexit 1\n`, async () => {
+      await assert.rejects(
+        () => convert(input),
+        (err: ConversionError) => {
+          assert.ok(err instanceof ConversionError);
+          message = err.userMessage;
+          return true;
+        }
+      );
+    });
+  } finally {
+    await fs.rm(uploadDir, { recursive: true, force: true });
+  }
+  return message;
+}
+
+describe('failureMessage', () => {
+  const failures = {
+    known: [[/zip: checksum error/, 'This file is corrupted.']] as [RegExp, string][],
+    otherwise: 'Conversion failed.',
+  };
+
+  it('gives the general message for a timeout', () => {
+    assert.strictEqual(
+      failureMessage(failures, 'kepubify timed out after 55000 ms'),
+      'Conversion failed.'
+    );
+  });
+
+  it('blames the server when it could not start the converter', () => {
+    for (const output of [
+      'kepubify spawn error: spawn kepubify ENOENT',
+      'choom exited with code 127\nchoom: failed to execute kepubify: No such file or directory',
+    ]) {
+      assert.strictEqual(
+        failureMessage(failures, output),
+        'Something went wrong on the server. Try again later.'
+      );
+    }
+  });
+});
 
 describe('convertWithKindlegen', () => {
   it('rejects with an error when kindlegen is not available or the file is invalid', async () => {
@@ -206,6 +258,67 @@ describe('convertWithKepubify', () => {
         );
         return true;
       }
+    );
+  });
+
+  const CORRUPTED = 'This file is corrupted. Download it again or repair it in Calibre.';
+  const FAILED = 'Conversion failed. Try resending the file or repairing it in Calibre.';
+
+  it('says a book whose contents are partly blank is corrupted', async () => {
+    const output = `Kepubify v5.0.0
+
+[  1/  1] Converting infile.epub
+          => outfile.kepub.epub
+          Error (1): copy "OEBPS/images/fig7-1-2.jpg" to output EPUB: zip: not a valid zip file`;
+    assert.strictEqual(await userMessageFor('kepubify', output, convertWithKepubify), CORRUPTED);
+  });
+
+  it('says a book whose contents list is missing is corrupted', async () => {
+    const output =
+      'Error (1): read source EPUB: parse OCF container: open META-INF/container.xml: file does not exist';
+    assert.strictEqual(await userMessageFor('kepubify', output, convertWithKepubify), CORRUPTED);
+  });
+
+  it('gives the general message when kepubify fails for an unknown reason', async () => {
+    assert.strictEqual(
+      await userMessageFor('kepubify', 'Error (1): something new', convertWithKepubify),
+      FAILED
+    );
+  });
+});
+
+describe('convertWithKindling failure messages', () => {
+  it('gives the general message when kindling rejects the MOBI it built', async () => {
+    const output =
+      'Error: MOBI readback check failed: 1 P0 errors. Built MOBI at out.mobi may be corrupted, not shipping.';
+    assert.strictEqual(
+      await userMessageFor('kindling-cli', output, convertWithKindling),
+      'Conversion failed. Try resending the file or repairing it in Calibre.'
+    );
+  });
+});
+
+describe('convertWithPdfCropMargins failure messages', () => {
+  const pdf = 'file-1700000000000-abc.pdf';
+
+  it('says a password-protected PDF cannot be cropped', async () => {
+    const output =
+      "Error in pdfCropMargins: The document is encrypted and the empty password does not work.  Try passing in a password with the '--password' option.";
+    assert.strictEqual(
+      await userMessageFor('pdfcropmargins', output, convertWithPdfCropMargins, pdf),
+      'This PDF is password-protected. Remove the password and try again.'
+    );
+  });
+
+  it('says a PDF that cannot be parsed is damaged', async () => {
+    assert.match(
+      await userMessageFor(
+        'pdfcropmargins',
+        'Error message   :  code=7: cannot parse object (3126 0 R)',
+        convertWithPdfCropMargins,
+        pdf
+      ),
+      /^This PDF is damaged or non-standard/
     );
   });
 });

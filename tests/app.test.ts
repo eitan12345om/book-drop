@@ -642,36 +642,54 @@ describe('POST /upload', () => {
     assert.match(res.body.error, /URL limit/i);
   });
 
+  async function withFailingKepubify(fn: () => Promise<void>): Promise<void> {
+    const fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-kepubify-'));
+    await fs.writeFile(path.join(fakeBinDir, 'kepubify'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${fakeBinDir}${path.delimiter}${originalPath}`;
+    try {
+      await fn();
+    } finally {
+      process.env.PATH = originalPath;
+      await fs.rm(fakeBinDir, { recursive: true, force: true });
+    }
+  }
+
   it('returns 500 with a generic message when conversion fails', async () => {
-    // Relies on kepubify not being installed in the test environment.
     const { app, key } = await generateKey('Kobo/1.0 Test');
-    const res = await request(app)
-      .post('/upload')
-      .set('X-Requested-With', 'XMLHttpRequest')
-      .set('User-Agent', 'Kobo/1.0 Test')
-      .field('key', key)
-      .field('kepubify', 'true')
-      .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
-        filename: 'book.epub',
-        contentType: 'application/epub+zip',
-      });
-    assert.strictEqual(res.status, 500);
-    assert.strictEqual(res.body.error, 'Conversion failed');
+    await withFailingKepubify(async () => {
+      const res = await request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .set('User-Agent', 'Kobo/1.0 Test')
+        .field('key', key)
+        .field('kepubify', 'true')
+        .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
+          filename: 'book.epub',
+          contentType: 'application/epub+zip',
+        });
+      assert.strictEqual(res.status, 500);
+      assert.strictEqual(
+        res.body.error,
+        'Conversion failed. Try resending the file or repairing it in Calibre.'
+      );
+    });
   });
 
   it('attempts the Kobo conversion for a Kobo whose user-agent is upper-case', async () => {
     const { app, key } = await generateKey('KOBO/1.0 Test');
-    const res = await request(app)
-      .post('/upload')
-      .set('X-Requested-With', 'XMLHttpRequest')
-      .field('key', key)
-      .field('kepubify', 'true')
-      .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
-        filename: 'book.epub',
-        contentType: 'application/epub+zip',
-      });
-    assert.strictEqual(res.status, 500);
-    assert.strictEqual(res.body.error, 'Conversion failed');
+    await withFailingKepubify(async () => {
+      const res = await request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .field('key', key)
+        .field('kepubify', 'true')
+        .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
+          filename: 'book.epub',
+          contentType: 'application/epub+zip',
+        });
+      assert.strictEqual(res.status, 500);
+    });
   });
 
   it('names a Tolino in the success response', async () => {
@@ -743,6 +761,24 @@ describe('POST /upload', () => {
         filename: 'book.epub',
         contentType: 'application/epub+zip',
       });
+    assert.strictEqual(res.status, 422);
+    assert.match(res.body.error, /\u201cbook\.epub\u201d isn\u2019t a valid EPUB/);
+    assert.strictEqual(keys.get(key)!.files.length, 0);
+  });
+
+  it('returns 422 for an EPUB whose index arrived but part of its body is blank', async () => {
+    const { app, keys, key } = await generateKey('Kobo/1.0 Test');
+    const epub = await new JSZip()
+      .file('mimetype', 'application/epub+zip', { compression: 'STORE' })
+      .file('OEBPS/images/fig.jpg', 'x'.repeat(1000), { createFolders: false })
+      .generateAsync({ type: 'nodebuffer' });
+    const imageAt = epub.indexOf('PK\x03\x04', 1, 'latin1');
+    epub.fill(0, imageAt, imageAt + 100);
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', epub, { filename: 'book.epub', contentType: 'application/epub+zip' });
     assert.strictEqual(res.status, 422);
     assert.match(res.body.error, /\u201cbook\.epub\u201d isn\u2019t a valid EPUB/);
     assert.strictEqual(keys.get(key)!.files.length, 0);

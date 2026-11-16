@@ -116,6 +116,44 @@ function sanitizeOutput(message: string, ...replacements: [string, string][]): s
   return replacements.reduce((msg, [from, to]) => msg.replaceAll(from, to), message);
 }
 
+// The bug-report link copies these into a public issue, so they never name the file.
+interface Failures {
+  known: [RegExp, string][];
+  otherwise: string;
+}
+
+const EPUB_FAILURES: Failures = {
+  known: [
+    [
+      /zip: not a valid zip file|zip: checksum error|flate: corrupt input|unexpected EOF|negative offset|larger than its declared uncompressed size|invalid Zip archive|parse OCF container|parse OPF package|No \.opf file found/,
+      'This file is corrupted. Download it again or repair it in Calibre.',
+    ],
+  ],
+  otherwise: 'Conversion failed. Try resending the file or repairing it in Calibre.',
+};
+
+const PDF_FAILURES: Failures = {
+  known: [
+    [/document is encrypted/, 'This PDF is password-protected. Remove the password and try again.'],
+    [
+      /could not read the document|cannot parse object|invalid key in dict|zero pages/,
+      'This PDF is damaged or non-standard, so it can\u2019t be cropped. Re-save it with \u201cPrint to PDF\u201d and try again.',
+    ],
+  ],
+  otherwise: 'PDF cropping failed. Try again or send it without \u201cCrop PDF margins\u201d.',
+};
+
+export function failureMessage({ known, otherwise }: Failures, output: string): string {
+  // choom and prlimit report a converter they can't run as a failure of their own.
+  if (/^\S+ spawn error:|failed to execute/.test(output)) {
+    return 'Something went wrong on the server. Try again later.';
+  }
+  if (/^\S+ (timed out after|was killed by) /.test(output)) {
+    return otherwise;
+  }
+  return known.find(([pattern]) => pattern.test(output))?.[1] ?? otherwise;
+}
+
 export async function convertWithKindlegen(inputPath: string): Promise<string> {
   const outPath = inputPath.replace(/\.epub$/i, '.mobi');
   const mobi8Path = inputPath.replace(/\.epub$/i, '.mobi8');
@@ -139,12 +177,13 @@ export async function convertWithKindlegen(inputPath: string): Promise<string> {
       [basename(outPath), 'outfile.mobi']
     );
     const reason = kindlegenErrorReason(msg);
-    if (reason) {
-      throw new ConversionError(msg, `KindleGen couldn't convert this EPUB: ${reason}`, {
-        cause: err,
-      });
-    }
-    throw new Error(msg, { cause: err });
+    throw new ConversionError(
+      msg,
+      reason
+        ? `KindleGen couldn't convert this EPUB: ${reason}`
+        : failureMessage(EPUB_FAILURES, msg),
+      { cause: err }
+    );
   } finally {
     await deleteFile(inputPath);
     await deleteFile(mobi8Path);
@@ -203,6 +242,12 @@ export async function convertWithKindling(inputPath: string): Promise<string> {
     });
     await fs.rename(workOutput, outPath);
     return outPath;
+  } catch (err) {
+    if (err instanceof ConversionError) {
+      throw err;
+    }
+    const msg = (err as Error).message;
+    throw new ConversionError(msg, failureMessage(EPUB_FAILURES, msg), { cause: err });
   } finally {
     if (!moved) {
       await deleteFile(inputPath);
@@ -229,7 +274,7 @@ export async function convertWithKepubify(inputPath: string): Promise<string> {
       [basename(inputPath), 'infile.epub'],
       [basename(outPath), 'outfile.kepub.epub']
     );
-    throw new Error(msg, { cause: err });
+    throw new ConversionError(msg, failureMessage(EPUB_FAILURES, msg), { cause: err });
   } finally {
     await deleteFile(inputPath);
   }
@@ -253,7 +298,7 @@ export async function convertWithPdfCropMargins(inputPath: string): Promise<stri
       [basename(inputPath), 'infile.pdf'],
       [basename(outPath), 'outfile.pdf']
     );
-    throw new Error(msg, { cause: err });
+    throw new ConversionError(msg, failureMessage(PDF_FAILURES, msg), { cause: err });
   } finally {
     await deleteFile(inputPath);
   }
