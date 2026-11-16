@@ -39,6 +39,7 @@ import {
   doTransliterate,
   updateEpubMetadata,
   hasZipEndRecord,
+  firstMissingZipEntry,
   readZipEntries,
   invalidEpubMessage,
   detectEreader,
@@ -315,14 +316,18 @@ export function makeUploadRouter(
 
         const isEpub =
           mimetype === TYPE_EPUB || path.extname(req.file.originalname).toLowerCase() === '.epub';
-        if (isEpub && !(await hasZipEndRecord(req.file.path))) {
-          logger.warn(
-            { key, mimetype, detectedMime, size: req.file.size },
-            'Upload rejected: invalid EPUB'
-          );
-          res.status(422).json({ error: invalidEpubMessage(req.file.originalname) });
-          deleteFile(req.file.path);
-          return;
+        if (isEpub) {
+          const hasEndRecord = await hasZipEndRecord(req.file.path);
+          const missingEntry = hasEndRecord ? await firstMissingZipEntry(req.file.path) : null;
+          if (!hasEndRecord || missingEntry) {
+            logger.warn(
+              { key, mimetype, detectedMime, size: req.file.size, missingEntry },
+              'Upload rejected: invalid EPUB'
+            );
+            res.status(422).json({ error: invalidEpubMessage(req.file.originalname) });
+            deleteFile(req.file.path);
+            return;
+          }
         }
 
         if (!ALLOWED_TYPES.has(mimetype) && !(detectedMime && ALLOWED_TYPES.has(detectedMime))) {

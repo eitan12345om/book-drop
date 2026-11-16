@@ -83,6 +83,7 @@ export interface ZipEntry {
   compressedSize: number;
   /** As the archive declares it; nothing checks it against the data. */
   uncompressedSize: number;
+  localHeaderOffset: number;
 }
 
 /**
@@ -136,7 +137,12 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
       }
       const compressedSize = dir.readUInt32LE(pos + 20);
       const uncompressedSize = dir.readUInt32LE(pos + 24);
-      if (compressedSize === ZIP64_U32 || uncompressedSize === ZIP64_U32) {
+      const localHeaderOffset = dir.readUInt32LE(pos + 42);
+      if (
+        compressedSize === ZIP64_U32 ||
+        uncompressedSize === ZIP64_U32 ||
+        localHeaderOffset === ZIP64_U32
+      ) {
         throw new Error('ZIP64 archives are not supported');
       }
       const nameStart = pos + ZIP_DIR_HEADER_SIZE;
@@ -148,6 +154,7 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
         name: dir.toString('utf8', nameStart, nameEnd),
         compressedSize,
         uncompressedSize,
+        localHeaderOffset,
       });
       pos = nameEnd + dir.readUInt16LE(pos + 30) + dir.readUInt16LE(pos + 32);
     }
@@ -155,6 +162,32 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
       throw new Error('Corrupt zip index: its entries and its end record disagree');
     }
     return entries;
+  } finally {
+    await handle.close();
+  }
+}
+
+const ZIP_LOCAL_SIGNATURE = 0x04034b50;
+
+// An index this can't read is left to the checks that need it.
+export async function firstMissingZipEntry(filePath: string): Promise<string | null> {
+  let entries: ZipEntry[];
+  try {
+    entries = await readZipEntries(filePath);
+  } catch {
+    return null;
+  }
+  const handle = await fsp.open(filePath, 'r');
+  try {
+    const signature = Buffer.alloc(4);
+    for (const entry of entries) {
+      signature.fill(0);
+      await handle.read(signature, 0, 4, entry.localHeaderOffset);
+      if (signature.readUInt32LE(0) !== ZIP_LOCAL_SIGNATURE) {
+        return entry.name;
+      }
+    }
+    return null;
   } finally {
     await handle.close();
   }

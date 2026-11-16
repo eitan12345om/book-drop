@@ -656,7 +656,7 @@ describe('POST /upload', () => {
         contentType: 'application/epub+zip',
       });
     assert.strictEqual(res.status, 500);
-    assert.strictEqual(res.body.error, 'Conversion failed');
+    assert.strictEqual(res.body.error, 'Something went wrong on the server. Try again later.');
   });
 
   it('attempts the Kobo conversion for a Kobo whose user-agent is upper-case', async () => {
@@ -671,7 +671,7 @@ describe('POST /upload', () => {
         contentType: 'application/epub+zip',
       });
     assert.strictEqual(res.status, 500);
-    assert.strictEqual(res.body.error, 'Conversion failed');
+    assert.match(res.body.error, /^Something went wrong on the server\./);
   });
 
   it('names a Tolino in the success response', async () => {
@@ -743,6 +743,24 @@ describe('POST /upload', () => {
         filename: 'book.epub',
         contentType: 'application/epub+zip',
       });
+    assert.strictEqual(res.status, 422);
+    assert.match(res.body.error, /\u201cbook\.epub\u201d isn\u2019t a valid EPUB/);
+    assert.strictEqual(keys.get(key)!.files.length, 0);
+  });
+
+  it('returns 422 for an EPUB whose index arrived but part of its body is blank', async () => {
+    const { app, keys, key } = await generateKey('Kobo/1.0 Test');
+    const epub = await new JSZip()
+      .file('mimetype', 'application/epub+zip', { compression: 'STORE' })
+      .file('OEBPS/images/fig.jpg', 'x'.repeat(1000), { createFolders: false })
+      .generateAsync({ type: 'nodebuffer' });
+    const imageAt = epub.indexOf('PK\x03\x04', 1, 'latin1');
+    epub.fill(0, imageAt, imageAt + 100);
+    const res = await request(app)
+      .post('/upload')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .field('key', key)
+      .attach('file', epub, { filename: 'book.epub', contentType: 'application/epub+zip' });
     assert.strictEqual(res.status, 422);
     assert.match(res.body.error, /\u201cbook\.epub\u201d isn\u2019t a valid EPUB/);
     assert.strictEqual(keys.get(key)!.files.length, 0);

@@ -22,6 +22,7 @@ import {
   updateEpubMetadata,
   hasZipEndRecord,
   readZipEntries,
+  firstMissingZipEntry,
   MAX_ZIP_INDEX_BYTES,
 } from '../src/utils.js';
 
@@ -260,6 +261,40 @@ describe('hasZipEndRecord', () => {
 
   it('rejects a file too short to hold an end record', async () => {
     assert.strictEqual(await check(Buffer.from('PK\x05\x06')), false);
+  });
+});
+
+describe('firstMissingZipEntry', () => {
+  async function check(buf: Buffer): Promise<string | null> {
+    const tmpPath = path.join(os.tmpdir(), `test-${Date.now()}-${Math.random()}.epub`);
+    await fsp.writeFile(tmpPath, buf);
+    try {
+      return await firstMissingZipEntry(tmpPath);
+    } finally {
+      await fsp.unlink(tmpPath).catch(() => {});
+    }
+  }
+
+  const book = () =>
+    new JSZip()
+      .file('mimetype', 'application/epub+zip', { compression: 'STORE' })
+      .file('OEBPS/images/fig.jpg', 'x'.repeat(1000), { createFolders: false })
+      .file('OEBPS/chapter.xhtml', '<p>x</p>', { createFolders: false })
+      .generateAsync({ type: 'nodebuffer' });
+
+  it('finds nothing missing in an intact zip', async () => {
+    assert.strictEqual(await check(await book()), null);
+  });
+
+  it('names the entry whose local header is blank', async () => {
+    const buf = await book();
+    const imageAt = buf.indexOf('PK\x03\x04', 1, 'latin1');
+    buf.fill(0, imageAt, imageAt + 4);
+    assert.strictEqual(await check(buf), 'OEBPS/images/fig.jpg');
+  });
+
+  it('leaves an index it cannot read to the other checks', async () => {
+    assert.strictEqual(await check(Buffer.from('not a zip')), null);
   });
 });
 
