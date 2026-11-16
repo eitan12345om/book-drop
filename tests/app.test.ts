@@ -642,36 +642,54 @@ describe('POST /upload', () => {
     assert.match(res.body.error, /URL limit/i);
   });
 
+  async function withFailingKepubify(fn: () => Promise<void>): Promise<void> {
+    const fakeBinDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fake-kepubify-'));
+    await fs.writeFile(path.join(fakeBinDir, 'kepubify'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${fakeBinDir}${path.delimiter}${originalPath}`;
+    try {
+      await fn();
+    } finally {
+      process.env.PATH = originalPath;
+      await fs.rm(fakeBinDir, { recursive: true, force: true });
+    }
+  }
+
   it('returns 500 with a generic message when conversion fails', async () => {
-    // Relies on kepubify not being installed in the test environment.
     const { app, key } = await generateKey('Kobo/1.0 Test');
-    const res = await request(app)
-      .post('/upload')
-      .set('X-Requested-With', 'XMLHttpRequest')
-      .set('User-Agent', 'Kobo/1.0 Test')
-      .field('key', key)
-      .field('kepubify', 'true')
-      .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
-        filename: 'book.epub',
-        contentType: 'application/epub+zip',
-      });
-    assert.strictEqual(res.status, 500);
-    assert.strictEqual(res.body.error, 'Something went wrong on the server. Try again later.');
+    await withFailingKepubify(async () => {
+      const res = await request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .set('User-Agent', 'Kobo/1.0 Test')
+        .field('key', key)
+        .field('kepubify', 'true')
+        .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
+          filename: 'book.epub',
+          contentType: 'application/epub+zip',
+        });
+      assert.strictEqual(res.status, 500);
+      assert.strictEqual(
+        res.body.error,
+        'Conversion failed. Try resending the file or repairing it in Calibre.'
+      );
+    });
   });
 
   it('attempts the Kobo conversion for a Kobo whose user-agent is upper-case', async () => {
     const { app, key } = await generateKey('KOBO/1.0 Test');
-    const res = await request(app)
-      .post('/upload')
-      .set('X-Requested-With', 'XMLHttpRequest')
-      .field('key', key)
-      .field('kepubify', 'true')
-      .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
-        filename: 'book.epub',
-        contentType: 'application/epub+zip',
-      });
-    assert.strictEqual(res.status, 500);
-    assert.match(res.body.error, /^Something went wrong on the server\./);
+    await withFailingKepubify(async () => {
+      const res = await request(app)
+        .post('/upload')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .field('key', key)
+        .field('kepubify', 'true')
+        .attach('file', await new JSZip().generateAsync({ type: 'nodebuffer' }), {
+          filename: 'book.epub',
+          contentType: 'application/epub+zip',
+        });
+      assert.strictEqual(res.status, 500);
+    });
   });
 
   it('names a Tolino in the success response', async () => {

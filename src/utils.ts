@@ -168,6 +168,7 @@ export async function readZipEntries(filePath: string): Promise<ZipEntry[]> {
 }
 
 const ZIP_LOCAL_SIGNATURE = 0x04034b50;
+const ZIP_HEADER_WINDOW_BYTES = 64 * 1024;
 
 // An index this can't read is left to the checks that need it.
 export async function firstMissingZipEntry(filePath: string): Promise<string | null> {
@@ -177,14 +178,22 @@ export async function firstMissingZipEntry(filePath: string): Promise<string | n
   } catch {
     return null;
   }
+  entries.sort((a, b) => a.localHeaderOffset - b.localHeaderOffset);
   const handle = await fsp.open(filePath, 'r');
   try {
-    const signature = Buffer.alloc(4);
-    for (const entry of entries) {
-      signature.fill(0);
-      await handle.read(signature, 0, 4, entry.localHeaderOffset);
-      if (signature.readUInt32LE(0) !== ZIP_LOCAL_SIGNATURE) {
-        return entry.name;
+    const window = Buffer.alloc(ZIP_HEADER_WINDOW_BYTES);
+    let windowStart = 0;
+    let windowLength = 0;
+    for (const { name, localHeaderOffset: at } of entries) {
+      if (at + 4 > windowStart + windowLength) {
+        windowStart = at;
+        ({ bytesRead: windowLength } = await handle.read(window, 0, window.length, at));
+      }
+      if (
+        at + 4 > windowStart + windowLength ||
+        window.readUInt32LE(at - windowStart) !== ZIP_LOCAL_SIGNATURE
+      ) {
+        return name;
       }
     }
     return null;

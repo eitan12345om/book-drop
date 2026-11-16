@@ -293,6 +293,17 @@ describe('firstMissingZipEntry', () => {
     assert.strictEqual(await check(buf), 'OEBPS/images/fig.jpg');
   });
 
+  it('finds a blank header beyond the first chunk it reads', async () => {
+    const buf = await new JSZip()
+      .file('mimetype', 'application/epub+zip', { compression: 'STORE' })
+      .file('OEBPS/images/big.jpg', 'x'.repeat(100_000), { createFolders: false })
+      .file('OEBPS/chapter.xhtml', '<p>x</p>', { createFolders: false })
+      .generateAsync({ type: 'nodebuffer' });
+    const chapterAt = buf.lastIndexOf('PK\x03\x04', undefined, 'latin1');
+    buf.fill(0, chapterAt, chapterAt + 4);
+    assert.strictEqual(await check(buf), 'OEBPS/chapter.xhtml');
+  });
+
   it('leaves an index it cannot read to the other checks', async () => {
     assert.strictEqual(await check(Buffer.from('not a zip')), null);
   });
